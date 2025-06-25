@@ -1,0 +1,13 @@
+/* index.css - Base styles for the React app */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f5f7fa;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  color: #222;
+}
+
+#root {
+  min-height: 100vh;
+} 
