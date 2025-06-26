@@ -12,6 +12,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     const messagesEndRef = useRef(null);
     const sessionIdRef = useRef(null);
     const [error, setError] = useState('');
+    const lastEnterPressRef = useRef(0);
 
     // Generate a sessionId once per ChatBox instance
     useEffect(() => {
@@ -25,8 +26,13 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
         setSelectedModel('');
         if (!selectedServer) return;
         const fetchModels = async () => {
-            const result = await getModels(selectedServer);
-            setModels(result);
+            try {
+                const result = await getModels(selectedServer);
+                setModels(result);
+            } catch (err) {
+                console.error('Error fetching models:', err);
+                setError('Failed to fetch models. Please try again.');
+            }
         };
         fetchModels();
     }, [selectedServer]);
@@ -38,7 +44,9 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     }, [messages]);
 
     const handleSendMessage = async (e) => {
-        e.preventDefault();
+        if (e) {
+            e.preventDefault();
+        }
         if (!selectedServer) {
             setError('Please select a server before sending a message.');
             return;
@@ -66,6 +74,22 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
 
     // Clear error when user selects server/model or types
     useEffect(() => { setError(''); }, [selectedServer, selectedModel]);
+    
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const now = Date.now();
+            const timeSinceLastEnter = now - lastEnterPressRef.current;
+            
+            if (timeSinceLastEnter <= 500) { // 500ms window for double Enter
+                handleSendMessage();
+                lastEnterPressRef.current = 0; // Reset the timer
+            } else {
+                lastEnterPressRef.current = now;
+            }
+        }
+    };
+
     const handleInputChange = (e) => {
         setInput(e.target.value);
         if (error) setError('');
@@ -99,7 +123,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                     >
                         <option value="" disabled>Select a model</option>
                         {models.map(model => (
-                            <option key={model} value={model}>{model}</option>
+                            <option key={model.name} value={model.name}>{model.name}</option>
                         ))}
                     </select>
                 )}
@@ -122,7 +146,8 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                         <textarea
                             value={input}
                             onChange={handleInputChange}
-                            placeholder="Enter a prompt..."
+                            onKeyPress={handleKeyPress}
+                            placeholder="Enter a prompt... (Press Enter twice to send)"
                             rows={4}
                             className="input-textarea"
                         />

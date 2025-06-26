@@ -37,13 +37,27 @@ backend/
    ```sh
    mvn clean verify
    ```
-2. **Run the backend app:**
+2. **Ensure Ollama is running:**
+   - Install Ollama from [ollama.ai/download](https://ollama.ai/download)
+   - Pull your preferred model: `ollama pull llama2`
+   - Start the server: `ollama serve`
+   - The default configuration expects Ollama at `http://localhost:11434`
+
+3. **Run the backend app:**
    ```sh
    cd app
    mvn spring-boot:run
    ```
-3. **Configuration:**
-   - Edit `app/src/main/resources/application.properties` to set Ollama API, CORS, and other properties.
+4. **Configuration:**
+   - Edit `app/src/main/resources/application.properties` to configure:
+     ```properties
+     # Ollama Configuration
+     ollama.api.url=http://localhost:11434  # Ollama API endpoint
+     ollama.model.name=llama2               # Model to use
+     ollama.timeout=120                     # Request timeout in seconds
+     
+     # CORS and other properties...
+     ```
 
 ## Code Quality & Formatting (Parent-Enforced)
 - **Checkstyle** (Google Java Style):

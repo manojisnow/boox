@@ -4,6 +4,31 @@ This project is a full-stack chat application featuring a React frontend and a S
 
 ---
 
+## Prerequisites
+
+### Required
+- **Ollama**: This application requires Ollama to be installed and running locally
+  - [Install Ollama](https://ollama.ai/download)
+  - After installation, pull the required model:
+    ```sh
+    ollama pull llama2  # or your preferred model
+    ```
+  - Start the Ollama server:
+    ```sh
+    ollama serve
+    ```
+  - The server will be available at `http://localhost:11434` by default
+
+### Development
+- Java 17 (LTS)
+- Maven 3.8+
+- Docker (for integration tests)
+- Node.js & npm (for frontend)
+
+> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it.
+
+---
+
 ## Repository Structure
 
 - [`backend/`](backend/README.md): Multi-module Spring Boot Java backend (API, AI, config, code quality, test separation)
