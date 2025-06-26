@@ -2,14 +2,15 @@ package com.example.chatapp.engine;
 
 import org.springframework.stereotype.Service;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class InMemoryChatContextService implements ChatContextService {
-    private final Map<String, List<Map<String, String>>> chatContexts = new HashMap<>();
+    private final Map<String, List<Map<String, String>>> chatContexts = new ConcurrentHashMap<>();
 
     @Override
     public List<Map<String, String>> getContext(String sessionId) {
-        return chatContexts.computeIfAbsent(sessionId, k -> new ArrayList<>());
+        return chatContexts.computeIfAbsent(sessionId, k -> Collections.synchronizedList(new ArrayList<>()));
     }
 
     @Override
