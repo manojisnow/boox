@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.29">
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/Application.java">
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/SendMessageRequest.java">
+<error line="14" column="32" severity="warning" message="&apos;}&apos; at column 32 should be alone on a line." source="RightCurlyAlone"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/GlobalExceptionHandler.java">
+<error line="15" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="27" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/ChatController.java">
+<error line="10" severity="warning" message="Using the &apos;.*&apos; form of import should be avoided - org.springframework.web.bind.annotation.*." source="com.puppycrawl.tools.checkstyle.checks.imports.AvoidStarImportCheck"/>
+<error line="39" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="47" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="55" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/ResetContextRequest.java">
+<error line="10" column="33" severity="warning" message="&apos;}&apos; at column 33 should be alone on a line." source="RightCurlyAlone"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/CorsConfig.java">
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/service/ChatService.java">
+<error line="7" severity="warning" message="Using the &apos;.*&apos; form of import should be avoided - java.util.*." source="com.puppycrawl.tools.checkstyle.checks.imports.AvoidStarImportCheck"/>
+<error line="28" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="38" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="54" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="66" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/OllamaChatEngine.java">
+<error line="47" column="3" severity="warning" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+<error line="115" severity="warning" message="&apos;if&apos; construct must use &apos;{}&apos;s." source="com.puppycrawl.tools.checkstyle.checks.blocks.NeedBracesCheck"/>
+<error line="162" severity="warning" message="Line is longer than 100 characters (found 113)." source="com.puppycrawl.tools.checkstyle.checks.sizes.LineLengthCheck"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/InMemoryChatContextService.java">
+<error line="3" severity="warning" message="Using the &apos;.*&apos; form of import should be avoided - java.util.*." source="com.puppycrawl.tools.checkstyle.checks.imports.AvoidStarImportCheck"/>
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ChatEngine.java">
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ChatContextService.java">
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ModelInfo.java">
+</file>
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/resources/application.properties">
+</file>
+</checkstyle>

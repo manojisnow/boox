@@ -1,0 +1,19 @@
+26OVb6pKdP5dgrjhf/YQL3TfehuQl8WCzfh+rDUUw38=
+src/main/java/com/example/chatapp/Application.java 2025-06-26T12:58:16.173435405Z
+src/main/java/com/example/chatapp/controller/ChatController.java 2025-06-26T12:54:33.064168530Z
+src/main/java/com/example/chatapp/controller/CorsConfig.java 2025-06-26T13:39:11.773295361Z
+src/main/java/com/example/chatapp/controller/GlobalExceptionHandler.java 2025-06-26T12:58:25.181263636Z
+src/main/java/com/example/chatapp/controller/ResetContextRequest.java 2025-06-26T12:58:35.179831907Z
+src/main/java/com/example/chatapp/controller/SendMessageRequest.java 2025-06-26T13:39:11.773330528Z
+src/main/java/com/example/chatapp/engine/ChatContextService.java 2025-06-26T11:02:45.019191185Z
+src/main/java/com/example/chatapp/engine/ChatEngine.java 2025-06-26T11:02:45.015504994Z
+src/main/java/com/example/chatapp/engine/InMemoryChatContextService.java 2025-06-26T12:58:46.168331468Z
+src/main/java/com/example/chatapp/engine/ModelInfo.java 2025-06-26T15:42:51.878658221Z
+src/main/java/com/example/chatapp/engine/OllamaChatEngine.java 2025-06-26T16:10:57.659546759Z
+src/main/java/com/example/chatapp/service/ChatService.java 2025-06-26T15:24:57.371351046Z
+src/test/java/com/example/chatapp/AppTest.java 2025-06-26T15:31:41.033311597Z
+src/test/java/com/example/chatapp/ChatControllerTest.java 2025-06-26T11:48:01.731164690Z
+src/test/java/com/example/chatapp/ChatServiceTest.java 2025-06-26T11:48:01.686226388Z
+src/test/java/com/example/chatapp/GlobalExceptionHandlerTest.java 2025-06-26T11:51:55.257611787Z
+src/test/java/com/example/chatapp/InMemoryChatContextServiceTest.java 2025-06-26T11:48:01.708848915Z
+src/test/java/com/example/chatapp/engine/OllamaChatEngineTest.java 2025-06-26T16:00:06.696333342Z

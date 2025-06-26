@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">chatapp</a> &gt; <a href="index.source.html" class="el_package">com.example.chatapp.controller</a> &gt; <span class="el_source">ChatController.java</span></div><h1>ChatController.java</h1><pre class="source lang-java linenums">package com.example.chatapp.controller;
+
+import com.example.chatapp.engine.ModelInfo;
+import java.util.List;
+import javax.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+// @CrossOrigin(origins = &quot;http://localhost:3000&quot;)
+@RestController
+@RequestMapping(&quot;/api/chat&quot;)
+public class ChatController {
+
+<span class="fc" id="L17">  private static final Logger LOGGER = LoggerFactory.getLogger(ChatController.class);</span>
+
+  private final com.example.chatapp.service.ChatService chatService;
+
+  @Autowired
+  @SuppressWarnings(&quot;PMD.LawOfDemeter&quot;)
+<span class="fc" id="L23">  public ChatController(final com.example.chatapp.service.ChatService chatService) {</span>
+<span class="fc" id="L24">    this.chatService = chatService;</span>
+<span class="fc" id="L25">  }</span>
+
+  @GetMapping(&quot;/servers&quot;)
+  public List&lt;String&gt; getServers() {
+<span class="fc" id="L29">    LOGGER.info(&quot;Received request: GET /api/chat/servers&quot;);</span>
+<span class="fc" id="L30">    return chatService.getServers();</span>
+  }
+
+  @GetMapping(&quot;/models&quot;)
+  public ResponseEntity&lt;List&lt;ModelInfo&gt;&gt; getModels(@RequestParam final String server) {
+<span class="fc" id="L35">    final List&lt;ModelInfo&gt; modelInfos = chatService.getModels(server);</span>
+<span class="fc" id="L36">    return ResponseEntity.ok(modelInfos);</span>
+  }
+
+  @PostMapping(&quot;/send&quot;)
+  public ResponseEntity&lt;?&gt; sendMessage(@Valid @RequestBody final SendMessageRequest request) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">    if (LOGGER.isInfoEnabled()) {</span>
+<span class="fc" id="L42">      LOGGER.info(&quot;Received sendMessage request: {}&quot;, request);</span>
+    }
+<span class="fc" id="L44">    return ResponseEntity.ok(chatService.sendMessage(request));</span>
+  }
+
+  @GetMapping(&quot;/search&quot;)
+  public ResponseEntity&lt;?&gt; searchWeb(@RequestParam final String query) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">    if (LOGGER.isInfoEnabled()) {</span>
+<span class="fc" id="L50">      LOGGER.info(&quot;Received searchWeb request: {}&quot;, query);</span>
+    }
+<span class="fc" id="L52">    return ResponseEntity.ok(chatService.searchWeb(query));</span>
+  }
+
+  @PostMapping(&quot;/reset-context&quot;)
+  public ResponseEntity&lt;?&gt; resetContext(@Valid @RequestBody final ResetContextRequest request) {
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">    if (LOGGER.isInfoEnabled()) {</span>
+<span class="fc" id="L58">      LOGGER.info(&quot;Received resetContext request: {}&quot;, request);</span>
+    }
+<span class="fc" id="L60">    chatService.resetContext(request);</span>
+<span class="fc" id="L61">    return ResponseEntity.ok().build();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,12 @@
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/Application.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/ChatController.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/CorsConfig.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/GlobalExceptionHandler.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/ResetContextRequest.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/controller/SendMessageRequest.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ChatContextService.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ChatEngine.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/InMemoryChatContextService.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/ModelInfo.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/engine/OllamaChatEngine.java
+/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/app/src/main/java/com/example/chatapp/service/ChatService.java

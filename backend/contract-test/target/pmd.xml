@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pmd xmlns="http://pmd.sourceforge.net/report/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pmd.sourceforge.net/report/2.0.0 http://pmd.sourceforge.net/report_2_0_0.xsd" version="6.55.0" timestamp="2025-06-26T17:43:59.378">
+<file name="/Users/manoj/Documents/GitHub/react-springboot-chat-app/backend/contract-test/src/main/java/com/example/chatapp/App.java">
+<violation beginline="4" endline="8" begincolumn="18" endcolumn="1" rule="UseUtilityClass" ruleset="Design" package="com.example.chatapp" class="App" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_design.html#useutilityclass" priority="3">
+All methods are static.  Consider using a utility class instead. Alternatively, you could add a private constructor or make the class abstract to silence this warning.
+</violation>
+<violation beginline="4" endline="8" begincolumn="8" endcolumn="1" rule="ShortClassName" ruleset="Code Style" package="com.example.chatapp" class="App" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_codestyle.html#shortclassname" priority="4">
+Avoid short class names like App
+</violation>
+<violation beginline="5" endline="5" begincolumn="27" endcolumn="39" rule="MethodArgumentCouldBeFinal" ruleset="Code Style" package="com.example.chatapp" class="App" method="main" variable="args" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_codestyle.html#methodargumentcouldbefinal" priority="3">
+Parameter 'args' is not assigned and could be declared final
+</violation>
+<violation beginline="6" endline="6" begincolumn="5" endcolumn="22" rule="SystemPrintln" ruleset="Best Practices" package="com.example.chatapp" class="App" method="main" externalInfoUrl="https://pmd.github.io/pmd-6.55.0/pmd_rules_java_bestpractices.html#systemprintln" priority="2">
+System.out.println is used
+</violation>
+</file>
+<configerror rule="LoosePackageCoupling" msg="No packages or classes specified"/>
+</pmd>

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OllamaChatEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">chatapp</a> &gt; <a href="index.source.html" class="el_package">com.example.chatapp.engine</a> &gt; <span class="el_source">OllamaChatEngine.java</span></div><h1>OllamaChatEngine.java</h1><pre class="source lang-java linenums">package com.example.chatapp.engine;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
+@Profile(&quot;!contract-test&quot;)
+@Component(&quot;ollama&quot;)
+@SuppressFBWarnings(
+    value = {&quot;EI_EXPOSE_REP2&quot;},
+    justification = &quot;Spring-managed beans are not exposed outside this class; safe for DI usage.&quot;)
+public class OllamaChatEngine implements ChatEngine {
+  private final RestTemplate restTemplate;
+  private final ChatContextService chatContextService;
+<span class="fc" id="L30">  private static final Logger LOGGER = LoggerFactory.getLogger(OllamaChatEngine.class);</span>
+
+  @Value(&quot;${ollama.api.url}&quot;)
+  private String ollamaApiUrl;
+
+  @Value(&quot;${ollama.api.tags-path}&quot;)
+  private String tagsPath;
+
+  @Value(&quot;${ollama.api.chat-path}&quot;)
+  private String chatPath;
+
+  @Value(&quot;${ollama.api.temperature}&quot;)
+  private double temperature;
+
+  @Value(&quot;${ollama.model.description}&quot;)
+  private String modelDescription;
+
+  @SuppressWarnings({&quot;PMD.LawOfDemeter&quot;, &quot;PMD.LongVariable&quot;})
+  public OllamaChatEngine(
+<span class="fc" id="L49">      final RestTemplate restTemplate, final ChatContextService chatContextService) {</span>
+    // These are Spring-managed beans, not exposed outside this class, so SpotBugs EI_EXPOSE_REP2 is
+    // a false positive.
+    // If you want to be extra strict, you could wrap with a proxy or unmodifiable, but for
+    // stateless beans this is safe.
+<span class="fc" id="L54">    this.restTemplate = restTemplate;</span>
+<span class="fc" id="L55">    this.chatContextService = chatContextService;</span>
+    // Suppress SpotBugs EI_EXPOSE_REP2: Beans are not exposed via getters/setters.
+<span class="fc" id="L57">  }</span>
+
+<span class="nc" id="L59">  public static class Constants {</span>
+    public static final String ROLE_ASSISTANT = &quot;assistant&quot;;
+    public static final String ROLE_USER = &quot;user&quot;;
+    public static final String CONTENT = &quot;content&quot;;
+    public static final String MESSAGE = &quot;message&quot;;
+    public static final String NO_CONTENT = &quot;No content&quot;;
+    public static final String NO_RESPONSE = &quot;No response&quot;;
+    public static final String NO_VALID_RESPONSE = &quot;No valid response&quot;;
+    public static final String SERVER_NOT_RUNNING = &quot;Server not running&quot;;
+    public static final String ERROR_FETCHING_MODELS = &quot;Error fetching models&quot;;
+    public static final String ERROR_COMMUNICATING = &quot;Error communicating with Ollama API&quot;;
+  }
+
+  private boolean isOllamaRunning() {
+    try {
+<span class="fc" id="L74">      final String url = ollamaApiUrl + tagsPath;</span>
+<span class="fc" id="L75">      restTemplate.getForEntity(url, Map.class);</span>
+<span class="fc" id="L76">      return true;</span>
+<span class="fc" id="L77">    } catch (final Exception e) {</span>
+<span class="fc" id="L78">      LOGGER.warn(&quot;Ollama server is not running: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L79">      return false;</span>
+    }
+  }
+
+  private List&lt;ModelInfo&gt; fetchModelsFromOllama()
+      throws java.io.IOException, com.fasterxml.jackson.core.JsonProcessingException {
+<span class="fc" id="L85">    final String url = ollamaApiUrl + tagsPath;</span>
+<span class="fc" id="L86">    final ResponseEntity&lt;Map&gt; response = restTemplate.getForEntity(url, Map.class);</span>
+<span class="fc" id="L87">    final Map body = response.getBody();</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">    if (body != null &amp;&amp; body.containsKey(&quot;models&quot;)) {</span>
+<span class="fc" id="L89">      final List&lt;Map&lt;String, Object&gt;&gt; models = (List&lt;Map&lt;String, Object&gt;&gt;) body.get(&quot;models&quot;);</span>
+<span class="fc" id="L90">      return models.stream()</span>
+<span class="fc" id="L91">          .map(m -&gt; new ModelInfo((String) m.get(&quot;name&quot;), modelDescription))</span>
+<span class="fc" id="L92">          .collect(Collectors.toList());</span>
+    }
+<span class="fc" id="L94">    return Collections.emptyList();</span>
+  }
+
+  private Map&lt;String, String&gt; parseOllamaResponse(final Map body) {
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">    if (body != null &amp;&amp; body.containsKey(Constants.MESSAGE)) {</span>
+<span class="fc" id="L99">      final Map messageObj = (Map) body.get(Constants.MESSAGE);</span>
+<span class="fc" id="L100">      final String role = messageObj.getOrDefault(&quot;role&quot;, Constants.ROLE_ASSISTANT).toString();</span>
+<span class="fc" id="L101">      final String content =</span>
+<span class="fc" id="L102">          messageObj.getOrDefault(Constants.CONTENT, Constants.NO_CONTENT).toString();</span>
+<span class="fc" id="L103">      return Map.of(&quot;role&quot;, role, Constants.CONTENT, content);</span>
+    }
+<span class="nc" id="L105">    return Map.of(&quot;role&quot;, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);</span>
+  }
+
+  private Map&lt;String, String&gt; parseStreamedOllamaResponse(final String body) {
+<span class="fc" id="L109">    final ObjectMapper mapper = new ObjectMapper();</span>
+<span class="fc" id="L110">    final String[] lines = body.split(&quot;\r?\n&quot;);</span>
+<span class="fc" id="L111">    final StringBuilder fullContent = new StringBuilder();</span>
+<span class="fc" id="L112">    String role = Constants.ROLE_ASSISTANT;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">    for (final String lineRaw : lines) {</span>
+<span class="fc" id="L114">      String line = lineRaw.trim();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">      if (line.isEmpty()) continue;</span>
+      try {
+<span class="fc" id="L117">        final Map json = mapper.readValue(line, Map.class);</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (json.get(&quot;done&quot;) != null &amp;&amp; Boolean.TRUE.equals(json.get(&quot;done&quot;))) {</span>
+<span class="fc" id="L119">          break;</span>
+        }
+<span class="fc" id="L121">        final Map msgObj = (Map) json.get(Constants.MESSAGE);</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        if (msgObj != null &amp;&amp; msgObj.get(Constants.CONTENT) != null) {</span>
+<span class="fc" id="L123">          final String chunk = msgObj.get(Constants.CONTENT).toString();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">          if (fullContent.length() &gt; 0</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">              &amp;&amp; !fullContent.toString().endsWith(&quot;\n&quot;)</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">              &amp;&amp; !chunk.startsWith(&quot;\n&quot;)) {</span>
+<span class="nc" id="L127">            fullContent.append(&quot;\n&quot;);</span>
+          }
+<span class="fc" id="L129">          fullContent.append(chunk);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">          if (msgObj.get(&quot;role&quot;) != null) {</span>
+<span class="fc" id="L131">            role = msgObj.get(&quot;role&quot;).toString();</span>
+          }
+        }
+<span class="nc" id="L134">      } catch (com.fasterxml.jackson.core.JsonProcessingException e) {</span>
+<span class="nc" id="L135">        LOGGER.debug(&quot;Malformed line in streamed response: {}&quot;, line);</span>
+<span class="fc" id="L136">      }</span>
+    }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">    if (fullContent.length() == 0) {</span>
+<span class="nc" id="L139">      return Map.of(</span>
+          &quot;role&quot;, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_VALID_RESPONSE);
+    }
+<span class="fc" id="L142">    return Map.of(&quot;role&quot;, role, Constants.CONTENT, fullContent.toString());</span>
+  }
+
+  @Override
+  public List&lt;ModelInfo&gt; getModels() {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">    if (!isOllamaRunning()) {</span>
+<span class="fc" id="L148">      LOGGER.warn(&quot;Ollama server is not running when fetching models.&quot;);</span>
+<span class="fc" id="L149">      return List.of(new ModelInfo(Constants.SERVER_NOT_RUNNING, &quot;&quot;));</span>
+    }
+    try {
+<span class="fc" id="L152">      return fetchModelsFromOllama();</span>
+<span class="nc" id="L153">    } catch (final Exception e) {</span>
+<span class="nc" id="L154">      LOGGER.error(&quot;Error fetching models from Ollama: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L155">      return List.of(new ModelInfo(Constants.ERROR_FETCHING_MODELS, &quot;&quot;));</span>
+    }
+  }
+
+  @SuppressFBWarnings(
+      value = {&quot;REC_CATCH_EXCEPTION&quot;},
+      justification =
+          &quot;Broad exception handling is intentional for robust error reporting in a service/controller boundary.&quot;)
+  @Override
+  public Map&lt;String, String&gt; sendMessage(
+      final String message, final String model, final String sessionId, final boolean stream) {
+    try {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">      if (!isOllamaRunning()) {</span>
+<span class="fc" id="L168">        LOGGER.warn(&quot;Ollama server is not running when sending message.&quot;);</span>
+<span class="fc" id="L169">        return Map.of(</span>
+            &quot;role&quot;, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.SERVER_NOT_RUNNING);
+      }
+<span class="fc" id="L172">      final String url = ollamaApiUrl + chatPath;</span>
+<span class="fc" id="L173">      chatContextService.addMessage(sessionId, Constants.ROLE_USER, message);</span>
+<span class="fc" id="L174">      final List&lt;Map&lt;String, String&gt;&gt; context = chatContextService.getContext(sessionId);</span>
+<span class="fc" id="L175">      final Map&lt;String, Object&gt; payload = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L176">      payload.put(&quot;model&quot;, model);</span>
+<span class="fc" id="L177">      payload.put(&quot;messages&quot;, context);</span>
+<span class="fc" id="L178">      payload.put(&quot;temperature&quot;, temperature);</span>
+<span class="fc" id="L179">      payload.put(&quot;stream&quot;, stream);</span>
+
+<span class="fc" id="L181">      final HttpHeaders headers = new HttpHeaders();</span>
+<span class="fc" id="L182">      headers.setContentType(MediaType.APPLICATION_JSON);</span>
+<span class="fc" id="L183">      final HttpEntity&lt;Map&lt;String, Object&gt;&gt; request = new HttpEntity&lt;&gt;(payload, headers);</span>
+
+<span class="fc" id="L185">      final ResponseEntity&lt;String&gt; response =</span>
+<span class="fc" id="L186">          restTemplate.exchange(url, HttpMethod.POST, request, String.class);</span>
+<span class="fc" id="L187">      final String body = response.getBody();</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">      if (body == null || body.isEmpty()) {</span>
+<span class="fc" id="L189">        LOGGER.warn(&quot;No response from Ollama for chat request.&quot;);</span>
+<span class="fc" id="L190">        return Map.of(&quot;role&quot;, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);</span>
+      }
+<span class="fc bfc" id="L192" title="All 2 branches covered.">      if (!stream) {</span>
+<span class="fc" id="L193">        final ObjectMapper mapper = new ObjectMapper();</span>
+<span class="fc" id="L194">        final Map json = mapper.readValue(body, Map.class);</span>
+<span class="fc" id="L195">        final Map&lt;String, String&gt; reply = parseOllamaResponse(json);</span>
+<span class="fc" id="L196">        chatContextService.addMessage(sessionId, reply.get(&quot;role&quot;), reply.get(Constants.CONTENT));</span>
+<span class="fc" id="L197">        return reply;</span>
+      } else {
+<span class="fc" id="L199">        final Map&lt;String, String&gt; reply = parseStreamedOllamaResponse(body);</span>
+<span class="fc" id="L200">        chatContextService.addMessage(sessionId, reply.get(&quot;role&quot;), reply.get(Constants.CONTENT));</span>
+<span class="fc" id="L201">        return reply;</span>
+      }
+<span class="fc" id="L203">    } catch (Exception e) {</span>
+<span class="fc" id="L204">      LOGGER.error(&quot;Error communicating with Ollama: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L205">      return Map.of(</span>
+          &quot;role&quot;, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.ERROR_COMMUNICATING);
+    }
+  }
+
+  @Override
+  public void resetContext(String sessionId) {
+<span class="fc" id="L212">    chatContextService.resetContext(sessionId);</span>
+<span class="fc" id="L213">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
