@@ -22,15 +22,13 @@ This directory contains the **Spring Boot** backend for the chat app. It is now 
 backend/
   README.md                # This file
   pom.xml                  # Parent POM (enforces code quality for all submodules)
-  app/                     # Main Spring Boot application code
-  unit-test/               # Unit tests + coverage enforcement (JaCoCo)
+  app/                     # Main Spring Boot application code and unit tests
   integration-test/        # Integration tests (Testcontainers, etc.)
   contract-test/           # Contract tests (Spring Cloud Contract)
 ```
 
 ### Submodules
-- **app/**: Main application code and configuration
-- **unit-test/**: All unit tests, JaCoCo coverage enforcement
+- **app/**: Main application code, configuration, and unit tests (with JaCoCo coverage)
 - **integration-test/**: Integration tests (e.g., with Testcontainers)
 - **contract-test/**: Contract tests and contract definitions
 
@@ -69,15 +67,16 @@ backend/
 ## Testing
 - **Unit tests:**
   ```sh
-  cd unit-test
+  cd app
   mvn test
-  # or from backend root: mvn -pl unit-test test
+  # or from backend root: mvn -pl app test
   ```
 - **Integration tests:**
   ```sh
   cd integration-test
   mvn test
   # or from backend root: mvn -pl integration-test test
+  # Requires Docker running (uses Testcontainers)
   ```
 - **Contract tests:**
   ```sh
@@ -86,7 +85,7 @@ backend/
   # or from backend root: mvn -pl contract-test test
   ```
 - **Coverage report:**
-  - Generated in `unit-test/target/site/jacoco/index.html` after running unit tests.
+  - Generated in `app/target/site/jacoco/index.html` after running unit tests.
 
 ## Related
 - **Frontend:** [../frontend/README.md](../frontend/README.md)

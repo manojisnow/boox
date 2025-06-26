@@ -8,7 +8,7 @@ This project is a full-stack chat application featuring a React frontend and a S
 
 - [`backend/`](backend/README.md): Multi-module Spring Boot Java backend (API, AI, config, code quality, test separation)
   - `app/`: Main application code
-  - `unit-test/`: Unit tests + coverage (JaCoCo)
+  - Unit tests: Now located in `app/` alongside main code (with JaCoCo coverage)
   - `integration-test/`: Integration tests (Testcontainers, etc.)
   - `contract-test/`: Contract tests (Spring Cloud Contract)
 - [`frontend/`](frontend/README.md): React frontend (UI, API integration)
