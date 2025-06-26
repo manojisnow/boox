@@ -2,6 +2,14 @@
 
 This project is a full-stack chat application featuring a React frontend and a Spring Boot backend. It leverages the Ollama-hosted local models for AI-driven conversations and integrates DuckDuckGo for web search capabilities (Yet to be done).
 
+---
+
+**Breaking Change:**
+CORS and Ollama API configuration are now set in `backend/src/main/resources/application.properties`.
+If you upgrade or pull these changes, review and update your configuration as needed.
+
+---
+
 ## Project Structure
 
 The repository is organized into two main directories: `backend` and `frontend`. ### Backend (`backend/`)
@@ -25,6 +33,31 @@ The repository is organized into two main directories: `backend` and `frontend`.
   - `src/App.jsx`, `src/index.js`: App entry points
   - `public/index.html`: HTML template
   - `package.json`: npm dependencies
+
+## Backend Configuration
+
+The backend is highly configurable via `backend/src/main/resources/application.properties`. Key properties include:
+
+```
+# Ollama API configuration
+ollama.api.url=http://localhost:11434
+ollama.api.tags-path=/api/tags
+ollama.api.chat-path=/api/chat
+ollama.api.temperature=0.7
+ollama.model.description=Ollama model
+
+# CORS configuration
+chat.cors.allowed-origins=http://localhost:3000
+chat.cors.allowed-methods=GET,POST,PUT,DELETE,OPTIONS
+chat.cors.allowed-headers=*
+chat.cors.allow-credentials=true
+```
+
+You can adjust these values to match your environment or deployment needs.
+
+## Backend Logging
+
+The backend now uses SLF4J for logging. Key actions, warnings, and errors are logged in the controller, service, and engine layers for better observability and debugging.
 
 ## Setup Instructions
 
