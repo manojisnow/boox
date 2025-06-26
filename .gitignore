@@ -27,3 +27,6 @@ yarn-error.log*
 
 # General
 .DS_Store
+
+# Local direnv environment file
+.envrc

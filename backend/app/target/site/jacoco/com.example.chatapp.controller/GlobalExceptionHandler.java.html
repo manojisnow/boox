@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">chatapp</a> &gt; <a href="index.source.html" class="el_package">com.example.chatapp.controller</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.example.chatapp.controller;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+@SuppressWarnings(&quot;PMD.AtLeastOneConstructor&quot;)
+<span class="fc" id="L14">public class GlobalExceptionHandler {</span>
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ResponseEntity&lt;Map&lt;String, String&gt;&gt; handleValidationExceptions(
+      final MethodArgumentNotValidException exception) {
+<span class="fc" id="L19">    final Map&lt;String, String&gt; errors = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L20">    exception</span>
+<span class="fc" id="L21">        .getBindingResult()</span>
+<span class="fc" id="L22">        .getFieldErrors()</span>
+<span class="fc" id="L23">        .forEach(fieldError -&gt; errors.put(fieldError.getField(), fieldError.getDefaultMessage()));</span>
+<span class="fc" id="L24">    return ResponseEntity.badRequest().body(errors);</span>
+  }
+
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity&lt;Map&lt;String, String&gt;&gt; handleGenericException(final Exception exception) {
+<span class="fc" id="L29">    final Map&lt;String, String&gt; error = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L30">    error.put(&quot;error&quot;, exception.getMessage());</span>
+<span class="fc" id="L31">    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
