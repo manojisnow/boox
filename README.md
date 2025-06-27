@@ -1,91 +1,181 @@
-# React-SpringBoot Chat Application
+# Boox - AI Chat Application
 
-This project is a full-stack chat application featuring a React frontend and a Spring Boot backend. It leverages the Ollama-hosted local models for AI-driven conversations and integrates DuckDuckGo for web search capabilities (planned).
+A modern chat application built with React and Spring Boot that uses Ollama for local AI models.
 
----
+## Quick Start with Docker Compose
+
+The fastest way to get started is using Docker Compose, which sets up everything automatically:
+
+```bash
+# Start the entire stack
+docker compose up -d
+
+# Watch the setup progress
+docker compose logs -f
+```
+
+The application will be available at:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8080
+- Ollama API: http://localhost:11434
+
+That's it! Everything is set up and ready to use.
 
 ## Prerequisites
 
-### Required
-- **Ollama**: This application requires Ollama to be installed and running locally
-  - [Install Ollama](https://ollama.ai/download)
-  - After installation, pull the required model:
-    ```sh
-    ollama pull llama2  # or your preferred model
-    ```
-  - Start the Ollama server:
-    ```sh
-    ollama serve
-    ```
-  - The server will be available at `http://localhost:11434` by default
+For quick start:
+- Docker and Docker Compose (that's all!)
 
-### Development
-- Java 17 (LTS)
-- Maven 3.8+
-- Docker (for integration tests)
-- Node.js & npm (for frontend)
+For local development:
+- Java 17
+- Node.js 20+
+- Maven
+- [Ollama](https://ollama.ai/) with your preferred model (default: llama2)
 
-> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it.
+## Development Options
 
----
+### Option 1: Docker Compose (Recommended)
 
-## Repository Structure
+This option requires only Docker and provides a complete development environment:
 
-- [`backend/`](backend/README.md): Multi-module Spring Boot Java backend (API, AI, config, code quality, test separation)
-  - `app/`: Main application code
-  - Unit tests: Now located in `app/` alongside main code (with JaCoCo coverage)
-  - `integration-test/`: Integration tests (Testcontainers, etc.)
-  - `contract-test/`: Contract tests (Spring Cloud Contract)
-- [`frontend/`](frontend/README.md): React frontend (UI, API integration)
+```bash
+# Start everything with Docker Compose
+docker compose up -d
 
----
-
-## Quick Start
-
-### 1. Clone the repository
-```sh
-git clone <repository-url>
-cd react-springboot-chat-app
+# View logs
+docker compose logs -f
 ```
 
-### 2. Build and Run (All-in-one)
-```sh
-mvn clean verify
-```
-- Builds both backend and frontend, runs all code quality checks and tests.
+The Ollama model will be automatically downloaded and cached in a Docker volume.
 
-### 3. Run Backend
-```sh
+### Option 2: Local Development
+
+1. Start Ollama server and pull the model:
+```bash
+ollama serve
+ollama pull llama2
+```
+
+2. Start the backend:
+```bash
 cd backend/app
 mvn spring-boot:run
 ```
 
-### 4. Run Frontend
-```sh
+3. Start the frontend:
+```bash
 cd frontend
 npm install
 npm start
 ```
 
----
+### Option 3: Docker + Local Ollama
 
-## Documentation
-- **Backend:** [backend/README.md](backend/README.md) (multi-module, code quality, test separation)
-- **Frontend:** [frontend/README.md](frontend/README.md)
+If you prefer to run Ollama locally (useful if you use Ollama for other projects) but want to containerize the Boox application:
 
----
+1. Start Ollama locally and pull the model:
+```bash
+ollama serve
+ollama pull llama2
+```
+
+2. Run the Boox container with host network access:
+```bash
+docker run -d --name boox_app \
+  -p 3000:3000 \
+  -p 8080:8080 \
+  -e OLLAMA_API_URL=http://host.docker.internal:11434 \
+  -e OLLAMA_MODEL=llama2 \
+  boox
+```
+
+This setup is particularly useful if you:
+- Already have Ollama running locally
+- Use Ollama with other applications
+- Want to manage Ollama models separately
+- Need to switch between different Ollama versions
+
+### Option 4: Hybrid Setup (Local App + Docker Ollama)
+
+If you want to run the application locally but use Ollama in Docker:
+
+```bash
+# Start only Ollama
+docker compose up -d ollama
+
+# Then run backend and frontend locally as in Option 2
+```
+
+## Configuration
+
+### Docker Compose Environment Variables
+
+Create a `.env` file to customize the setup:
+
+```env
+OLLAMA_MODEL=codellama      # Use a different model
+OLLAMA_API_TEMPERATURE=0.5  # Adjust temperature
+```
+
+### Manual Configuration
+
+When running services separately, you can configure:
+
+```bash
+docker run -d --name boox_app \
+  -p 3000:3000 \
+  -p 8080:8080 \
+  -e OLLAMA_API_URL=http://ollama:11434 \
+  -e OLLAMA_MODEL=llama2 \
+  -e OLLAMA_API_TEMPERATURE=0.7 \
+  boox
+```
+
+Available variables:
+- `OLLAMA_API_URL`: Ollama server URL
+- `OLLAMA_MODEL`: AI model to use (default: llama2)
+- `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7)
+- `PORT`: Backend port (default: 8080)
+- `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
+
+## Project Structure
+
+```
+boox/
+├── backend/           # Spring Boot backend
+│   └── app/          # Main application module
+├── frontend/         # React frontend
+├── scripts/          # Utility scripts
+└── docker-compose.yml # Complete development environment
+```
+
+## Features
+
+- Real-time chat interface
+- Integration with Ollama models
+- Configurable model parameters
+- Modern React UI
+- RESTful Spring Boot backend
+- Zero-configuration Docker setup
+- Development hot-reload
+
+## Development Notes
+
+- Frontend runs in development mode with hot-reload
+- Backend uses Spring Boot with embedded Tomcat
+- Docker Compose provides complete environment
+- Ollama models are cached in Docker volume
+- All services are configured to work together automatically
 
 ## Contributing
-Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
-MIT License.
 
-## Backend Prerequisites
-
-- Java 17 (LTS)
-- Maven 3.8+
-- Docker (for integration tests)
-
-> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 

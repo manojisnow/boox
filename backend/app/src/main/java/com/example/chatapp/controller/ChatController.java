@@ -38,10 +38,20 @@ public class ChatController {
 
   @PostMapping("/send")
   public ResponseEntity<?> sendMessage(@Valid @RequestBody final SendMessageRequest request) {
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("Received sendMessage request: {}", request);
+    LOGGER.info("Received sendMessage request with message: {}", request.getMessage());
+    LOGGER.info(
+        "Request details: message={}, server={}, model={}, sessionId={}, stream={}",
+        request.getMessage(),
+        request.getServer(),
+        request.getModel(),
+        request.getSessionId(),
+        request.getStream());
+    try {
+      return ResponseEntity.ok(chatService.sendMessage(request));
+    } catch (Exception e) {
+      LOGGER.error("Error processing sendMessage request: {}", e.getMessage(), e);
+      throw e;
     }
-    return ResponseEntity.ok(chatService.sendMessage(request));
   }
 
   @GetMapping("/search")

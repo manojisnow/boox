@@ -29,6 +29,13 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             try {
                 const result = await getModels(selectedServer);
                 setModels(result);
+                // Set default model to llama3.2 if available
+                const defaultModel = result.find(m => m.name === 'llama3.2:latest');
+                if (defaultModel) {
+                    setSelectedModel(defaultModel.name);
+                } else {
+                    console.error('No llama3.2 model found in:', result);
+                }
             } catch (err) {
                 console.error('Error fetching models:', err);
                 setError('Failed to fetch models. Please try again.');
@@ -44,9 +51,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     }, [messages]);
 
     const handleSendMessage = async (e) => {
-        if (e) {
-            e.preventDefault();
-        }
+        if (e) e.preventDefault();
         if (!selectedServer) {
             setError('Please select a server before sending a message.');
             return;
@@ -55,19 +60,53 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             setError('Please select a model before sending a message.');
             return;
         }
-        if (!input.trim() || chatLocked) return;
+        if (!input.trim()) return;
+        if (chatLocked) return;
+
         setError('');
         setChatLocked(true);
         const userMessage = { text: input, sender: 'user' };
         setMessages((prevMessages) => [...prevMessages, userMessage]);
-        setInput(''); // Clear input immediately for better UX
+        setInput('');
+
         try {
-            const response = await sendMessage(input, selectedServer, selectedModel, sessionIdRef.current, streamEnabled);
+            // Ensure all values are properly formatted
+            const server = selectedServer.trim();
+            const model = selectedModel.trim();
+            const sessionId = sessionIdRef.current.trim();
+            const stream = Boolean(streamEnabled);
+
+            // Log the request details before sending
+            console.log('Sending message with:', {
+                message: input,
+                server,
+                model,
+                sessionId,
+                stream
+            });
+
+            const response = await sendMessage(
+                input.trim(),
+                server,
+                model,
+                sessionId,
+                stream
+            );
+
+            console.log('Successfully sent message:', {
+                message: input,
+                server,
+                model,
+                sessionId,
+                stream
+            });
+            console.log('Received response:', response);
+
             const botMessage = { text: response.content, sender: response.role };
             setMessages((prevMessages) => [...prevMessages, botMessage]);
         } catch (err) {
-            setMessages((prevMessages) => [...prevMessages, { text: '(Error sending message)', sender: 'assistant' }]);
-        } finally {
+            console.error('Error sending message:', err);
+            setError('Failed to send message. Please try again.');
             setChatLocked(false);
         }
     };

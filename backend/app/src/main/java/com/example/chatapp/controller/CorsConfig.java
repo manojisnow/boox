@@ -20,12 +20,17 @@ public class CorsConfig implements WebMvcConfigurer {
   @Value("${chat.cors.allow-credentials}")
   private boolean allowCredentials;
 
+  @Value("${chat.cors.max-age:3600}")
+  private long maxAge;
+
   @Override
   public void addCorsMappings(CorsRegistry registry) {
-    registry.addMapping("/**")
-            .allowedOrigins(allowedOrigins.split(","))
-            .allowedMethods(allowedMethods.split(","))
-            .allowedHeaders(allowedHeaders.split(","))
-            .allowCredentials(allowCredentials);
+    registry
+        .addMapping("/api/**")
+        .allowedOrigins(allowedOrigins.split(","))
+        .allowedMethods(allowedMethods.split(","))
+        .allowedHeaders(allowedHeaders.split(","))
+        .allowCredentials(allowCredentials)
+        .maxAge(maxAge);
   }
 }
