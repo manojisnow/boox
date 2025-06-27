@@ -46,7 +46,17 @@ docker compose up -d
 docker compose logs -f
 ```
 
-The Ollama model will be automatically downloaded and cached in a Docker volume.
+After the containers are up and running, you'll need to download the llama3.2 model:
+
+```bash
+# Get the Ollama container ID
+docker compose ps
+
+# Download the llama3.2 model
+docker exec <ollama_container_id> ollama pull llama3.2
+```
+
+The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
 
 ### Option 2: Local Development
 
