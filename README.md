@@ -94,7 +94,7 @@ ollama pull llama2
 docker run -d --name boox_app \
   -p 3000:3000 \
   -p 8080:8080 \
-  -e OLLAMA_API_URL=http://host.docker.internal:11434 \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
   -e OLLAMA_MODEL=llama2 \
   boox
 ```
@@ -135,14 +135,14 @@ When running services separately, you can configure:
 docker run -d --name boox_app \
   -p 3000:3000 \
   -p 8080:8080 \
-  -e OLLAMA_API_URL=http://ollama:11434 \
+  -e OLLAMA_BASE_URL=http://ollama:11434 \
   -e OLLAMA_MODEL=llama2 \
   -e OLLAMA_API_TEMPERATURE=0.7 \
   boox
 ```
 
 Available variables:
-- `OLLAMA_API_URL`: Ollama server URL
+- `OLLAMA_BASE_URL`: Ollama server URL
 - `OLLAMA_MODEL`: AI model to use (default: llama2)
 - `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7)
 - `PORT`: Backend port (default: 8080)
