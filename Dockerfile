@@ -3,7 +3,6 @@ FROM maven:3.9.5-openjdk-17-slim AS builder-backend
 WORKDIR /app/backend
 COPY backend/pom.xml .
 COPY backend/chatapp/pom.xml chatapp/
-RUN mvn -f chatapp/pom.xml dependency:go-offline -B
 COPY backend/src ./src
 RUN mvn -f chatapp/pom.xml clean package -DskipTests
 
