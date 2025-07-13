@@ -29,7 +29,7 @@ public class OllamaChatEngine implements ChatEngine {
   private final ChatContextService chatContextService;
   private static final Logger LOGGER = LoggerFactory.getLogger(OllamaChatEngine.class);
 
-  @Value("${ollama.api.url}")
+  @Value("${ollama.base.url}")
   private String ollamaApiUrl;
 
   @Value("${ollama.api.tags-path}")
