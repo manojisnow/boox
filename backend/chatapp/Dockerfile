@@ -4,11 +4,8 @@ FROM maven:3.9.5-openjdk-17-slim as build
 # Set working directory
 WORKDIR /app
 
-# Copy pom.xml and download dependencies
+# Copy pom.xml and source code
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code
 COPY src ./src
 
 # Build the application

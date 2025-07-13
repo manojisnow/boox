@@ -1,46 +1,38 @@
-# Use node as base image and add Java
-FROM node:20-slim
+# Stage 1: Build backend
+FROM maven:3.9.5-openjdk-17-slim AS builder-backend
+WORKDIR /app/backend
+COPY backend/pom.xml .
+COPY backend/chatapp/pom.xml chatapp/
+RUN mvn -f chatapp/pom.xml dependency:go-offline -B
+COPY backend/src ./src
+RUN mvn -f chatapp/pom.xml clean package -DskipTests
 
-# Install OpenJDK-17
-RUN apt-get update && \
-    apt-get install -y openjdk-17-jdk maven && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Stage 2: Build frontend
+FROM node:20-slim AS builder-frontend
+WORKDIR /app/frontend
+COPY frontend/package*.json .
+RUN npm ci
+COPY frontend/src ./src
+COPY frontend/public ./public
+RUN npm run build
 
-# Set working directory
+# Stage 3: Final image
+FROM openjdk:17-slim
 WORKDIR /app
 
-# Copy package.json and install dependencies
-COPY frontend/package*.json frontend/
-RUN cd frontend && npm install
+# Copy built artifacts
+COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar .
+COPY --from=builder-frontend /app/frontend/build ./frontend/build
 
-# Copy backend pom files and download dependencies
-COPY backend/pom.xml backend/
-COPY backend/app/pom.xml backend/app/
-RUN cd backend && mvn -f app/pom.xml dependency:go-offline -B
-
-# Copy source code
-COPY frontend frontend/
-COPY backend/app backend/app/
-
-# Build backend
-RUN cd backend && mvn -f app/pom.xml clean package -DskipTests
-
-# Copy start script
-COPY scripts/start.sh ./
-RUN chmod +x start.sh
+# Copy start script and set permissions
+COPY scripts/start-combined.sh .
+RUN chmod +x start-combined.sh
 
 # Environment variables
-ENV NODE_OPTIONS=--openssl-legacy-provider \
-    PORT=8080 \
-    CORS_ALLOWED_ORIGINS=http://localhost:3000 \
-    OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-    OLLAMA_MODEL=llama2 \
-    OLLAMA_API_TEMPERATURE=0.7 \
-    SPRING_PROFILES_ACTIVE=docker
+ENV PORT=8080     CORS_ALLOWED_ORIGINS=http://localhost:3000     OLLAMA_BASE_URL=http://host.docker.internal:11434     OLLAMA_MODEL=llama2     OLLAMA_API_TEMPERATURE=0.7     SPRING_PROFILES_ACTIVE=docker
 
 # Expose ports
 EXPOSE 3000 8080
 
 # Start the application
-CMD ["./start.sh"] 
+CMD ["./start-combined.sh"]
