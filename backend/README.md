@@ -22,15 +22,11 @@ This directory contains the **Spring Boot** backend for the chat app. It is now 
 backend/
   README.md                # This file
   pom.xml                  # Parent POM (enforces code quality for all submodules)
-  app/                     # Main Spring Boot application code and unit tests
-  integration-test/        # Integration tests (Testcontainers, etc.)
-  contract-test/           # Contract tests (Spring Cloud Contract)
+  chatapp/                 # Main Spring Boot application code and unit tests
 ```
 
-### Submodules
-- **app/**: Main application code, configuration, and unit tests (with JaCoCo coverage)
-- **integration-test/**: Integration tests (e.g., with Testcontainers)
-- **contract-test/**: Contract tests and contract definitions
+### Structure
+- **chatapp/**: Main application code, configuration, and unit tests (with JaCoCo coverage)
 
 ## Setup & Development
 1. **Install dependencies & build all modules:**
@@ -45,7 +41,7 @@ backend/
 
 3. **Run the backend app:**
    ```sh
-   cd app
+   cd chatapp
    mvn spring-boot:run
    ```
 4. **Configuration:**
@@ -113,4 +109,4 @@ backend/
 - Maven 3.8+
 - Docker (for Testcontainers)
 
-> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it. 
+> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it.
