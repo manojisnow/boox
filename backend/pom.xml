@@ -7,9 +7,7 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>app</module>
-        <module>integration-test</module>
-        <module>contract-test</module>
+        <module>chatapp</module>
     </modules>
     <name>ChatApp Backend Parent</name>
     <description>Parent module for ChatApp backend, aggregating app, unit, integration, and contract test modules.</description>

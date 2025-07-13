@@ -2,27 +2,28 @@ package com.example.chatapp.contract;
 
 import com.example.chatapp.engine.ChatEngine;
 import com.example.chatapp.engine.ModelInfo;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-@TestConfiguration
+@Configuration
 public class ContractTestConfig {
-  @Bean(name = "ollama")
+  @Bean
   @Primary
-  public ChatEngine mockOllamaChatEngine() {
+  public ChatEngine mockChatEngine() {
     return new ChatEngine() {
       @Override
       public List<ModelInfo> getModels() {
-        return List.of();
+        return Collections.singletonList(new ModelInfo("mock-model", "mock-model"));
       }
 
       @Override
       public Map<String, String> sendMessage(
           String message, String model, String sessionId, boolean stream) {
-        return Map.of("role", "assistant", "content", "Hi!");
+        return Map.of("role", "assistant", "content", "Greetings!");
       }
 
       @Override
