@@ -20,39 +20,64 @@ public class ChatService {
     this.engines = new HashMap<>(engines);
   }
 
-  public List<ModelInfo> getModels() {
-    final ChatEngine engine = engines.get("ollama");
+  public List<String> getServers() {
+    LOGGER.debug("Fetching list of servers");
+    List<String> servers = new ArrayList<>();
+    for (String server : engines.keySet()) {
+        if (server.equals("ollama")) {
+            servers.add("localhost");
+        } else {
+            servers.add(server);
+        }
+    }
+    return servers;
+  }
+
+  public List<ModelInfo> getModels(final String server) {
+    String engineName = server;
+    if (server.equals("localhost")) {
+        engineName = "ollama";
+    }
+    final ChatEngine engine = engines.get(engineName);
     if (engine != null) {
-      LOGGER.debug("Fetching models for server: ollama");
+      LOGGER.debug("Fetching models for server: {}", server);
       return engine.getModels();
     }
-    LOGGER.warn("Requested models for unknown server: ollama");
+    LOGGER.warn("Requested models for unknown server: {}", server);
     return Collections.emptyList();
   }
 
   public Map<String, String> sendMessage(final SendMessageRequest request) {
     final String message = request.getMessage();
+    String server = request.getServer();
+    if (server.equals("localhost")) {
+        server = "ollama";
+    }
     final String model = request.getModel();
     final String sessionId = request.getSessionId();
     final boolean stream = request.getStream() != null && request.getStream();
-    final ChatEngine engine = engines.get("ollama");
+    final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
-          "Sending message to server: ollama, model: {}, session: {}", model, sessionId);
+          "Sending message to server: {}, model: {}, session: {}", server, model, sessionId);
       return engine.sendMessage(message, model, sessionId, stream);
     }
-    LOGGER.warn("Attempted to send message to unknown server: ollama");
+    LOGGER.warn("Attempted to send message to unknown server: {}", server);
     return Map.of("role", "assistant", "content", "(unknown server)");
   }
 
   public void resetContext(final ResetContextRequest request) {
+    String server = request.getServer();
+    if (server.equals("localhost")) {
+        server = "ollama";
+    }
     final String sessionId = request.getSessionId();
-    final ChatEngine engine = engines.get("ollama");
+    final ChatEngine engine = engines.get(server);
     if (engine != null) {
-      LOGGER.info("Resetting context for server: ollama, session: {}", sessionId);
+      LOGGER.info("Resetting context for server: {}, session: {}", server, sessionId);
       engine.resetContext(sessionId);
     } else {
-      LOGGER.warn("Attempted to reset context for unknown server: ollama");
+      LOGGER.warn("Attempted to reset context for unknown server: {}", server);
     }
   }
 

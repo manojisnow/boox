@@ -6,6 +6,7 @@ import javax.validation.constraints.NotNull;
 @SuppressWarnings("PMD.UnnecessaryConstructor")
 public class SendMessageRequest {
   @NotBlank private String message;
+  @NotBlank private String server;
   @NotBlank private String model;
   @NotBlank private String sessionId;
   @NotNull private Boolean stream;
@@ -18,6 +19,14 @@ public class SendMessageRequest {
 
   public void setMessage(final String message) {
     this.message = message;
+  }
+
+  public String getServer() {
+    return server;
+  }
+
+  public void setServer(final String server) {
+    this.server = server;
   }
 
   public String getModel() {

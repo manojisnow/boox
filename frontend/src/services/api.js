@@ -5,15 +5,23 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 // Add axios default configs
 axios.defaults.withCredentials = true;
 
-export const getModels = async () => {
-    const response = await axios.get(`${API_BASE_URL}/api/chat/models`);
+export const getServers = async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/chat/servers`);
     return response.data;
 };
 
-export const sendMessage = async (message, model, sessionId, stream) => {
+export const getModels = async (server) => {
+    const response = await axios.get(`${API_BASE_URL}/api/chat/models`, { params: { server } });
+    return response.data;
+};
+
+export const sendMessage = async (message, server, model, sessionId, stream) => {
     // Validate input parameters
     if (!message || !message.trim()) {
         throw new Error('Message cannot be empty');
+    }
+    if (!server || !server.trim()) {
+        throw new Error('Server cannot be empty');
     }
     if (!model || !model.trim()) {
         throw new Error('Model cannot be empty');
@@ -26,6 +34,7 @@ export const sendMessage = async (message, model, sessionId, stream) => {
         // Ensure all values are properly formatted
         const requestBody = {
             message: message.trim(),
+            server: server.trim(),
             model: model.trim(),
             sessionId: sessionId.trim(),
             stream: Boolean(stream)
@@ -51,6 +60,7 @@ export const sendMessage = async (message, model, sessionId, stream) => {
             validationErrors: error.response?.data?.errors,
             request: {
                 message,
+                server,
                 model,
                 sessionId,
                 stream

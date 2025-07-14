@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ChatBox from './components/ChatBox';
+import { getServers } from './services/api';
 import './App.css';
 
 const App = () => {
+    const [servers, setServers] = useState([]);
+    const [selectedServer, setSelectedServer] = useState('');
     const [sidebarExpanded, setSidebarExpanded] = useState(false);
     const [chatBoxKey, setChatBoxKey] = useState(0); // for resetting ChatBox
+
+    useEffect(() => {
+        const fetchServers = async () => {
+            const result = await getServers();
+            setServers(result);
+        };
+        fetchServers();
+    }, []);
 
     // New Chat handler to reset ChatBox
     const handleNewChat = () => {
@@ -41,6 +52,9 @@ const App = () => {
             <div className="main-chat-section">
                 <ChatBox
                     key={chatBoxKey}
+                    selectedServer={selectedServer}
+                    setSelectedServer={setSelectedServer}
+                    servers={servers}
                 />
             </div>
         </div>

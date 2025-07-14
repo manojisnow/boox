@@ -24,9 +24,15 @@ public class ChatController {
     this.chatService = chatService;
   }
 
+  @GetMapping("/servers")
+  public List<String> getServers() {
+    LOGGER.info("Received request: GET /api/chat/servers");
+    return chatService.getServers();
+  }
+
   @GetMapping("/models")
-  public ResponseEntity<List<ModelInfo>> getModels() {
-    final List<ModelInfo> modelInfos = chatService.getModels();
+  public ResponseEntity<List<ModelInfo>> getModels(@RequestParam final String server) {
+    final List<ModelInfo> modelInfos = chatService.getModels(server);
     return ResponseEntity.ok(modelInfos);
   }
 
@@ -34,8 +40,9 @@ public class ChatController {
   public ResponseEntity<?> sendMessage(@Valid @RequestBody final SendMessageRequest request) {
     LOGGER.info("Received sendMessage request with message: {}", request.getMessage());
     LOGGER.info(
-        "Request details: message={}, model={}, sessionId={}, stream={}",
+        "Request details: message={}, server={}, model={}, sessionId={}, stream={}",
         request.getMessage(),
+        request.getServer(),
         request.getModel(),
         request.getSessionId(),
         request.getStream());
