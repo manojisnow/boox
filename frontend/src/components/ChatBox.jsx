@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Message from './Message';
 import { sendMessage, getModels } from '../services/api';
 
-const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
+const ChatBox = () => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [models, setModels] = useState([]);
@@ -24,10 +24,9 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     useEffect(() => {
         setModels([]);
         setSelectedModel('');
-        if (!selectedServer) return;
         const fetchModels = async () => {
             try {
-                const result = await getModels(selectedServer);
+                const result = await getModels();
                 setModels(result);
                 // Set default model to llama3.2 if available
                 const defaultModel = result.find(m => m.name === 'llama3.2:latest');
@@ -42,7 +41,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             }
         };
         fetchModels();
-    }, [selectedServer]);
+    }, []);
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -52,10 +51,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
 
     const handleSendMessage = async (e) => {
         if (e) e.preventDefault();
-        if (!selectedServer) {
-            setError('Please select a server before sending a message.');
-            return;
-        }
         if (!selectedModel) {
             setError('Please select a model before sending a message.');
             return;
@@ -71,7 +66,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
 
         try {
             // Ensure all values are properly formatted
-            const server = selectedServer.trim();
             const model = selectedModel.trim();
             const sessionId = sessionIdRef.current.trim();
             const stream = Boolean(streamEnabled);
@@ -79,7 +73,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             // Log the request details before sending
             console.log('Sending message with:', {
                 message: input,
-                server,
                 model,
                 sessionId,
                 stream
@@ -87,7 +80,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
 
             const response = await sendMessage(
                 input.trim(),
-                server,
                 model,
                 sessionId,
                 stream
@@ -95,7 +87,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
 
             console.log('Successfully sent message:', {
                 message: input,
-                server,
                 model,
                 sessionId,
                 stream
@@ -112,7 +103,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     };
 
     // Clear error when user selects server/model or types
-    useEffect(() => { setError(''); }, [selectedServer, selectedModel]);
+    useEffect(() => { setError(''); }, [selectedModel]);
     
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -142,17 +133,6 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             {error && <div className="chat-error-message">{error}</div>}
             {/* New Chat button */}
             <div className="chat-controls">
-                <select
-                    value={selectedServer}
-                    onChange={e => setSelectedServer(e.target.value)}
-                    disabled={chatLocked || messages.length > 0}
-                    className="inline-select"
-                >
-                    <option value="" disabled>Select a server</option>
-                    {servers.map(server => (
-                        <option key={server} value={server}>{server}</option>
-                    ))}
-                </select>
                 {models.length > 0 && (
                     <select
                         value={selectedModel}
@@ -190,7 +170,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                             rows={4}
                             className="input-textarea"
                         />
-                        <button type="submit" className="send-btn" aria-label="Send" disabled={chatLocked || !input.trim() || !selectedServer || !selectedModel}>
+                        <button type="submit" className="send-btn" aria-label="Send" disabled={chatLocked || !input.trim() || !selectedModel}>
                             <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <circle cx="14" cy="14" r="14" fill="#7b61ff"/>
                                 <path d="M10 14L18 14M18 14L15 11M18 14L15 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

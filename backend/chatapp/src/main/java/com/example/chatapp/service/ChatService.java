@@ -20,46 +20,39 @@ public class ChatService {
     this.engines = new HashMap<>(engines);
   }
 
-  public List<String> getServers() {
-    LOGGER.debug("Fetching list of servers");
-    return new ArrayList<>(engines.keySet());
-  }
-
-  public List<ModelInfo> getModels(final String server) {
-    final ChatEngine engine = engines.get(server);
+  public List<ModelInfo> getModels() {
+    final ChatEngine engine = engines.get("ollama");
     if (engine != null) {
-      LOGGER.debug("Fetching models for server: {}", server);
+      LOGGER.debug("Fetching models for server: ollama");
       return engine.getModels();
     }
-    LOGGER.warn("Requested models for unknown server: {}", server);
+    LOGGER.warn("Requested models for unknown server: ollama");
     return Collections.emptyList();
   }
 
   public Map<String, String> sendMessage(final SendMessageRequest request) {
     final String message = request.getMessage();
-    final String server = request.getServer();
     final String model = request.getModel();
     final String sessionId = request.getSessionId();
     final boolean stream = request.getStream() != null && request.getStream();
-    final ChatEngine engine = engines.get(server);
+    final ChatEngine engine = engines.get("ollama");
     if (engine != null) {
       LOGGER.info(
-          "Sending message to server: {}, model: {}, session: {}", server, model, sessionId);
+          "Sending message to server: ollama, model: {}, session: {}", model, sessionId);
       return engine.sendMessage(message, model, sessionId, stream);
     }
-    LOGGER.warn("Attempted to send message to unknown server: {}", server);
+    LOGGER.warn("Attempted to send message to unknown server: ollama");
     return Map.of("role", "assistant", "content", "(unknown server)");
   }
 
   public void resetContext(final ResetContextRequest request) {
-    final String server = request.getServer();
     final String sessionId = request.getSessionId();
-    final ChatEngine engine = engines.get(server);
+    final ChatEngine engine = engines.get("ollama");
     if (engine != null) {
-      LOGGER.info("Resetting context for server: {}, session: {}", server, sessionId);
+      LOGGER.info("Resetting context for server: ollama, session: {}", sessionId);
       engine.resetContext(sessionId);
     } else {
-      LOGGER.warn("Attempted to reset context for unknown server: {}", server);
+      LOGGER.warn("Attempted to reset context for unknown server: ollama");
     }
   }
 
