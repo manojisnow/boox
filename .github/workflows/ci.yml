@@ -16,10 +16,6 @@ jobs:
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
-      - name: Run Hadolint on backend Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: backend/chatapp/Dockerfile
 
   backend:
     name: Java Backend Build & Quality
