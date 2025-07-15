@@ -35,6 +35,10 @@ ENV PORT=8080 \
     OLLAMA_API_TEMPERATURE=0.7 \
     SPRING_PROFILES_ACTIVE=docker
 
+# Add a healthcheck for operational readiness
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+
 # Expose the single port for the Spring Boot application
 EXPOSE 8080
 
