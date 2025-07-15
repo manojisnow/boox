@@ -74,3 +74,32 @@ jobs:
         run: |
           cd frontend
           npm test -- --watchAll=false --passWithNoTests
+  docker-build-and-test:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    # This job should only run after the source code jobs succeed
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build the Docker image
+        run: docker build -t boox-app:ci-${{ github.sha }} .
+
+      - name: Run the container using Docker Compose
+        # We run in detached mode and override the image to use the one we just built
+        run: |
+          # Create a temporary .env file for docker-compose to use
+          echo "BOOX_IMAGE_TAG=ci-${{ github.sha }}" > .env
+          docker compose up -d
+
+      - name: Wait for container to be healthy
+        # This gives the app time to start and respects the HEALTHCHECK in your Dockerfile
+        # The script will fail if the container doesn't become healthy in time.
+        run: |
+          echo "Waiting for container to become healthy..."
+          timeout 60s bash -c 'while [[ "$(docker ps -f "name=app" -f "health=healthy" -q)" == "" ]]; do sleep 2; done'
+          echo "Container is healthy!"
+
+      - name: Check container logs for errors
+        run: docker compose logs app

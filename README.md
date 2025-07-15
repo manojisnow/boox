@@ -36,7 +36,11 @@ For local development:
 
 ### Option 1: Docker Compose (Recommended)
 
-This option requires only Docker and provides a complete development environment:
+This is the simplest and most reliable way to run the entire application. It uses the production-grade `Dockerfile` to build a single, self-contained image where the Spring Boot backend serves both the API and the compiled React frontend.
+
+1.  **Ensure Docker Desktop is running.**
+
+2.  **From the project root, run:**
 
 ```bash
 # Start everything with Docker Compose
