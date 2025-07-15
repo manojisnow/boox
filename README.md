@@ -157,7 +157,7 @@ Available variables:
 ```
 boox/
 ├── backend/           # Spring Boot backend
-│   └── app/          # Main application module
+│   └── chatapp/          # Main application module
 ├── frontend/         # React frontend
 ├── scripts/          # Utility scripts
 └── docker-compose.yml # Complete development environment
