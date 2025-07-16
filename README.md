@@ -62,6 +62,9 @@ docker exec <ollama_container_id> ollama pull llama3.2
 
 The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
 
+Only with this option. there are no 2 servers running, and the frontend is served directly from the backend, making it easy to develop and deploy. 
+To access the application, open your browser and go to: http://localhost:8080 
+
 ### Option 2: Local Development
 
 1. Start Ollama server and pull the model:
