@@ -23,6 +23,10 @@ RUN mvn -f backend/pom.xml -pl chatapp -am clean package -DskipTests
 FROM openjdk:17-slim
 WORKDIR /app
 
+ # Install curl for the HEALTHCHECK.
+ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+     rm -rf /var/lib/apt/lists/*
+
 # Copy the final, self-contained executable JAR
 COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar app.jar
 
@@ -30,7 +34,7 @@ COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar
 # CORS is no longer needed since the frontend and backend are served from the same origin.
 # The entire application will be available at http://localhost:8080/
 ENV PORT=8080 \
-    OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+    OLLAMA_API_URL=http://host.docker.internal:11434 \
     OLLAMA_MODEL=llama2 \
     OLLAMA_API_TEMPERATURE=0.7 \
     SPRING_PROFILES_ACTIVE=docker
