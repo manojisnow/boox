@@ -1,7 +1,9 @@
 package com.example.chatapp.controller;
 
 import com.example.chatapp.engine.ModelInfo;
+import com.example.chatapp.tool.ToolRegistry;
 import java.util.List;
+import java.util.Map;
 import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,11 +19,14 @@ public class ChatController {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChatController.class);
 
   private final com.example.chatapp.service.ChatService chatService;
+  private final ToolRegistry toolRegistry;
 
   @Autowired
   @SuppressWarnings("PMD.LawOfDemeter")
-  public ChatController(final com.example.chatapp.service.ChatService chatService) {
+  public ChatController(
+      final com.example.chatapp.service.ChatService chatService, final ToolRegistry toolRegistry) {
     this.chatService = chatService;
+    this.toolRegistry = toolRegistry;
   }
 
   @GetMapping("/servers")
@@ -54,12 +59,10 @@ public class ChatController {
     }
   }
 
-  @GetMapping("/search")
-  public ResponseEntity<?> searchWeb(@RequestParam final String query) {
-    if (LOGGER.isInfoEnabled()) {
-      LOGGER.info("Received searchWeb request: {}", query);
-    }
-    return ResponseEntity.ok(chatService.searchWeb(query));
+  @GetMapping("/tools")
+  public ResponseEntity<List<Map<String, String>>> getTools() {
+    LOGGER.info("Received request: GET /api/chat/tools");
+    return ResponseEntity.ok(toolRegistry.getAvailableTools());
   }
 
   @PostMapping("/reset-context")

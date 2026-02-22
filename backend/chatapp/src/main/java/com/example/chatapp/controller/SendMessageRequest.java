@@ -10,6 +10,7 @@ public class SendMessageRequest {
   @NotBlank private String model;
   @NotBlank private String sessionId;
   @NotNull private Boolean stream;
+  private String systemPrompt;
 
   public SendMessageRequest() {}
 
@@ -51,5 +52,13 @@ public class SendMessageRequest {
 
   public void setStream(final boolean stream) {
     this.stream = stream;
+  }
+
+  public String getSystemPrompt() {
+    return systemPrompt;
+  }
+
+  public void setSystemPrompt(final String systemPrompt) {
+    this.systemPrompt = systemPrompt;
   }
 }

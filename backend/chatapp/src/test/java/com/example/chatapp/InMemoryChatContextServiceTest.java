@@ -39,4 +39,22 @@ class InMemoryChatContextServiceTest {
     List<Map<String, String>> context = service.getContext("sid");
     assertTrue(context.isEmpty());
   }
+
+  @Test
+  void setSystemPrompt_and_getSystemPrompt() {
+    service.setSystemPrompt("sid", "You are helpful.");
+    assertEquals("You are helpful.", service.getSystemPrompt("sid"));
+  }
+
+  @Test
+  void getSystemPrompt_returnsNull_whenNotSet() {
+    assertNull(service.getSystemPrompt("sid"));
+  }
+
+  @Test
+  void resetContext_clearsSystemPrompt() {
+    service.setSystemPrompt("sid", "prompt");
+    service.resetContext("sid");
+    assertNull(service.getSystemPrompt("sid"));
+  }
 }

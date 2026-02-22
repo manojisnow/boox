@@ -1,13 +1,117 @@
-/* index.css - Base styles for the React app */
+/* index.css - Base styles and design tokens */
+
+:root {
+  /* Colors */
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f9fafb;
+  --color-border: #e5e5ea;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #86868b;
+  --color-text-muted: #aeaeb2;
+  --color-accent: #7b61ff;
+  --color-accent-hover: #5a43c2;
+  --color-error: #ff3b30;
+  --color-bot-bubble: #f2f2f7;
+  --color-user-bubble-start: #7b61ff;
+  --color-user-bubble-end: #5a43c2;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 18px;
+  --radius-lg: 32px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.08);
+
+  /* Z-index scale */
+  --z-base: 1;
+  --z-input: 2;
+  --z-sidebar: 10;
+  --z-controls: 20;
+  --z-overlay: 100;
+  --z-toast: 200;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+}
 
 body {
   margin: 0;
   padding: 0;
-  background: #f5f7fa;
-  font-family: 'Segoe UI', Arial, sans-serif;
-  color: #222;
+  background: var(--color-bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', sans-serif;
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
-} 
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1c1c1e;
+    --color-surface: #2c2c2e;
+    --color-surface-secondary: #3a3a3c;
+    --color-border: rgba(255, 255, 255, 0.1);
+    --color-text-primary: #f5f5f7;
+    --color-text-secondary: rgba(235, 235, 245, 0.6);
+    --color-text-muted: rgba(235, 235, 245, 0.3);
+    --color-bot-bubble: rgba(255, 255, 255, 0.08);
+    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 4px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
