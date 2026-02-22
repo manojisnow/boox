@@ -1,0 +1,72 @@
+.tool-call {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-secondary);
+    border: 1px solid var(--color-border);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    max-width: 480px;
+    margin: 4px 0;
+}
+
+.tool-call:hover {
+    background: var(--color-surface);
+}
+
+.tool-call-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-call-icon {
+    flex-shrink: 0;
+}
+
+.tool-call.searching .tool-call-icon {
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+.tool-call-label {
+    flex: 1;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-call.complete .tool-call-label {
+    color: var(--color-text-primary);
+}
+
+.tool-call-chevron {
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    transition: transform var(--transition-fast);
+}
+
+.tool-call-chevron.open {
+    transform: rotate(90deg);
+}
+
+.tool-call-result {
+    margin: 8px 0 0 0;
+    padding: 8px;
+    background: var(--color-surface);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}

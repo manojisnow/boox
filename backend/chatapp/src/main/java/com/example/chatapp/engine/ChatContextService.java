@@ -8,5 +8,9 @@ public interface ChatContextService {
 
   void addMessage(String sessionId, String role, String content);
 
+  void setSystemPrompt(String sessionId, String systemPrompt);
+
+  String getSystemPrompt(String sessionId);
+
   void resetContext(String sessionId);
 }

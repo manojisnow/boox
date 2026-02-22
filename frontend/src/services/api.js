@@ -15,8 +15,7 @@ export const getModels = async (server) => {
     return response.data;
 };
 
-export const sendMessage = async (message, server, model, sessionId, stream) => {
-    // Validate input parameters
+export const sendMessage = async (message, server, model, sessionId, stream, systemPrompt) => {
     if (!message || !message.trim()) {
         throw new Error('Message cannot be empty');
     }
@@ -31,18 +30,17 @@ export const sendMessage = async (message, server, model, sessionId, stream) => 
     }
 
     try {
-        // Ensure all values are properly formatted
         const requestBody = {
             message: message.trim(),
             server: server.trim(),
             model: model.trim(),
             sessionId: sessionId.trim(),
-            stream: Boolean(stream)
+            stream: Boolean(stream),
         };
-        
-        console.log('Sending request with body:', requestBody);
-        
-        // Send the request with proper headers
+        if (systemPrompt && systemPrompt.trim()) {
+            requestBody.systemPrompt = systemPrompt.trim();
+        }
+
         const response = await axios.post(
             `${API_BASE_URL}/api/chat/send`,
             requestBody,
@@ -54,46 +52,45 @@ export const sendMessage = async (message, server, model, sessionId, stream) => 
         );
         return response.data;
     } catch (error) {
-        console.error('Error sending message:', {
-            message: error.response?.data?.message || error.message,
-            status: error.response?.status,
-            validationErrors: error.response?.data?.errors,
-            request: {
-                message,
-                server,
-                model,
-                sessionId,
-                stream
-            }
-        });
+        console.error('Send failed:', error.message);
         throw error;
     }
 };
 
-export const searchWeb = async (query) => {
+export const streamMessage = async (message, server, model, sessionId, systemPrompt) => {
+    const body = {
+        message: message.trim(),
+        server: server.trim(),
+        model: model.trim(),
+        sessionId: sessionId.trim(),
+        stream: true,
+    };
+    if (systemPrompt && systemPrompt.trim()) {
+        body.systemPrompt = systemPrompt.trim();
+    }
+    const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+        throw new Error(`Stream request failed: ${response.status}`);
+    }
+    return response;
+};
+
+export const getTools = async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/chat/tools`);
+    return response.data;
+};
+
+export const resetContext = async (server, sessionId) => {
     try {
-        const response = await axios.get(`${API_BASE_URL}/api/chat/search`, { params: { query } });
+        const response = await axios.post(`${API_BASE_URL}/api/chat/reset-context`, {
+            server: server,
+            sessionId: sessionId,
+        });
         return response.data;
-    } catch (error) {
-        console.error('Error searching the web:', error);
-        throw error;
-    }
-};
-
-export const resetContext = async () => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/chat/reset`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
     } catch (error) {
         console.error('Error resetting context:', error);
         throw error;
