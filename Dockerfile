@@ -20,12 +20,14 @@ COPY --from=builder-frontend /app/build ./backend/chatapp/src/main/resources/sta
 RUN mvn -f backend/pom.xml -pl chatapp -am clean package -DskipTests
 
 # Stage 3: Final, lean, and secure production image
-FROM openjdk:17-slim
+# eclipse-temurin is the actively maintained successor to the deprecated openjdk Docker images.
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
- # Install curl for the HEALTHCHECK.
- RUN apt-get update && apt-get install -y --no-install-recommends curl=7.74.0-1.3+deb11u15 && \
-     rm -rf /var/lib/apt/lists/*
+# Install curl for the HEALTHCHECK.
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the final, self-contained executable JAR
 COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar app.jar
