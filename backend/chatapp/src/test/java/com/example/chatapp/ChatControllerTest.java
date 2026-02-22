@@ -8,6 +8,7 @@ import com.example.chatapp.controller.ResetContextRequest;
 import com.example.chatapp.controller.SendMessageRequest;
 import com.example.chatapp.engine.ModelInfo;
 import com.example.chatapp.service.ChatService;
+import com.example.chatapp.tool.ToolRegistry;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 
 class ChatControllerTest {
   @Mock private ChatService chatService;
+  @Mock private ToolRegistry toolRegistry;
 
   @InjectMocks private ChatController chatController;
 
@@ -57,10 +59,12 @@ class ChatControllerTest {
   }
 
   @Test
-  void searchWeb_returnsResults() {
-    when(chatService.searchWeb("q")).thenReturn("results");
-    ResponseEntity<?> response = chatController.searchWeb("q");
-    assertEquals("results", response.getBody());
+  void getTools_returnsToolList() {
+    List<Map<String, String>> tools =
+        List.of(Map.of("name", "web_search", "description", "Search the web"));
+    when(toolRegistry.getAvailableTools()).thenReturn(tools);
+    ResponseEntity<List<Map<String, String>>> response = chatController.getTools();
+    assertEquals(tools, response.getBody());
   }
 
   @Test

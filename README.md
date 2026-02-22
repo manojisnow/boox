@@ -87,7 +87,7 @@ You can download a different model by replacing `llama2` with your desired model
 
 2. Start the backend:
 ```bash
-cd backend/app
+cd backend/chatapp
 mvn spring-boot:run
 ```
 
@@ -180,21 +180,38 @@ boox/
 
 ## Features
 
-- Real-time chat interface
-- Integration with Ollama models
-- Configurable model parameters
-- Modern React UI
-- RESTful Spring Boot backend
-- Zero-configuration Docker setup
-- Development hot-reload
+### Chat
+- **Real-time streaming** — responses appear token by token via SSE (Server-Sent Events), with a toggle to switch to non-streaming mode
+- **Markdown rendering** — bot replies render as rich markdown with syntax-highlighted code blocks (via `react-markdown` + `react-syntax-highlighter`)
+- **System prompt** — collapsible gear icon in the input bar lets you set a custom system instruction (e.g. "You are a pirate"); persisted across page reloads via `sessionStorage`
+- **Context reset** — clear conversation history without restarting the server
+- **Multi-model support** — switch between any models pulled into Ollama; changing model mid-conversation resets the session automatically
+
+### Tool Calling
+- **Web search** — powered by the DuckDuckGo Instant Answer API; the model can look up facts and entities on its own when needed
+- **Live tool call cards** — while the model is searching, a pulsing card appears in the chat; it expands with the result once done
+- **Extensible framework** — add new tools by implementing the `Tool` interface and registering as a Spring `@Component`; no other wiring needed
+
+To enable web search, set in `backend/chatapp/src/main/resources/application.properties`:
+```properties
+tools.websearch.enabled=true
+```
+
+### UI / UX
+- **Dark mode** — automatic via `prefers-color-scheme`, no toggle needed
+- **25 CSS design tokens** — consistent spacing, colours, radii, and transitions throughout
+- **Auto-resize textarea** — input grows as you type, capped at 120px
+- **Enter to send, Shift+Enter for newline**
+- **Typing indicator** — animated dots while waiting for the first token
+- **Toast notifications** — errors auto-dismiss after 5 seconds
+- **Accessible** — `aria-label` on all interactive elements
 
 ## Development Notes
 
 - Frontend runs in development mode with hot-reload
-- Backend uses Spring Boot with embedded Tomcat
-- Docker Compose provides complete environment
-- Ollama models are cached in Docker volume
-- All services are configured to work together automatically
+- Backend uses Spring Boot with embedded Tomcat and a bounded SSE thread pool (`AsyncConfig`)
+- Docker Compose provides complete environment; Ollama models cached in a Docker volume
+- Quality gates: JaCoCo ≥ 90% coverage · SpotBugs · Checkstyle (Google Java Style) · PMD · Spotless
 
 ## Contributing
 

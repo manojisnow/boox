@@ -271,6 +271,8 @@
                                 <exclude>com/example/chatapp/controller/ResetContextRequest*</exclude>
                                 <exclude>com/example/chatapp/engine/ModelInfo*</exclude>
                                 <exclude>com/example/chatapp/controller/CorsConfig*</exclude>
+                                <exclude>com/example/chatapp/engine/ChatEngine*</exclude>
+                                <exclude>com/example/chatapp/engine/OllamaChatEngine$Constants*</exclude>
                             </excludes>
                             <rules>
                                 <rule>

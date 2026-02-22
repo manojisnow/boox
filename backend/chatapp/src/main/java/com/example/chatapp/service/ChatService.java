@@ -2,22 +2,31 @@ package com.example.chatapp.service;
 
 import com.example.chatapp.controller.ResetContextRequest;
 import com.example.chatapp.controller.SendMessageRequest;
+import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.ChatEngine;
 import com.example.chatapp.engine.ModelInfo;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
+@SuppressFBWarnings(
+    value = {"EI_EXPOSE_REP2"},
+    justification = "Spring-managed beans are not exposed outside this class; safe for DI usage.")
 public class ChatService {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChatService.class);
   private final Map<String, ChatEngine> engines;
+  private final ChatContextService chatContextService;
 
   @Autowired
-  public ChatService(Map<String, ChatEngine> engines) {
+  public ChatService(
+      final Map<String, ChatEngine> engines, final ChatContextService chatContextService) {
     this.engines = new HashMap<>(engines);
+    this.chatContextService = chatContextService;
   }
 
   public List<String> getServers() {
@@ -41,6 +50,9 @@ public class ChatService {
     final String model = request.getModel();
     final String sessionId = request.getSessionId();
     final boolean stream = request.getStream() != null && request.getStream();
+    if (request.getSystemPrompt() != null) {
+      chatContextService.setSystemPrompt(sessionId, request.getSystemPrompt());
+    }
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -63,9 +75,29 @@ public class ChatService {
     }
   }
 
-  public String searchWeb(final String query) {
-    LOGGER.info("Performing web search for query: {}", query);
-    // Logic to perform a web search using DuckDuckGo
-    return "Search results for query: " + query;
+  public void streamMessage(final SendMessageRequest request, final SseEmitter emitter) {
+    final String server = request.getServer();
+    if (request.getSystemPrompt() != null) {
+      chatContextService.setSystemPrompt(request.getSessionId(), request.getSystemPrompt());
+    }
+    final ChatEngine engine = engines.get(server);
+    if (engine != null) {
+      LOGGER.info(
+          "Streaming message to server: {}, model: {}, session: {}",
+          server,
+          request.getModel(),
+          request.getSessionId());
+      engine.streamMessage(
+          request.getMessage(), request.getModel(), request.getSessionId(), emitter);
+    } else {
+      LOGGER.warn("Attempted to stream message to unknown server: {}", server);
+      try {
+        emitter.send(SseEmitter.event().data("(unknown server)"));
+        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.complete();
+      } catch (Exception e) {
+        emitter.completeWithError(e);
+      }
+    }
   }
 }
