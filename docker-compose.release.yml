@@ -5,7 +5,7 @@
 # the default AI model on first run.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/dumanoj/boox/main/docker-compose.release.yml \
+#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
 #     -o docker-compose.boox.yml
 #   docker compose -f docker-compose.boox.yml up
 #

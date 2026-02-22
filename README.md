@@ -8,7 +8,7 @@ Just Docker required — no repo clone, no build, no manual model setup.
 
 ```bash
 # 1. Download the compose file
-curl -fsSL https://raw.githubusercontent.com/dumanoj/boox/main/docker-compose.release.yml \
+curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
   -o docker-compose.boox.yml
 
 # 2. Run it
