@@ -2,48 +2,51 @@
 
 A modern chat application built with React and Spring Boot that uses Ollama for local AI models.
 
-## Quick Start with Docker Compose
+## ⚡ Zero-Setup Quick Start
 
-The fastest way to get started is using Docker Compose, which sets up everything automatically:
+Just Docker required — no repo clone, no build, no manual model setup.
 
 ```bash
-# Start the entire stack
-docker compose up -d
+# 1. Download the compose file
+curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
+  -o docker-compose.boox.yml
 
-# Watch the setup progress
-docker compose logs -f
+# 2. Run it
+docker compose -f docker-compose.boox.yml up
 ```
 
-The application will be available at:
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8080
-- Ollama API: http://localhost:11434
+Open **http://localhost:8080** — done.
 
-That's it! Everything is set up and ready to use.
+> The default AI model (`llama3.2:1b`, ~1.3 GB) is pulled automatically on first run and cached in
+> a Docker volume. Subsequent starts are instant. To use a different model, create a `.env` file
+> next to the compose file with `OLLAMA_MODEL=<model-name>`.
+
+---
 
 ## Prerequisites
 
-For quick start:
+For zero-setup quick start:
 - Docker and Docker Compose (that's all!)
 
 For local development:
 - Java 17
 - Node.js 20+
 - Maven
-- [Ollama](https://ollama.ai/) with your preferred model (default: llama2)
+- [Ollama](https://ollama.ai/) with your preferred model (default: llama3.2)
 
 ## Development Options
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker Compose from Source (Contributors / Developers)
 
-This is the simplest and most reliable way to run the entire application. It uses the production-grade `Dockerfile` to build a single, self-contained image where the Spring Boot backend serves both the API and the compiled React frontend.
+Builds the image locally from source. Use this if you are making code changes and want to test
+the full stack end-to-end. Requires cloning the repository.
 
 1.  **Ensure Docker Desktop is running.**
 
 2.  **From the project root, run:**
 
 ```bash
-# Start everything with Docker Compose
+# Build and start everything
 docker compose up -d
 
 # View logs
@@ -62,8 +65,8 @@ docker exec <ollama_container_id> ollama pull llama3.2
 
 The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
 
-Only with this option. there are no 2 servers running, and the frontend is served directly from the backend, making it easy to develop and deploy. 
-To access the application, open your browser and go to: http://localhost:8080 
+The frontend is compiled and served directly by the Spring Boot backend — there is only one server.
+Open your browser and go to: http://localhost:8080
 
 #### Bonus:
 If you have enough resources and want to download a different model, you can do so by running the following command:

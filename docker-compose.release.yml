@@ -1,0 +1,74 @@
+# Boox — End-User Compose File
+#
+# This file is for end users who want to run Boox without cloning the repo.
+# It pulls the pre-built image from Docker Hub and automatically downloads
+# the default AI model on first run.
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
+#     -o docker-compose.boox.yml
+#   docker compose -f docker-compose.boox.yml up
+#
+# Open http://localhost:8080 — no further configuration needed.
+# The AI model (~1.3 GB) is downloaded once and cached in a Docker volume.
+
+services:
+
+  # ── Ollama AI engine ─────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── One-time model bootstrap (runs once, then exits) ─────────────────────────
+  # Pulls the default model into the shared ollama_data volume.
+  # On subsequent runs the model is already cached — this exits immediately.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "pull", "llama3.2:1b"]
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: "no"
+
+  # ── Boox application (frontend + backend in one image) ───────────────────────
+  app:
+    image: dumanoj/boox:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama3.2:1b
+      - OLLAMA_API_TEMPERATURE=0.7
+      - PORT=8080
+      - CORS_ALLOWED_ORIGINS=http://localhost:8080
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  # Model weights are cached here — survives container restarts and upgrades.
+  # Remove this volume only if you want to force a fresh model download.
+  ollama_data:
