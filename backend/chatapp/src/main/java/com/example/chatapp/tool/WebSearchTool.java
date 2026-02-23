@@ -3,15 +3,18 @@ package com.example.chatapp.tool;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +28,7 @@ import org.springframework.web.client.RestTemplate;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 /**
  * Web search tool using a three-provider fallback chain — all free, no API keys required.
@@ -106,7 +110,7 @@ public class WebSearchTool implements Tool {
   // ---------------------------------------------------------------------------
 
   @Override
-  @SuppressWarnings({"unchecked", "PMD.AvoidCatchingGenericException"})
+  @SuppressWarnings("unchecked")
   public String execute(final Map<String, Object> arguments) {
     final Object queryObj = arguments.get("query");
     if (queryObj == null) {
@@ -125,7 +129,8 @@ public class WebSearchTool implements Tool {
               .values().stream()
                   .filter(v -> v instanceof String)
                   .map(v -> ((String) v).strip())
-                  .filter(v -> !v.isBlank() && !JSON_TYPE_KEYWORDS.contains(v.toLowerCase()))
+                  .filter(
+                      v -> !v.isBlank() && !JSON_TYPE_KEYWORDS.contains(v.toLowerCase(Locale.ROOT)))
                   .findFirst()
                   .orElse(null);
       if (extracted != null) {
@@ -167,7 +172,7 @@ public class WebSearchTool implements Tool {
       LOGGER.info("Wikipedia returned no results for '{}', trying Google News RSS", query);
       return searchGoogleNewsRss(query).orElse("No results found for: " + query);
 
-    } catch (Exception e) {
+    } catch (IOException | ParserConfigurationException | SAXException | RuntimeException e) {
       LOGGER.error("Web search failed for query '{}': {}", query, e.getMessage(), e);
       return "Search failed: " + e.getMessage();
     }
@@ -178,8 +183,7 @@ public class WebSearchTool implements Tool {
   // ---------------------------------------------------------------------------
 
   @SuppressWarnings({"unchecked", "PMD.LawOfDemeter"})
-  Optional<String> searchDuckDuckGo(final String query)
-      throws com.fasterxml.jackson.core.JsonProcessingException, java.io.IOException {
+  Optional<String> searchDuckDuckGo(final String query) throws IOException {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = DDG_API_URL + "?q=" + encoded + "&format=json&no_html=1&skip_disambig=1";
 
@@ -192,7 +196,7 @@ public class WebSearchTool implements Tool {
     final ResponseEntity<String> response =
         restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
-    final String body = response != null ? response.getBody() : null;
+    final String body = response.getBody();
     if (body == null || body.isEmpty()) {
       return Optional.empty();
     }
@@ -249,8 +253,7 @@ public class WebSearchTool implements Tool {
   // ---------------------------------------------------------------------------
 
   @SuppressWarnings("unchecked")
-  Optional<String> searchWikipedia(final String query)
-      throws com.fasterxml.jackson.core.JsonProcessingException, java.io.IOException {
+  Optional<String> searchWikipedia(final String query) throws IOException {
     // Step 1: find the most relevant article title
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String searchUrl =
@@ -267,7 +270,7 @@ public class WebSearchTool implements Tool {
     final ResponseEntity<String> searchResponse =
         restTemplate.exchange(searchUrl, HttpMethod.GET, entity, String.class);
 
-    final String searchBody = searchResponse != null ? searchResponse.getBody() : null;
+    final String searchBody = searchResponse.getBody();
     if (searchBody == null || searchBody.isEmpty()) {
       return Optional.empty();
     }
@@ -296,7 +299,7 @@ public class WebSearchTool implements Tool {
     final ResponseEntity<String> summaryResponse =
         restTemplate.exchange(summaryUrl, HttpMethod.GET, entity, String.class);
 
-    final String summaryBody = summaryResponse != null ? summaryResponse.getBody() : null;
+    final String summaryBody = summaryResponse.getBody();
     if (summaryBody == null || summaryBody.isEmpty()) {
       return Optional.empty();
     }
@@ -334,10 +337,8 @@ public class WebSearchTool implements Tool {
   // Provider 3: Google News RSS
   // ---------------------------------------------------------------------------
 
-  @SuppressFBWarnings(
-      value = "XXE_DOCUMENT_BUILDER_FACTORY",
-      justification = "XXE is disabled via setFeature calls below.")
-  Optional<String> searchGoogleNewsRss(final String query) throws Exception {
+  Optional<String> searchGoogleNewsRss(final String query)
+      throws IOException, ParserConfigurationException, SAXException {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = GOOGLE_NEWS_RSS_URL + "?q=" + encoded + "&hl=en-US&gl=US&ceid=US:en";
 
@@ -349,7 +350,7 @@ public class WebSearchTool implements Tool {
     final ResponseEntity<String> response =
         restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
-    final String body = response != null ? response.getBody() : null;
+    final String body = response.getBody();
     if (body == null || body.isEmpty()) {
       return Optional.empty();
     }
