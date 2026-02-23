@@ -79,12 +79,35 @@ public class OllamaChatEngine implements ChatEngine {
     public static final String ERROR_COMMUNICATING = "Error communicating with Ollama API";
   }
 
+  /**
+   * Tool-use hint prepended to every system message when tools are registered. Guides smaller
+   * models (e.g. llama3.2 3B) that otherwise echo the parameter schema as argument values.
+   */
+  private static final String TOOL_USAGE_HINT =
+      "You have access to tools, but you must only use them when truly necessary.\n"
+          + "Do NOT call any tool for: greetings, small talk, simple facts, math, coding"
+          + " questions, or anything you can answer confidently from your training data.\n"
+          + "Only call a tool (e.g. web_search) when the user explicitly needs current,"
+          + " real-time, or external information that you cannot reliably provide yourself.\n"
+          + "When you do call a tool, always supply plain scalar values as arguments — never"
+          + " the schema definition. Example: {\"query\": \"your actual search terms\"},"
+          + " not {\"query\": {\"type\": \"string\", \"description\": \"...\"}}.\n";
+
   private List<Map<String, String>> buildMessagesWithSystemPrompt(final String sessionId) {
     final List<Map<String, String>> context = chatContextService.getContext(sessionId);
-    final String systemPrompt = chatContextService.getSystemPrompt(sessionId);
-    if (systemPrompt != null && !systemPrompt.isEmpty()) {
+    final String userSystemPrompt = chatContextService.getSystemPrompt(sessionId);
+
+    final StringBuilder systemContent = new StringBuilder();
+    if (toolRegistry.hasTools()) {
+      systemContent.append(TOOL_USAGE_HINT);
+    }
+    if (userSystemPrompt != null && !userSystemPrompt.isEmpty()) {
+      systemContent.append(userSystemPrompt);
+    }
+
+    if (systemContent.length() > 0) {
       final List<Map<String, String>> messages = new ArrayList<>();
-      messages.add(Map.of("role", "system", Constants.CONTENT, systemPrompt));
+      messages.add(Map.of("role", "system", Constants.CONTENT, systemContent.toString()));
       messages.addAll(context);
       return messages;
     }
@@ -134,6 +157,32 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   /**
+   * Resolves the {@code arguments} field of a tool call function object into a usable Map.
+   *
+   * <p>Ollama may return {@code arguments} either as a pre-parsed JSON object (Map) or as a
+   * JSON-encoded string. Both cases are handled here so the rest of the tool-call pipeline always
+   * receives a {@code Map<String, Object>}.
+   */
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> resolveArguments(final Map<String, Object> function) {
+    final Object raw = function.getOrDefault("arguments", Map.of());
+    if (raw instanceof Map) {
+      return (Map<String, Object>) raw;
+    }
+    if (raw instanceof String) {
+      final String json = ((String) raw).trim();
+      if (!json.isEmpty()) {
+        try {
+          return MAPPER.readValue(json, Map.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+          LOGGER.warn("Could not parse tool arguments as JSON: {}", json);
+        }
+      }
+    }
+    return Map.of();
+  }
+
+  /**
    * Runs the tool-use loop until no tool calls remain or MAX_TOOL_ITERATIONS is reached.
    *
    * <p>When {@code emitter} is non-null, emits {@code tool_call} and {@code tool_result} named SSE
@@ -172,8 +221,7 @@ public class OllamaChatEngine implements ChatEngine {
       for (final Map<String, Object> toolCall : toolCalls) {
         final Map<String, Object> function = (Map<String, Object>) toolCall.get("function");
         final String toolName = (String) function.get("name");
-        final Map<String, Object> args =
-            (Map<String, Object>) function.getOrDefault("arguments", Map.of());
+        final Map<String, Object> args = resolveArguments(function);
         final int currentIndex = toolIndex++;
 
         if (emitter != null) {
