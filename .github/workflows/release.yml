@@ -104,6 +104,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Re-use cached layers from previous releases to speed up builds
