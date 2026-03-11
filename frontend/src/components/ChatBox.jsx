@@ -34,7 +34,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             try {
                 const result = await getModels(selectedServer);
                 setModels(result);
-                const defaultModel = result.find(m => m.name === 'llama3.2:latest');
+                const defaultModel = result.find(m => m.name === 'phi4-mini:latest');
                 if (defaultModel) {
                     setSelectedModel(defaultModel.name);
                 }

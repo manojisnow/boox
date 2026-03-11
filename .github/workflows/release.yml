@@ -129,7 +129,7 @@ jobs:
             docker compose -f docker-compose.boox.yml up
             ```
 
-            - The default AI model (`llama3.2:1b`, ~1.3 GB) downloads automatically on first run.
+            - The default AI model (`phi4-mini`, ~2.5 GB) downloads automatically on first run.
             - The model is cached in a Docker volume — subsequent starts are instant.
             - To use a different model, set `OLLAMA_MODEL` in a `.env` file next to the compose file.
 

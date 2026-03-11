@@ -14,7 +14,7 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 |---|---|
 | Frontend | React 17, Axios, react-scripts |
 | Backend | Spring Boot 2.6.6, Java 17, Maven |
-| AI Engine | Ollama (llama3.2 default) |
+| AI Engine | Ollama (phi4-mini default) |
 | HTTP Client | Spring Cloud OpenFeign |
 | Containerization | Docker, Docker Compose |
 
@@ -26,14 +26,14 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 ```bash
 docker compose up -d
 # Pull a model into the ollama container:
-docker exec <ollama_container_id> ollama pull llama3.2
+docker exec <ollama_container_id> ollama pull phi4-mini
 # App available at http://localhost:8080
 ```
 
 ### Local Development
 ```bash
 # Terminal 1 — Ollama
-ollama serve && ollama pull llama3.2
+ollama serve && ollama pull phi4-mini
 
 # Terminal 2 — Backend (port 8080)
 cd backend/chatapp && mvn spring-boot:run
@@ -109,7 +109,7 @@ Key properties (`backend/chatapp/src/main/resources/application.properties`):
 ```properties
 server.port=8080
 ollama.api.url=http://localhost:11434
-ollama.model=llama3.2
+ollama.model=phi4-mini
 ollama.api.temperature=0.7
 chat.cors.allowed-origins=http://localhost:3000
 ```
