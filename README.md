@@ -17,7 +17,7 @@ docker compose -f docker-compose.boox.yml up
 
 Open **http://localhost:8080** — done.
 
-> The default AI model (`llama3.2:1b`, ~1.3 GB) is pulled automatically on first run and cached in
+> The default AI model (`phi4-mini`, ~2.5 GB) is pulled automatically on first run and cached in
 > a Docker volume. Subsequent starts are instant. To use a different model, create a `.env` file
 > next to the compose file with `OLLAMA_MODEL=<model-name>`.
 
@@ -32,7 +32,7 @@ For local development:
 - Java 17
 - Node.js 20+
 - Maven
-- [Ollama](https://ollama.ai/) with your preferred model (default: llama3.2)
+- [Ollama](https://ollama.ai/) with your preferred model (default: phi4-mini)
 
 ## Development Options
 
@@ -53,14 +53,14 @@ docker compose up -d
 docker compose logs -f
 ```
 
-After the containers are up and running, you'll need to download the llama3.2 model:
+After the containers are up and running, you'll need to download the phi4-mini model:
 
 ```bash
 # Get the Ollama container ID
 docker compose ps
 
-# Download the llama3.2 model
-docker exec <ollama_container_id> ollama pull llama3.2
+# Download the phi4-mini model
+docker exec <ollama_container_id> ollama pull phi4-mini
 ```
 
 The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
@@ -80,10 +80,10 @@ docker exec <ollama_container_id> ollama pull <model_name>
 1. Start Ollama server and pull the model:
 ```bash
 ollama serve
-ollama pull llama2
+ollama pull phi4-mini
 ```
 
-You can download a different model by replacing `llama2` with your desired model name. Be considerate of your system resources, as some models can be quite large.
+You can download a different model by replacing `phi4-mini` with your desired model name. Be considerate of your system resources, as some models can be quite large.
 
 2. Start the backend:
 ```bash
@@ -105,7 +105,7 @@ If you prefer to run Ollama locally (useful if you use Ollama for other projects
 1. Start Ollama locally and pull the model:
 ```bash
 ollama serve
-ollama pull llama2
+ollama pull phi4-mini
 ```
 
 2. Run the Boox container with host network access:
@@ -114,7 +114,7 @@ docker run -d --name boox_app \
   -p 3000:3000 \
   -p 8080:8080 \
   -e OLLAMA_API_URL=http://host.docker.internal:11434 \
-  -e OLLAMA_MODEL=llama2 \
+  -e OLLAMA_MODEL=phi4-mini \
   boox
 ```
 
@@ -155,14 +155,14 @@ docker run -d --name boox_app \
   -p 3000:3000 \
   -p 8080:8080 \
   -e OLLAMA_API_URL=http://ollama:11434 \
-  -e OLLAMA_MODEL=llama2 \
+  -e OLLAMA_MODEL=phi4-mini \
   -e OLLAMA_API_TEMPERATURE=0.7 \
   boox
 ```
 
 Available variables:
 - `OLLAMA_API_URL`: Ollama server URL
-- `OLLAMA_MODEL`: AI model to use (default: llama2)
+- `OLLAMA_MODEL`: AI model to use (default: phi4-mini)
 - `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7)
 - `PORT`: Backend port (default: 8080)
 - `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
