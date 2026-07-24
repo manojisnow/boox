@@ -113,6 +113,11 @@
                 <version>3.14.0</version>
                 <configuration>
                     <release>21</release>
+                    <!-- Retain method parameter names in bytecode. Spring 6 dropped the
+                         debug-symbol fallback, so @RequestParam/@PathVariable without an
+                         explicit name need this flag (starter-parent sets it by default;
+                         this project imports the BOM directly, so we set it here). -->
+                    <parameters>true</parameters>
                 </configuration>
             </plugin>
             <plugin>
