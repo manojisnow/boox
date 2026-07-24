@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Message from './Message';
-import { sendMessage, streamMessage, getModels } from '../services/api';
+import { sendMessage, streamMessage, getModels, getConversationMessages } from '../services/api';
 import './ChatBox.css';
 
-const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
+const ChatBox = ({
+    conversationId,
+    initialModel,
+    onConversationChanged,
+    selectedServer,
+    setSelectedServer,
+    servers,
+}) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [models, setModels] = useState([]);
@@ -15,17 +22,28 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
     const [showSystemPrompt, setShowSystemPrompt] = useState(false);
     const [error, setError] = useState('');
     const messagesEndRef = useRef(null);
-    const sessionIdRef = useRef(null);
     const textareaRef = useRef(null);
 
-    // Generate a sessionId once per ChatBox instance
+    // Load persisted history for this conversation on mount (component is
+    // remounted with a new key whenever the active conversation changes).
     useEffect(() => {
-        if (!sessionIdRef.current) {
-            sessionIdRef.current = Math.random().toString(36).substring(2, 15);
-        }
-    }, []);
+        if (!conversationId) return;
+        let cancelled = false;
+        const loadHistory = async () => {
+            try {
+                const history = await getConversationMessages(conversationId);
+                if (!cancelled && history.length > 0) {
+                    setMessages(history.map(m => ({ text: m.content, sender: m.role })));
+                }
+            } catch (err) {
+                console.error('Failed to load conversation history:', err.message);
+            }
+        };
+        loadHistory();
+        return () => { cancelled = true; };
+    }, [conversationId]);
 
-    // Fetch models when server changes
+    // Fetch models when server changes; prefer the conversation's own model on resume.
     useEffect(() => {
         setModels([]);
         setSelectedModel('');
@@ -34,9 +52,11 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             try {
                 const result = await getModels(selectedServer);
                 setModels(result);
-                const defaultModel = result.find(m => m.name === 'phi4-mini:latest');
-                if (defaultModel) {
-                    setSelectedModel(defaultModel.name);
+                const preferred =
+                    result.find(m => m.name === initialModel)
+                    || result.find(m => m.name === 'phi4-mini:latest');
+                if (preferred) {
+                    setSelectedModel(preferred.name);
                 }
             } catch (err) {
                 console.error('Failed to fetch models:', err.message);
@@ -44,16 +64,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             }
         };
         fetchModels();
-    }, [selectedServer]);
-
-    // Reset conversation when model changes mid-chat
-    useEffect(() => {
-        if (messages.length > 0 && selectedModel) {
-            setMessages([]);
-            sessionIdRef.current = Math.random().toString(36).substring(2, 15);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedModel]);
+    }, [selectedServer, initialModel]);
 
     // Auto-scroll to latest message
     useEffect(() => {
@@ -113,9 +124,13 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                     currentInput,
                     selectedServer.trim(),
                     selectedModel.trim(),
-                    sessionIdRef.current.trim(),
+                    conversationId.trim(),
                     systemPrompt
                 );
+                // The backend has now created/updated this conversation, so surface it
+                // in the sidebar immediately — before streaming finishes — in case the
+                // user navigates away mid-response.
+                if (onConversationChanged) onConversationChanged();
                 // Add empty bot message that will be filled by streaming
                 setMessages((prev) => [...prev, { text: '', sender: 'assistant', toolCalls: [] }]);
                 setIsStreaming(true);
@@ -207,6 +222,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
             } finally {
                 setIsStreaming(false);
                 setChatLocked(false);
+                if (onConversationChanged) onConversationChanged();
             }
         } else {
             try {
@@ -214,7 +230,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                     currentInput,
                     selectedServer.trim(),
                     selectedModel.trim(),
-                    sessionIdRef.current.trim(),
+                    conversationId.trim(),
                     false,
                     systemPrompt
                 );
@@ -225,6 +241,7 @@ const ChatBox = ({ selectedServer, setSelectedServer, servers }) => {
                 setError('Failed to send message. Please try again.');
             } finally {
                 setChatLocked(false);
+                if (onConversationChanged) onConversationChanged();
             }
         }
     };

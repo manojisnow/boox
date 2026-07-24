@@ -96,3 +96,29 @@ export const resetContext = async (server, sessionId) => {
         throw error;
     }
 };
+
+// --- Conversation persistence & management ---
+
+export const listConversations = async () => {
+    const response = await axios.get(`${API_BASE_URL}/api/conversations`);
+    return response.data;
+};
+
+export const getConversationMessages = async (id) => {
+    const response = await axios.get(
+        `${API_BASE_URL}/api/conversations/${encodeURIComponent(id)}/messages`
+    );
+    return response.data;
+};
+
+export const renameConversation = async (id, title) => {
+    const response = await axios.patch(
+        `${API_BASE_URL}/api/conversations/${encodeURIComponent(id)}`,
+        { title }
+    );
+    return response.data;
+};
+
+export const deleteConversation = async (id) => {
+    await axios.delete(`${API_BASE_URL}/api/conversations/${encodeURIComponent(id)}`);
+};

@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -379,6 +380,9 @@ public class OllamaChatEngine implements ChatEngine {
     payload.put("stream", true);
 
     final StringBuilder fullContent = new StringBuilder();
+    // Tracks whether the SSE client is still connected. If it disconnects mid-stream
+    // we keep consuming Ollama so the full answer is still persisted — just stop emitting.
+    final AtomicBoolean clientConnected = new AtomicBoolean(true);
 
     restTemplate.execute(
         url,
@@ -406,7 +410,15 @@ public class OllamaChatEngine implements ChatEngine {
                 if (msgObj != null && msgObj.get(Constants.CONTENT) != null) {
                   final String chunk = msgObj.get(Constants.CONTENT).toString();
                   fullContent.append(chunk);
-                  emitter.send(SseEmitter.event().data(chunk));
+                  if (clientConnected.get()) {
+                    try {
+                      emitter.send(SseEmitter.event().data(chunk));
+                    } catch (Exception sendEx) {
+                      clientConnected.set(false);
+                      LOGGER.info(
+                          "Client disconnected mid-stream; continuing to persist response.");
+                    }
+                  }
                 }
               } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                 LOGGER.debug("Malformed line in streamed response: {}", line);
@@ -416,9 +428,15 @@ public class OllamaChatEngine implements ChatEngine {
           return null;
         });
 
-    chatContextService.addMessage(sessionId, Constants.ROLE_ASSISTANT, fullContent.toString());
-    emitter.send(SseEmitter.event().data("[DONE]"));
-    emitter.complete();
+    // Persist the assistant reply even if the client left, so reopening the
+    // conversation shows the full answer rather than a dangling question.
+    if (fullContent.length() > 0) {
+      chatContextService.addMessage(sessionId, Constants.ROLE_ASSISTANT, fullContent.toString());
+    }
+    if (clientConnected.get()) {
+      emitter.send(SseEmitter.event().data("[DONE]"));
+      emitter.complete();
+    }
   }
 
   @Override

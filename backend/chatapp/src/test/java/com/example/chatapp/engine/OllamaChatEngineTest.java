@@ -337,6 +337,48 @@ class OllamaChatEngineTest {
   }
 
   @Test
+  void streamMessage_persistsResponse_whenClientDisconnectsMidStream() throws Exception {
+    // Arrange
+    String sessionId = "sid";
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext(sessionId)).thenReturn(List.of());
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"\"}}", HttpStatus.OK));
+
+    String streamData =
+        "{\"message\":{\"role\":\"assistant\",\"content\":\"Hello\"}}\n"
+            + "{\"message\":{\"role\":\"assistant\",\"content\":\" world\"}}\n"
+            + "{\"done\":true}\n";
+    ByteArrayInputStream inputStream =
+        new ByteArrayInputStream(streamData.getBytes(StandardCharsets.UTF_8));
+    when(restTemplate.execute(anyString(), eq(HttpMethod.POST), any(), any()))
+        .thenAnswer(
+            inv -> {
+              ResponseExtractor<?> extractor = inv.getArgument(3);
+              ClientHttpResponse mockResponse = mock(ClientHttpResponse.class);
+              when(mockResponse.getBody()).thenReturn(inputStream);
+              return extractor.extractData(mockResponse);
+            });
+
+    SseEmitter emitter = mock(SseEmitter.class);
+    // Simulate the client navigating away: every emit fails.
+    doThrow(new IOException("broken pipe"))
+        .when(emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+
+    // Act
+    engine.streamMessage("hi", "m", sessionId, emitter);
+
+    // Assert: the full assistant reply is still persisted despite the disconnect,
+    // and we do not try to complete a dead emitter.
+    verify(chatContextService).addMessage(eq(sessionId), eq("assistant"), eq("Hello world"));
+    verify(emitter, never()).complete();
+  }
+
+  @Test
   void streamMessage_handlesToolCalls() throws Exception {
     // Arrange
     String sessionId = "sid";

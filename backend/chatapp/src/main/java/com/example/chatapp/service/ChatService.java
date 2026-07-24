@@ -53,6 +53,7 @@ public class ChatService {
     if (request.getSystemPrompt() != null) {
       chatContextService.setSystemPrompt(sessionId, request.getSystemPrompt());
     }
+    chatContextService.setMetadata(sessionId, server, model);
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -80,6 +81,7 @@ public class ChatService {
     if (request.getSystemPrompt() != null) {
       chatContextService.setSystemPrompt(request.getSessionId(), request.getSystemPrompt());
     }
+    chatContextService.setMetadata(request.getSessionId(), server, request.getModel());
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
