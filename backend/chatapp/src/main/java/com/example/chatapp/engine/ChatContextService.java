@@ -21,4 +21,19 @@ public interface ChatContextService {
   default void setMetadata(String sessionId, String server, String model) {
     // no-op
   }
+
+  /** Running summary of older turns already folded out of the context window; null if none. */
+  default String getSummary(String sessionId) {
+    return null;
+  }
+
+  /** How many of the oldest messages are already represented by {@link #getSummary}. */
+  default int getSummarizedCount(String sessionId) {
+    return 0;
+  }
+
+  /** Persists the running summary and the count of messages it now covers. No-op by default. */
+  default void setSummaryState(String sessionId, String summary, int summarizedCount) {
+    // no-op
+  }
 }

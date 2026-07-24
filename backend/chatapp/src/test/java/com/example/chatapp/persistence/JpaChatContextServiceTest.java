@@ -71,6 +71,16 @@ class JpaChatContextServiceTest {
   }
 
   @Test
+  void summaryState_roundTrips() {
+    service.addMessage("sum1", "user", "hi");
+    assertNull(service.getSummary("sum1"));
+    assertEquals(0, service.getSummarizedCount("sum1"));
+    service.setSummaryState("sum1", "earlier summary", 3);
+    assertEquals("earlier summary", service.getSummary("sum1"));
+    assertEquals(3, service.getSummarizedCount("sum1"));
+  }
+
+  @Test
   void resetContext_clearsMessagesButKeepsConversation() {
     service.addMessage("s7", "user", "hi");
     service.setSystemPrompt("s7", "prompt");

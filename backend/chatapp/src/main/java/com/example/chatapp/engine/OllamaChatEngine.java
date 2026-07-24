@@ -41,9 +41,19 @@ public class OllamaChatEngine implements ChatEngine {
   private final RestTemplate restTemplate;
   private final ChatContextService chatContextService;
   private final ToolRegistry toolRegistry;
+  private final ContextWindowManager windowManager = new ContextWindowManager();
 
   @Value("${ollama.api.url}")
   private String ollamaApiUrl;
+
+  @Value("${ollama.context.max-tokens}")
+  private int maxContextTokens;
+
+  @Value("${ollama.context.summary.enabled}")
+  private boolean summaryEnabled;
+
+  @Value("${ollama.context.num-ctx}")
+  private int numCtx;
 
   @Value("${ollama.api.tags-path}")
   private String tagsPath;
@@ -97,7 +107,14 @@ public class OllamaChatEngine implements ChatEngine {
   private List<Map<String, String>> buildMessagesWithSystemPrompt(final String sessionId) {
     final List<Map<String, String>> context = chatContextService.getContext(sessionId);
     final String userSystemPrompt = chatContextService.getSystemPrompt(sessionId);
+    final String summary = chatContextService.getSummary(sessionId);
+    final int summarizedCount =
+        Math.min(chatContextService.getSummarizedCount(sessionId), context.size());
+    final List<Map<String, String>> live = context.subList(summarizedCount, context.size());
+    final List<Map<String, String>> window =
+        windowManager.split(live, maxContextTokens).getWindow();
 
+    final List<Map<String, String>> messages = new ArrayList<>();
     final StringBuilder systemContent = new StringBuilder();
     if (toolRegistry.hasTools()) {
       systemContent.append(TOOL_USAGE_HINT);
@@ -105,14 +122,97 @@ public class OllamaChatEngine implements ChatEngine {
     if (userSystemPrompt != null && !userSystemPrompt.isEmpty()) {
       systemContent.append(userSystemPrompt);
     }
-
     if (systemContent.length() > 0) {
-      final List<Map<String, String>> messages = new ArrayList<>();
       messages.add(Map.of("role", "system", Constants.CONTENT, systemContent.toString()));
-      messages.addAll(context);
-      return messages;
     }
-    return context;
+    if (summary != null && !summary.isEmpty()) {
+      messages.add(
+          Map.of(
+              "role", "system", Constants.CONTENT, "Summary of earlier conversation:\n" + summary));
+    }
+    messages.addAll(window);
+    return messages;
+  }
+
+  /** Shared Ollama generation options. Ollama reads these under {@code options}, not top-level. */
+  private Map<String, Object> buildOptions() {
+    final Map<String, Object> options = new HashMap<>();
+    options.put("temperature", temperature);
+    if (numCtx > 0) {
+      options.put("num_ctx", numCtx);
+    }
+    return options;
+  }
+
+  /**
+   * Folds any messages that have fallen out of the context window into the conversation's running
+   * summary — one incremental Ollama call per turn. Best-effort: a failure is logged and the chat
+   * continues (the delta is retried next turn).
+   */
+  private void ensureSummarized(final String sessionId, final String model) {
+    if (!summaryEnabled) {
+      return;
+    }
+    try {
+      final List<Map<String, String>> context = chatContextService.getContext(sessionId);
+      final int summarizedCount =
+          Math.min(chatContextService.getSummarizedCount(sessionId), context.size());
+      final List<Map<String, String>> live = context.subList(summarizedCount, context.size());
+      final List<Map<String, String>> dropped =
+          windowManager.split(live, maxContextTokens).getDropped();
+      if (dropped.isEmpty()) {
+        return;
+      }
+      final String existingSummary = chatContextService.getSummary(sessionId);
+      final String newSummary = summarize(model, existingSummary, dropped);
+      if (newSummary != null && !newSummary.isBlank()) {
+        chatContextService.setSummaryState(
+            sessionId, newSummary.trim(), summarizedCount + dropped.size());
+        LOGGER.info("Summarized {} dropped message(s) for session {}", dropped.size(), sessionId);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Context summarization failed (continuing without it): {}", e.getMessage());
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private String summarize(
+      final String model, final String existingSummary, final List<Map<String, String>> dropped)
+      throws java.io.IOException {
+    final StringBuilder convo = new StringBuilder();
+    for (final Map<String, String> msg : dropped) {
+      convo
+          .append(msg.get("role"))
+          .append(": ")
+          .append(msg.getOrDefault(Constants.CONTENT, ""))
+          .append('\n');
+    }
+    final String prompt =
+        "You maintain a running summary of an ongoing chat. Update the summary to incorporate the"
+            + " new messages below, preserving key facts, decisions, names, and unresolved"
+            + " questions. Be concise. Respond with ONLY the updated summary.\n\nExisting summary:\n"
+            + (existingSummary == null || existingSummary.isEmpty() ? "(none)" : existingSummary)
+            + "\n\nNew messages:\n"
+            + convo;
+
+    final String url = ollamaApiUrl + chatPath;
+    final Map<String, Object> payload = new HashMap<>();
+    payload.put("model", model);
+    payload.put("messages", List.of(Map.of("role", "user", Constants.CONTENT, prompt)));
+    payload.put("stream", false);
+    payload.put("options", buildOptions());
+    final HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    final ResponseEntity<String> response =
+        restTemplate.exchange(
+            url, HttpMethod.POST, new HttpEntity<>(payload, headers), String.class);
+    final String body = response.getBody();
+    if (body == null || body.isEmpty()) {
+      return null;
+    }
+    final Map<String, Object> json = MAPPER.readValue(body, Map.class);
+    final Map<String, Object> msgObj = (Map<String, Object>) json.get(Constants.MESSAGE);
+    return msgObj == null ? null : String.valueOf(msgObj.getOrDefault(Constants.CONTENT, ""));
   }
 
   private Optional<Map<String, Object>> callOllamaWithTools(
@@ -122,7 +222,7 @@ public class OllamaChatEngine implements ChatEngine {
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
     payload.put("messages", messages);
-    payload.put("temperature", temperature);
+    payload.put("options", buildOptions());
     payload.put("stream", stream);
     if (toolRegistry.hasTools()) {
       payload.put("tools", toolRegistry.getToolDefinitions());
@@ -315,6 +415,7 @@ public class OllamaChatEngine implements ChatEngine {
             "role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.SERVER_NOT_RUNNING);
       }
       chatContextService.addMessage(sessionId, Constants.ROLE_USER, message);
+      ensureSummarized(sessionId, model);
 
       final Optional<Map<String, Object>> finalResponse = executeToolLoop(model, sessionId, null);
       if (finalResponse.isEmpty()) {
@@ -346,6 +447,7 @@ public class OllamaChatEngine implements ChatEngine {
         return;
       }
       chatContextService.addMessage(sessionId, Constants.ROLE_USER, message);
+      ensureSummarized(sessionId, model);
 
       final Optional<Map<String, Object>> finalResponse =
           executeToolLoop(model, sessionId, emitter);
@@ -376,7 +478,7 @@ public class OllamaChatEngine implements ChatEngine {
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
     payload.put("messages", messagesForOllama);
-    payload.put("temperature", temperature);
+    payload.put("options", buildOptions());
     payload.put("stream", true);
 
     final StringBuilder fullContent = new StringBuilder();
