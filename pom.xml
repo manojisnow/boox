@@ -8,8 +8,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>backend</module>
-        <module>frontend</module>
     </modules>
     <name>React-SpringBoot Chat Application</name>
-    <description>Parent module for the full-stack chat app, aggregating backend and frontend.</description>
+    <description>Parent aggregator for the backend module. The frontend is a Vite app built via npm (see frontend/ and the Dockerfile).</description>
 </project> 

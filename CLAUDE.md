@@ -12,10 +12,10 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 17, Axios, react-scripts |
+| Frontend | React 19, Axios, Vite |
 | Backend | Spring Boot 3.5.3, Java 21, Maven |
 | AI Engine | Ollama (phi4-mini default) |
-| HTTP Client | Spring Cloud OpenFeign |
+| HTTP Client | Spring RestTemplate |
 | Containerization | Docker, Docker Compose |
 
 ---
