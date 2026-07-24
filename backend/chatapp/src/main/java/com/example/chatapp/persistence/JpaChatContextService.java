@@ -105,6 +105,28 @@ public class JpaChatContextService implements ChatContextService {
     conversations.save(conversation);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public String getSummary(final String sessionId) {
+    return conversations.findById(sessionId).map(Conversation::getSummary).orElse(null);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public int getSummarizedCount(final String sessionId) {
+    return conversations.findById(sessionId).map(Conversation::getSummarizedCount).orElse(0);
+  }
+
+  @Override
+  @Transactional
+  public void setSummaryState(
+      final String sessionId, final String summary, final int summarizedCount) {
+    final Conversation conversation = getOrCreate(sessionId);
+    conversation.setSummary(summary);
+    conversation.setSummarizedCount(summarizedCount);
+    conversations.save(conversation);
+  }
+
   private Conversation getOrCreate(final String sessionId) {
     return conversations
         .findById(sessionId)
