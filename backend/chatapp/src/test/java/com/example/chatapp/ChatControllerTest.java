@@ -2,6 +2,9 @@ package com.example.chatapp;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.chatapp.controller.ChatController;
 import com.example.chatapp.controller.ResetContextRequest;
@@ -17,6 +20,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ChatControllerTest {
   @Mock private ChatService chatService;
@@ -42,6 +47,19 @@ class ChatControllerTest {
     when(chatService.getModels("server1")).thenReturn(models);
     ResponseEntity<List<ModelInfo>> response = chatController.getModels("server1");
     assertEquals(models, response.getBody());
+  }
+
+  // Exercises @RequestParam binding through the MVC layer. Under Spring 6 this
+  // fails unless the code is compiled with -parameters, so it guards against the
+  // compiler flag regressing.
+  @Test
+  void getModels_bindsQueryParamThroughMvc() throws Exception {
+    when(chatService.getModels("ollama")).thenReturn(List.of(new ModelInfo("m1", "desc")));
+    MockMvc mockMvc = MockMvcBuilders.standaloneSetup(chatController).build();
+    mockMvc
+        .perform(get("/api/chat/models").param("server", "ollama"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].name").value("m1"));
   }
 
   @Test
