@@ -1,7 +1,7 @@
 package com.example.chatapp.controller;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 @SuppressWarnings("PMD.UnnecessaryConstructor")
 public class SendMessageRequest {

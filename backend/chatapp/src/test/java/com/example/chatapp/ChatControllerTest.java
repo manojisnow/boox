@@ -74,6 +74,6 @@ class ChatControllerTest {
     req.setSessionId("sid");
     doNothing().when(chatService).resetContext(req);
     ResponseEntity<?> response = chatController.resetContext(req);
-    assertEquals(200, response.getStatusCodeValue());
+    assertEquals(200, response.getStatusCode().value());
   }
 }

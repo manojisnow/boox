@@ -105,8 +105,8 @@ backend/
 - Please open issues or pull requests for improvements or bug fixes.
 
 ## Prerequisites
-- Java 17 (LTS)
+- Java 21 (LTS)
 - Maven 3.8+
 - Docker (for Testcontainers)
 
-> **Note:** Java 21+ migration will be revisited when the Spring ecosystem and all tools fully support it.
+> **Note:** Runs on Spring Boot 3.x (Jakarta EE namespace) with Java 21.

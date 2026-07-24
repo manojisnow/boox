@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @SuppressWarnings("PMD.AtLeastOneConstructor")
@@ -20,14 +21,32 @@ public class GlobalExceptionHandler {
     exception
         .getBindingResult()
         .getFieldErrors()
-        .forEach(fieldError -> errors.put(fieldError.getField(), fieldError.getDefaultMessage()));
+        .forEach(
+            fieldError ->
+                errors.put(fieldError.getField(), defaultString(fieldError.getDefaultMessage())));
     return ResponseEntity.badRequest().body(errors);
+  }
+
+  /**
+   * Spring 6.1+ raises {@link NoResourceFoundException} for unmapped paths and missing static
+   * assets. Handle it explicitly so the generic catch-all below does not convert a 404 into a 500.
+   */
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<Map<String, String>> handleNoResourceFound(
+      final NoResourceFoundException exception) {
+    final Map<String, String> error = new ConcurrentHashMap<>();
+    error.put("error", "Resource not found");
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
   }
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Map<String, String>> handleGenericException(final Exception exception) {
     final Map<String, String> error = new ConcurrentHashMap<>();
-    error.put("error", exception.getMessage());
+    error.put("error", defaultString(exception.getMessage()));
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+  }
+
+  private static String defaultString(final String value) {
+    return value == null ? "" : value;
   }
 }

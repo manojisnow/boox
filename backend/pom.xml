@@ -16,7 +16,7 @@
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>2.6.6</version>
+                <version>3.5.3</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -48,7 +48,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-pmd-plugin</artifactId>
-                <version>3.21.2</version>
+                <version>3.28.0</version>
                 <executions>
                     <execution>
                         <id>pmd</id>
@@ -75,7 +75,7 @@
                             <ruleName>UnnecessaryImport</ruleName>
                         </excludeRule>
                     </excludeRules>
-                    <targetJdk>17</targetJdk>
+                    <targetJdk>21</targetJdk>
                 </configuration>
             </plugin>
             <plugin>
@@ -135,7 +135,6 @@
                         </goals>
                         <configuration>
                             <outputDirectory>${project.build.directory}/jacoco-aggregate-report</outputDirectory>
-                            <dataFile>${project.build.directory}/../unit-test/target/jacoco.exec</dataFile>
                             <includes>
                                 <include>com/example/chatapp/*</include>
                             </includes>

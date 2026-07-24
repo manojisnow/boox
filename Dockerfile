@@ -9,7 +9,7 @@ ENV NODE_OPTIONS=--openssl-legacy-provider
 RUN npm run build
 
 # Stage 2: Build the Spring Boot backend and package frontend assets into the JAR
-FROM maven:3.9.10-amazoncorretto-17 AS builder-backend
+FROM maven:3.9.10-amazoncorretto-21 AS builder-backend
 WORKDIR /app
 # Copy the entire project context to leverage build caching
 COPY . .
@@ -21,7 +21,7 @@ RUN mvn -f backend/pom.xml -pl chatapp -am clean package -DskipTests
 
 # Stage 3: Final, lean, and secure production image
 # eclipse-temurin is the actively maintained successor to the deprecated openjdk Docker images.
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
 # Install curl for the HEALTHCHECK.
@@ -37,7 +37,7 @@ COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar
 # The entire application will be available at http://localhost:8080/
 ENV PORT=8080 \
     OLLAMA_API_URL=http://host.docker.internal:11434 \
-    OLLAMA_MODEL=llama2 \
+    OLLAMA_MODEL=phi4-mini \
     OLLAMA_API_TEMPERATURE=0.7 \
     SPRING_PROFILES_ACTIVE=docker
 

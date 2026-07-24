@@ -2,9 +2,9 @@ package com.example.chatapp.controller;
 
 import com.example.chatapp.engine.ModelInfo;
 import com.example.chatapp.tool.ToolRegistry;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
-import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
