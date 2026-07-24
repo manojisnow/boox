@@ -6,9 +6,12 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ToolCall from './ToolCall';
 import './Message.css';
 
-const CodeBlock = ({ node, inline, className, children, ...props }) => {
+// react-markdown v10 removed the `inline` prop from the `code` renderer.
+// Distinguish block vs inline via a language class or a multi-line body.
+const CodeBlock = ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
-    if (!inline && match) {
+    const content = String(children).replace(/\n$/, '');
+    if (match) {
         return (
             <SyntaxHighlighter
                 style={oneDark}
@@ -16,18 +19,18 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
                 PreTag="div"
                 {...props}
             >
-                {String(children).replace(/\n$/, '')}
+                {content}
             </SyntaxHighlighter>
         );
     }
-    if (!inline && String(children).includes('\n')) {
+    if (content.includes('\n')) {
         return (
             <SyntaxHighlighter
                 style={oneDark}
                 PreTag="div"
                 {...props}
             >
-                {String(children).replace(/\n$/, '')}
+                {content}
             </SyntaxHighlighter>
         );
     }
