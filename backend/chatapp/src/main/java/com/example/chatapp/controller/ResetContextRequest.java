@@ -1,6 +1,6 @@
 package com.example.chatapp.controller;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 @SuppressWarnings("PMD.UnnecessaryConstructor")
 public class ResetContextRequest {
