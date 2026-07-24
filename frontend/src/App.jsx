@@ -61,6 +61,7 @@ const App = () => {
 
     const handleNewChat = () => {
         setActiveConversationId(newConversationId());
+        refreshConversations();
     };
 
     const handleSelectConversation = (id) => {
@@ -69,6 +70,7 @@ const App = () => {
             setSelectedServer(summary.server);
         }
         setActiveConversationId(id);
+        refreshConversations();
     };
 
     const handleRename = async (id, title) => {

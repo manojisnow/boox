@@ -127,6 +127,10 @@ const ChatBox = ({
                     conversationId.trim(),
                     systemPrompt
                 );
+                // The backend has now created/updated this conversation, so surface it
+                // in the sidebar immediately — before streaming finishes — in case the
+                // user navigates away mid-response.
+                if (onConversationChanged) onConversationChanged();
                 // Add empty bot message that will be filled by streaming
                 setMessages((prev) => [...prev, { text: '', sender: 'assistant', toolCalls: [] }]);
                 setIsStreaming(true);
