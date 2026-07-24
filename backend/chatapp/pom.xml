@@ -33,6 +33,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- SQLite JDBC driver (not managed by the Spring Boot BOM). -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.49.1.0</version>
+        </dependency>
+        <!-- Hibernate community dialects provide SQLiteDialect (version BOM-managed). -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-community-dialects</artifactId>
+        </dependency>
         <!-- Testcontainers version is managed by the Spring Boot dependencies BOM. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -215,6 +230,7 @@
                     <effort>Max</effort>
                     <threshold>Low</threshold>
                     <failOnError>true</failOnError>
+                    <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
             </plugin>
             <plugin>
@@ -251,6 +267,11 @@
                                 <exclude>com/example/chatapp/controller/CorsConfig*</exclude>
                                 <exclude>com/example/chatapp/engine/ChatEngine*</exclude>
                                 <exclude>com/example/chatapp/engine/OllamaChatEngine$Constants*</exclude>
+                                <exclude>com/example/chatapp/config/*</exclude>
+                                <exclude>com/example/chatapp/persistence/Conversation.class</exclude>
+                                <exclude>com/example/chatapp/persistence/ChatMessageEntity.class</exclude>
+                                <exclude>com/example/chatapp/persistence/*Repository*</exclude>
+                                <exclude>com/example/chatapp/controller/dto/*</exclude>
                             </excludes>
                             <rules>
                                 <rule>

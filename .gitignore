@@ -30,3 +30,10 @@ yarn-error.log*
 
 # Local direnv environment file
 .envrc
+
+# Claude Code
+.claude/
+
+# Boox local SQLite database
+backend/chatapp/data/
+*.db

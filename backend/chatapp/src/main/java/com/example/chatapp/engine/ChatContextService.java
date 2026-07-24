@@ -13,4 +13,12 @@ public interface ChatContextService {
   String getSystemPrompt(String sessionId);
 
   void resetContext(String sessionId);
+
+  /**
+   * Records the server/model a conversation is using, for display and resume. No-op by default so
+   * non-persistent implementations need not track it.
+   */
+  default void setMetadata(String sessionId, String server, String model) {
+    // no-op
+  }
 }

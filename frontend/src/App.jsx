@@ -1,28 +1,97 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ChatBox from './components/ChatBox';
-import { getServers } from './services/api';
+import ConversationSidebar from './components/ConversationSidebar';
+import {
+    getServers,
+    listConversations,
+    renameConversation,
+    deleteConversation,
+} from './services/api';
 import './App.css';
+
+const ACTIVE_KEY = 'boox-active-conversation';
+
+const newConversationId = () =>
+    (window.crypto && window.crypto.randomUUID)
+        ? window.crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 15);
 
 const App = () => {
     const [servers, setServers] = useState([]);
     const [selectedServer, setSelectedServer] = useState('');
     const [sidebarExpanded, setSidebarExpanded] = useState(false);
-    const [chatBoxKey, setChatBoxKey] = useState(0);
+    const [conversations, setConversations] = useState([]);
+    const [activeConversationId, setActiveConversationId] = useState(
+        () => localStorage.getItem(ACTIVE_KEY) || newConversationId()
+    );
+
+    useEffect(() => {
+        localStorage.setItem(ACTIVE_KEY, activeConversationId);
+    }, [activeConversationId]);
+
+    const refreshConversations = useCallback(async () => {
+        try {
+            setConversations(await listConversations());
+        } catch (err) {
+            console.error('Failed to load conversations:', err.message);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchServers = async () => {
             try {
-                const result = await getServers();
-                setServers(result);
+                setServers(await getServers());
             } catch (err) {
                 console.error('Failed to fetch servers:', err.message);
             }
         };
         fetchServers();
-    }, []);
+        refreshConversations();
+    }, [refreshConversations]);
+
+    const activeConversation = conversations.find(c => c.id === activeConversationId);
+
+    // Restore the server the active conversation was using (e.g. after a page
+    // reload) so its model can be preselected too.
+    useEffect(() => {
+        if (activeConversation && activeConversation.server) {
+            setSelectedServer(activeConversation.server);
+        }
+    }, [activeConversation]);
 
     const handleNewChat = () => {
-        setChatBoxKey(prev => prev + 1);
+        setActiveConversationId(newConversationId());
+    };
+
+    const handleSelectConversation = (id) => {
+        const summary = conversations.find(c => c.id === id);
+        if (summary && summary.server) {
+            setSelectedServer(summary.server);
+        }
+        setActiveConversationId(id);
+    };
+
+    const handleRename = async (id, title) => {
+        try {
+            await renameConversation(id, title);
+            await refreshConversations();
+        } catch (err) {
+            console.error('Failed to rename conversation:', err.message);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        // eslint-disable-next-line no-alert
+        if (!window.confirm('Delete this conversation?')) return;
+        try {
+            await deleteConversation(id);
+            if (id === activeConversationId) {
+                setActiveConversationId(newConversationId());
+            }
+            await refreshConversations();
+        } catch (err) {
+            console.error('Failed to delete conversation:', err.message);
+        }
     };
 
     return (
@@ -60,14 +129,22 @@ const App = () => {
             </div>
             <div className={`sidebar${sidebarExpanded ? ' expanded' : ' collapsed'}`}>
                 {sidebarExpanded && (
-                    <div style={{ padding: 'var(--space-lg)', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                        Chat History
-                    </div>
+                    <ConversationSidebar
+                        conversations={conversations}
+                        activeId={activeConversationId}
+                        onSelect={handleSelectConversation}
+                        onNewChat={handleNewChat}
+                        onRename={handleRename}
+                        onDelete={handleDelete}
+                    />
                 )}
             </div>
             <div className="main-chat-section">
                 <ChatBox
-                    key={chatBoxKey}
+                    key={activeConversationId}
+                    conversationId={activeConversationId}
+                    initialModel={activeConversation ? activeConversation.model : ''}
+                    onConversationChanged={refreshConversations}
                     selectedServer={selectedServer}
                     setSelectedServer={setSelectedServer}
                     servers={servers}
