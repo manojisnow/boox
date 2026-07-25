@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# Least-privilege default: this workflow only checks out code, builds, tests,
+# and uploads artifacts — none of that needs write access to the repo.
+permissions:
+  contents: read
+
 jobs:
   hadolint:
     name: Dockerfile Lint

@@ -37,3 +37,4 @@ yarn-error.log*
 # Boox local SQLite database
 backend/chatapp/data/
 *.db
+reports-laria/

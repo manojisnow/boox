@@ -11,6 +11,11 @@ on:
     branches:
       - main
 
+# Least-privilege default; the qodana job below elevates to what it actually
+# needs (posting PR comments and check annotations).
+permissions:
+  contents: read
+
 jobs:
   qodana:
     runs-on: ubuntu-latest

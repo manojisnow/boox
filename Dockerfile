@@ -28,8 +28,18 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
+# Run as a dedicated non-root user (defense-in-depth: limits the blast radius if the
+# JVM process is ever compromised). /app/data is where the SQLite database lives
+# (see BOOX_DB_PATH) and must stay writable by this user, including when it's
+# mounted as a Docker volume — a named volume inherits the mount point's ownership
+# from the image on first creation.
+RUN groupadd --system boox \
+    && useradd --system --gid boox --home-dir /app --shell /usr/sbin/nologin boox \
+    && mkdir -p /app/data \
+    && chown -R boox:boox /app
+
 # Copy the final, self-contained executable JAR
-COPY --from=builder-backend /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar app.jar
+COPY --from=builder-backend --chown=boox:boox /app/backend/chatapp/target/chatapp-1.0-SNAPSHOT.jar app.jar
 
 # Environment variables
 # CORS is no longer needed since the frontend and backend are served from the same origin.
@@ -47,6 +57,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Expose the single port for the Spring Boot application
 EXPOSE 8080
+
+# Drop root privileges for the running process.
+USER boox
 
 # The command is now simple, direct, and manages a single process.
 CMD ["java", "-jar", "app.jar"]
