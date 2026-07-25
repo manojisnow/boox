@@ -10,6 +10,11 @@ on:
 #   DOCKERHUB_USERNAME  →  dumanoj
 #   DOCKERHUB_TOKEN     →  Docker Hub access token (Account Settings → Security)
 
+# Least-privilege default; the `publish` job below elevates to contents:write
+# for the jobs that actually need it (creating the GitHub Release).
+permissions:
+  contents: read
+
 jobs:
 
   # ── Quality gates (mirrors CI — must pass before publishing) ─────────────────
