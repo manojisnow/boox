@@ -145,7 +145,7 @@ jobs:
             ## Docker image
 
             ```bash
-            docker pull dumanoj/boox:${{ github.ref_name }}
+            docker pull dumanoj/boox:${{ steps.meta.outputs.version }}
             ```
 
             Or pull `dumanoj/boox:latest` for the most recent release.
