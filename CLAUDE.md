@@ -87,17 +87,27 @@ mvn clean verify
 
 ```
 backend/chatapp/src/main/java/com/example/chatapp/
-  ChatController.java          # REST endpoints
-  ChatService.java             # Business logic
-  OllamaChatEngine.java        # Ollama API integration
-  InMemoryChatContextService.java  # Thread-safe conversation context
-  CorsConfig.java              # CORS configuration
-  GlobalExceptionHandler.java  # Centralized error handling
+  controller/
+    ChatController.java          # Chat REST endpoints
+    StreamController.java        # SSE streaming endpoint
+    ConversationController.java  # Conversation list/resume/rename/delete
+    CorsConfig.java               # CORS configuration
+    GlobalExceptionHandler.java   # Centralized error handling
+  service/ChatService.java     # Business logic
+  engine/
+    OllamaChatEngine.java        # Ollama API integration + tool loop
+    ChatContextService.java      # Context abstraction (interface)
+    ContextWindowManager.java    # Token-budget window + summarization split
+  persistence/
+    JpaChatContextService.java   # Default (SQLite-backed) context implementation
+    InMemoryChatContextService.java  # Non-persistent fallback, used in unit tests
+    ConversationService.java     # Backs ConversationController
+    Conversation.java, ChatMessageEntity.java  # JPA entities
 
 frontend/src/
-  components/                  # ChatBox, Message, Sidebar
+  components/                  # ChatBox, Message, ToolCall, ConversationSidebar
   services/api.js              # Axios HTTP client
-  App.jsx                      # Root component
+  App.jsx                      # Root component; owns active conversation + sidebar
 ```
 
 ---
@@ -112,6 +122,8 @@ ollama.api.url=http://localhost:11434
 ollama.model=phi4-mini
 ollama.api.temperature=0.7
 chat.cors.allowed-origins=http://localhost:3000
+spring.datasource.url=jdbc:sqlite:./data/boox.db
+ollama.context.max-tokens=3000
 ```
 
 Environment variable overrides (Docker/runtime):
@@ -120,6 +132,8 @@ Environment variable overrides (Docker/runtime):
 - `OLLAMA_API_TEMPERATURE` — creativity 0–1 (default 0.7)
 - `CORS_ALLOWED_ORIGINS` — allowed frontend origins
 - `PORT` — backend port (default 8080)
+- `BOOX_DB_PATH` — SQLite database file path (default `/app/data/boox.db` in Docker)
+- `OLLAMA_CONTEXT_MAX_TOKENS` / `OLLAMA_CONTEXT_SUMMARY_ENABLED` / `OLLAMA_CONTEXT_NUM_CTX` — context-window tuning
 
 ---
 
@@ -132,7 +146,9 @@ Environment variable overrides (Docker/runtime):
 - **Google Java Format** enforced via Spotless — always run `mvn spotless:apply` before committing Java changes
 - **Docker deployment serves frontend from backend** — React build is embedded in the Spring Boot JAR as static resources
 - **Ollama container needs 8GB memory** allocation (4GB reservation) — set in docker-compose.yml
-- **In-memory chat context** — conversation history is not persisted across restarts
+- **Persistent chat context** — conversation history is stored in SQLite (`JpaChatContextService`, the default) and survives restarts; mount `/app/data` as a volume in Docker. `InMemoryChatContextService` still exists as a non-persistent fallback, used in unit tests
+- **Context window management** — long conversations are token-budgeted; older turns are summarized rather than sent to the model (or dropped) in full every turn — see `ContextWindowManager`
+- **Container runs as a non-root user** in the production image
 
 ---
 

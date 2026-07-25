@@ -29,7 +29,7 @@ For zero-setup quick start:
 - Docker and Docker Compose (that's all!)
 
 For local development:
-- Java 17
+- Java 21
 - Node.js 20+
 - Maven
 - [Ollama](https://ollama.ai/) with your preferred model (default: phi4-mini)
@@ -111,12 +111,15 @@ ollama pull phi4-mini
 2. Run the Boox container with host network access:
 ```bash
 docker run -d --name boox_app \
-  -p 3000:3000 \
   -p 8080:8080 \
+  -v boox_data:/app/data \
   -e OLLAMA_API_URL=http://host.docker.internal:11434 \
   -e OLLAMA_MODEL=phi4-mini \
   boox
 ```
+
+> The image serves both the frontend and backend from a single origin on `:8080` — no separate
+> `:3000` port. `-v boox_data:/app/data` persists conversation history (SQLite) across restarts.
 
 This setup is particularly useful if you:
 - Already have Ollama running locally
@@ -152,8 +155,8 @@ When running services separately, you can configure:
 
 ```bash
 docker run -d --name boox_app \
-  -p 3000:3000 \
   -p 8080:8080 \
+  -v boox_data:/app/data \
   -e OLLAMA_API_URL=http://ollama:11434 \
   -e OLLAMA_MODEL=phi4-mini \
   -e OLLAMA_API_TEMPERATURE=0.7 \
@@ -166,6 +169,10 @@ Available variables:
 - `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7)
 - `PORT`: Backend port (default: 8080)
 - `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
+- `BOOX_DB_PATH`: SQLite database file path (default: `/app/data/boox.db` in Docker, `./data/boox.db` locally) — conversation history is stored here
+- `OLLAMA_CONTEXT_MAX_TOKENS`: token budget for what's sent to the model each turn (default: 3000); older messages are folded into a running summary rather than dropped
+- `OLLAMA_CONTEXT_SUMMARY_ENABLED`: whether to summarize messages that fall out of the context window (default: true)
+- `OLLAMA_CONTEXT_NUM_CTX`: if set (>0), passed to Ollama as `options.num_ctx` to size the model's own context window
 
 ## Project Structure
 
@@ -184,8 +191,14 @@ boox/
 - **Real-time streaming** — responses appear token by token via SSE (Server-Sent Events), with a toggle to switch to non-streaming mode
 - **Markdown rendering** — bot replies render as rich markdown with syntax-highlighted code blocks (via `react-markdown` + `react-syntax-highlighter`)
 - **System prompt** — collapsible gear icon in the input bar lets you set a custom system instruction (e.g. "You are a pirate"); persisted across page reloads via `sessionStorage`
-- **Context reset** — clear conversation history without restarting the server
-- **Multi-model support** — switch between any models pulled into Ollama; changing model mid-conversation resets the session automatically
+- **Context reset** — clear the current conversation's messages without restarting the server
+- **Multi-model support** — switch between any models pulled into Ollama at any point; switching mid-conversation continues the same conversation rather than starting a new one
+- **Context window management** — long conversations stay fast and coherent: once a conversation exceeds a token budget, older turns are automatically folded into a running summary instead of being sent to the model in full every turn. The full conversation is always still stored and shown — only what's *sent to the model* is trimmed. Configurable via `OLLAMA_CONTEXT_*` (see [Manual Configuration](#manual-configuration))
+
+### Conversation History
+- **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
+- **Sidebar** — lists all conversations (newest first); click to resume, rename inline, or delete
+- **Auto-titled** — each conversation is titled from your first message
 
 ### Tool Calling
 - **Web search** — powered by the DuckDuckGo Instant Answer API; the model can look up facts and entities on its own when needed
@@ -208,9 +221,11 @@ tools.websearch.enabled=true
 
 ## Development Notes
 
-- Frontend runs in development mode with hot-reload
+- Frontend runs in development mode with hot-reload (Vite)
 - Backend uses Spring Boot with embedded Tomcat and a bounded SSE thread pool (`AsyncConfig`)
-- Docker Compose provides complete environment; Ollama models cached in a Docker volume
+- Conversation history is persisted to a local SQLite database (via Spring Data JPA), not kept in memory — it survives restarts
+- Docker Compose provides complete environment; Ollama models and conversation history are each cached in their own Docker volume
+- The production container runs as a dedicated non-root user
 - Quality gates: JaCoCo ≥ 90% coverage · SpotBugs · Checkstyle (Google Java Style) · PMD · Spotless
 
 ## Contributing
