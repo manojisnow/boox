@@ -135,8 +135,47 @@ A structured review of both sessions identified 10 issues across backend and fro
 
 ## What was originally planned as a Phase 7?
 
-There was no Phase 7 in either plan. The smart chatbot plan explicitly covered 6 phases. You might be counting the two separate planning sessions together (4 + 6 = 10 sub-phases, loosely remembered as 7). If a 7th feature phase were added, natural candidates would be:
-- **Conversation persistence** — save/restore chat history across page reloads (localStorage or a backend store)
-- **Multiple chat sessions** — sidebar to switch between named conversations
-- **Model configuration UI** — temperature slider, context length, stop tokens exposed in the UI
-- **More tools** — calculator, URL fetcher, file reader
+There was no Phase 7 in either plan. The smart chatbot plan explicitly covered 6 phases. You might be counting the two separate planning sessions together (4 + 6 = 10 sub-phases, loosely remembered as 7). At the time, natural candidates for a 7th feature phase were:
+- ~~**Conversation persistence** — save/restore chat history across page reloads (localStorage or a backend store)~~ — built in Session 5 below (SQLite-backed, not localStorage)
+- ~~**Multiple chat sessions** — sidebar to switch between named conversations~~ — built in Session 5 below
+- **Model configuration UI** — temperature slider, context length, stop tokens exposed in the UI — still open
+- **More tools** — calculator, URL fetcher, file reader — still open
+
+---
+
+## Session 4: Stack Modernization
+
+Goal: move off stacks that had gone EOL or unmaintained (Spring Boot 2.6.6, Create React App 4) before adding more features on top of them.
+
+- **Backend:** Spring Boot 2.6.6 → 3.5.3, Java 17 → 21. `javax.*` → `jakarta.*` in the validation-annotated classes; REST Assured/Mockito/Testcontainers versions handed off to the Boot BOM instead of being pinned by hand; removed the unused `spring-cloud-starter-openfeign` dependency (HTTP was always `RestTemplate`); added a `NoResourceFoundException` handler so Spring 6.1's stricter 404 behavior doesn't fall through to the catch-all 500 handler.
+- **Frontend:** Create React App 4 → Vite 8, React 17 → 19, axios 0.21 → 1.18, react-markdown 8 → 10 (its `code` renderer API changed — `Message.jsx`'s `CodeBlock` was updated accordingly). `src/index.js` → `src/main.jsx`; `public/index.html` → root `index.html`.
+- **Fix:** the Boot 3 upgrade silently broke `GET /api/chat/models` — Spring 6 removed the debug-symbol fallback for method parameter names, so `@RequestParam` without an explicit name needs the compiler's `-parameters` flag, which this project's POM never set (it imports the Boot BOM directly rather than using `spring-boot-starter-parent`, which sets it by default). Caught via a live smoke test against Ollama, not by the unit tests — added a MockMvc-based regression test that exercises real param binding.
+
+---
+
+## Session 5: Conversation Persistence & Context Window Management
+
+Goal: the two biggest product gaps — chat history vanished on every restart, and long conversations had no ceiling on what got sent to the model.
+
+### Conversation Persistence
+- `JpaChatContextService` — a SQLite-backed (`Spring Data JPA` + `sqlite-jdbc` + Hibernate's SQLite dialect) implementation of the existing `ChatContextService` interface, made the default (`@Primary`) over `InMemoryChatContextService`. Because the engine already wrote every message through that interface, this required no changes to `OllamaChatEngine` itself.
+- `Conversation` / `ChatMessageEntity` JPA entities; auto-titled from the first user message; `Conversation` implements `Persistable` so its assigned-String id uses JPA `persist` rather than `merge` (the default merge path silently diverges the managed instance for entities with non-generated ids).
+- New `ConversationController` (`/api/conversations`) — list, resume (fetch messages, filtering out intermediate tool-call rows for a clean replay), rename, delete.
+- Frontend: `ConversationSidebar.jsx` — list, new chat, resume, inline rename, delete. `ChatBox.jsx` uses the conversation id as the session id, loads history on mount, and no longer wipes the conversation when the model is switched mid-chat (previously it did).
+- **Fix:** navigating away while a response was still streaming both hid the new conversation from the sidebar (it only refreshed after streaming completed) and dropped the assistant's reply (the backend only persisted it after the stream finished, so a disconnect mid-stream lost it). Fixed by refreshing the sidebar as soon as a message is sent, and by having the backend keep consuming Ollama and persist the full reply even after the SSE client disconnects.
+- Docker: a named `boox_data` volume at `/app/data` so the SQLite file survives container recreation.
+
+### Context Window Management
+- `ContextWindowManager` — pure, unit-tested: estimates tokens (~chars/4) and splits a conversation's messages into a recent window that fits a budget plus the older messages that don't, nudging the window boundary to start on a `user` message.
+- Incremental summarization: a running `summary` + `summarizedCount` live on the `Conversation`; each turn folds only the *newly* dropped messages into the existing summary via one Ollama call (best-effort — a failure is logged and the chat continues). The summary is injected as a system message; the full message history is untouched in storage.
+- **Fix (found in the same pass):** `temperature` was being sent at the top level of the Ollama request payload, where Ollama silently ignores it — moved under `options`, alongside an optional `num_ctx`.
+
+---
+
+## Session 6: Security Hardening
+
+Goal: run [laria](https://github.com/manojisnow/laria) (an in-house multi-tool security scanner) against the repo and act on real findings.
+
+- **Dockerfile ran as root** — the final image had no `USER` directive. Added a dedicated system user/group, `chown`'d `/app` (including `/app/data`, where the SQLite file lives) before switching, and verified end-to-end: the process runs as a non-root uid, a real chat message still persists to SQLite through the Docker volume, and the container's own `HEALTHCHECK` reports healthy.
+- **GitHub Actions workflows had no top-level `permissions` block**, so `GITHUB_TOKEN` defaulted to write-all. Added `permissions: contents: read` as the workflow-level default in `ci.yml`, `release.yml`, and `qodana_code_quality.yml`; the jobs that genuinely need more (the release workflow's publish job, Qodana's PR-comment job) keep their existing job-level elevation.
+- Everything else the scan surfaced was noise from stale `.claude/worktrees/` checkout copies and a gitignored JetBrains workspace file — not real findings.
