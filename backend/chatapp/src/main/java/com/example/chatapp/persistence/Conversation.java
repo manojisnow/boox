@@ -43,6 +43,18 @@ public class Conversation implements Persistable<String> {
   @Column(columnDefinition = "text")
   private String systemPrompt;
 
+  /** Running summary of older turns that have fallen out of the context window. */
+  @Column(columnDefinition = "text")
+  private String summary;
+
+  /**
+   * How many of the oldest messages are already folded into {@link #summary}. The explicit default
+   * lets SQLite's {@code ALTER TABLE ADD COLUMN} add this NOT NULL column to tables that already
+   * have rows (a bare {@code NOT NULL} add is rejected by SQLite).
+   */
+  @Column(columnDefinition = "integer not null default 0")
+  private int summarizedCount;
+
   @Column(nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -109,6 +121,22 @@ public class Conversation implements Persistable<String> {
 
   public void setSystemPrompt(final String systemPrompt) {
     this.systemPrompt = systemPrompt;
+  }
+
+  public String getSummary() {
+    return summary;
+  }
+
+  public void setSummary(final String summary) {
+    this.summary = summary;
+  }
+
+  public int getSummarizedCount() {
+    return summarizedCount;
+  }
+
+  public void setSummarizedCount(final int summarizedCount) {
+    this.summarizedCount = summarizedCount;
   }
 
   public Instant getCreatedAt() {

@@ -13,6 +13,7 @@ import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.*;
@@ -38,6 +39,10 @@ class OllamaChatEngineTest {
     setField(engine, "chatPath", "/api/chat");
     setField(engine, "temperature", 0.7d);
     setField(engine, "modelDescription", "desc");
+    // Large budget + summary off by default so existing tests send the full context.
+    setField(engine, "maxContextTokens", 100000);
+    setField(engine, "summaryEnabled", false);
+    setField(engine, "numCtx", 0);
   }
 
   static void setField(Object target, String field, Object value) {
@@ -376,6 +381,67 @@ class OllamaChatEngineTest {
     // and we do not try to complete a dead emitter.
     verify(chatContextService).addMessage(eq(sessionId), eq("assistant"), eq("Hello world"));
     verify(emitter, never()).complete();
+  }
+
+  @Test
+  void sendMessage_summarizesDroppedMessages_whenBudgetExceeded() throws Exception {
+    // Arrange
+    setField(engine, "summaryEnabled", true);
+    setField(engine, "maxContextTokens", 25);
+    String sessionId = "sid";
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    List<Map<String, String>> ctx =
+        List.of(
+            Map.of("role", "user", "content", "a".repeat(40)),
+            Map.of("role", "assistant", "content", "b".repeat(40)),
+            Map.of("role", "user", "content", "c".repeat(40)),
+            Map.of("role", "assistant", "content", "d".repeat(40)));
+    when(chatContextService.getContext(sessionId)).thenReturn(ctx);
+    when(chatContextService.getSummarizedCount(sessionId)).thenReturn(0);
+    when(chatContextService.getSummary(sessionId)).thenReturn(null);
+    // First exchange = summarize call; second = tool-loop final response (no tool calls).
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"SUMMARY\"}}", HttpStatus.OK))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"final answer\"}}",
+                HttpStatus.OK));
+
+    // Act
+    Map<String, String> reply = engine.sendMessage("hello", "m", sessionId, false);
+
+    // Assert: the two oldest messages were folded into a stored summary.
+    verify(chatContextService).setSummaryState(eq(sessionId), eq("SUMMARY"), eq(2));
+    assertEquals("final answer", reply.get("content"));
+  }
+
+  @Test
+  void sendMessage_sendsGenerationOptions() throws Exception {
+    // Arrange
+    setField(engine, "numCtx", 4096);
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext("sid")).thenReturn(List.of());
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}", HttpStatus.OK));
+    ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+
+    // Act
+    engine.sendMessage("hi", "m", "sid", false);
+
+    // Assert: temperature and num_ctx are nested under options (Ollama ignores top-level).
+    verify(restTemplate)
+        .exchange(anyString(), eq(HttpMethod.POST), captor.capture(), eq(String.class));
+    Map<String, Object> body = (Map<String, Object>) captor.getValue().getBody();
+    Map<String, Object> options = (Map<String, Object>) body.get("options");
+    assertEquals(0.7d, options.get("temperature"));
+    assertEquals(4096, options.get("num_ctx"));
+    assertNull(body.get("temperature"));
   }
 
   @Test
