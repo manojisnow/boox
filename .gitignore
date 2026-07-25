@@ -38,3 +38,4 @@ yarn-error.log*
 backend/chatapp/data/
 *.db
 reports-laria/
+.kiro/
