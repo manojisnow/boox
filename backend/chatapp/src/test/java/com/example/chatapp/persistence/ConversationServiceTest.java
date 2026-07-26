@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.example.chatapp.controller.dto.ConversationSummary;
 import com.example.chatapp.controller.dto.MessageView;
+import com.example.chatapp.engine.GenerationConfig;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,16 @@ class ConversationServiceTest {
     assertEquals("c1", summaries.get(0).getId());
     assertEquals("hello there", summaries.get(0).getTitle());
     assertEquals("m1", summaries.get(0).getModel());
+  }
+
+  @Test
+  void list_includesGenerationConfig_whenSet() {
+    contextService.addMessage("c7", "user", "hi");
+    contextService.setGenerationConfig("c7", new GenerationConfig(0.5, 4096, List.of("STOP")));
+    ConversationSummary summary = conversationService.list().get(0);
+    assertEquals(0.5, summary.getTemperature());
+    assertEquals(4096, summary.getNumCtx());
+    assertEquals(List.of("STOP"), summary.getStopSequences());
   }
 
   @Test

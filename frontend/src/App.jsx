@@ -146,6 +146,11 @@ const App = () => {
                     key={activeConversationId}
                     conversationId={activeConversationId}
                     initialModel={activeConversation ? activeConversation.model : ''}
+                    initialGenerationConfig={activeConversation ? {
+                        temperature: activeConversation.temperature,
+                        numCtx: activeConversation.numCtx,
+                        stopSequences: activeConversation.stopSequences,
+                    } : null}
                     onConversationChanged={refreshConversations}
                     selectedServer={selectedServer}
                     setSelectedServer={setSelectedServer}

@@ -1,6 +1,7 @@
 package com.example.chatapp.persistence;
 
 import com.example.chatapp.engine.ChatContextService;
+import com.example.chatapp.engine.GenerationConfig;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ public class JpaChatContextService implements ChatContextService {
       final Map<String, Object> entry = new HashMap<>();
       entry.put("role", message.getRole());
       entry.put("content", nullToEmpty(message.getContent()));
-      final List<String> images = ImageCodec.fromJson(message.getImages());
+      final List<String> images = JsonListCodec.fromJson(message.getImages());
       if (!images.isEmpty()) {
         entry.put("images", images);
       }
@@ -59,7 +60,7 @@ public class JpaChatContextService implements ChatContextService {
     final Integer maxSeq = messages.findMaxSeq(sessionId);
     final int nextSeq = maxSeq == null ? 0 : maxSeq + 1;
     final ChatMessageEntity entity = new ChatMessageEntity(conversation, nextSeq, role, content);
-    entity.setImages(ImageCodec.toJson(images));
+    entity.setImages(JsonListCodec.toJson(images));
     messages.save(entity);
     if ("user".equals(role)
         && Conversation.DEFAULT_TITLE.equals(conversation.getTitle())
@@ -135,6 +136,30 @@ public class JpaChatContextService implements ChatContextService {
     final Conversation conversation = getOrCreate(sessionId);
     conversation.setSummary(summary);
     conversation.setSummarizedCount(summarizedCount);
+    conversations.save(conversation);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public GenerationConfig getGenerationConfig(final String sessionId) {
+    return conversations
+        .findById(sessionId)
+        .map(
+            c ->
+                new GenerationConfig(
+                    c.getTemperature(),
+                    c.getNumCtx(),
+                    JsonListCodec.fromJson(c.getStopSequences())))
+        .orElseGet(GenerationConfig::empty);
+  }
+
+  @Override
+  @Transactional
+  public void setGenerationConfig(final String sessionId, final GenerationConfig config) {
+    final Conversation conversation = getOrCreate(sessionId);
+    conversation.setTemperature(config.getTemperature());
+    conversation.setNumCtx(config.getNumCtx());
+    conversation.setStopSequences(JsonListCodec.toJson(config.getStopSequences()));
     conversations.save(conversation);
   }
 

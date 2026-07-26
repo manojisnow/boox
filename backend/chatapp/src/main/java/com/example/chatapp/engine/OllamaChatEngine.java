@@ -134,12 +134,39 @@ public class OllamaChatEngine implements ChatEngine {
     return messages;
   }
 
-  /** Shared Ollama generation options. Ollama reads these under {@code options}, not top-level. */
+  /**
+   * Shared Ollama generation options using only the server defaults. Ollama reads these under
+   * {@code options}, not top-level. Used for internal calls (context summarization) that must not
+   * pick up a conversation's own overrides — e.g. a user's stop sequence must not truncate the
+   * summary the engine writes about their conversation.
+   */
   private Map<String, Object> buildOptions() {
     final Map<String, Object> options = new HashMap<>();
     options.put("temperature", temperature);
     if (numCtx > 0) {
       options.put("num_ctx", numCtx);
+    }
+    return options;
+  }
+
+  /**
+   * Generation options for a user-facing call: the server defaults, overridden by whatever the
+   * conversation has configured (temperature, context size, stop sequences).
+   */
+  private Map<String, Object> buildOptions(final String sessionId) {
+    final Map<String, Object> options = buildOptions();
+    final GenerationConfig config = chatContextService.getGenerationConfig(sessionId);
+    if (config == null) {
+      return options;
+    }
+    if (config.getTemperature() != null) {
+      options.put("temperature", config.getTemperature());
+    }
+    if (config.getNumCtx() != null) {
+      options.put("num_ctx", config.getNumCtx());
+    }
+    if (!config.getStopSequences().isEmpty()) {
+      options.put("stop", config.getStopSequences());
     }
     return options;
   }
@@ -216,13 +243,16 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   private Optional<Map<String, Object>> callOllamaWithTools(
-      final String model, final List<Map<String, ?>> messages, final boolean stream)
+      final String model,
+      final List<Map<String, ?>> messages,
+      final boolean stream,
+      final String sessionId)
       throws com.fasterxml.jackson.core.JsonProcessingException, java.io.IOException {
     final String url = ollamaApiUrl + chatPath;
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
     payload.put("messages", messages);
-    payload.put("options", buildOptions());
+    payload.put("options", buildOptions(sessionId));
     payload.put("stream", stream);
     if (toolRegistry.hasTools()) {
       payload.put("tools", toolRegistry.getToolDefinitions());
@@ -299,7 +329,8 @@ public class OllamaChatEngine implements ChatEngine {
     int toolIndex = 0;
     for (int i = 0; i < MAX_TOOL_ITERATIONS; i++) {
       final List<Map<String, ?>> msgs = new ArrayList<>(buildMessagesWithSystemPrompt(sessionId));
-      final Optional<Map<String, Object>> responseOpt = callOllamaWithTools(model, msgs, false);
+      final Optional<Map<String, Object>> responseOpt =
+          callOllamaWithTools(model, msgs, false, sessionId);
       if (responseOpt.isEmpty()) {
         return Optional.empty();
       }
@@ -495,7 +526,7 @@ public class OllamaChatEngine implements ChatEngine {
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
     payload.put("messages", messagesForOllama);
-    payload.put("options", buildOptions());
+    payload.put("options", buildOptions(sessionId));
     payload.put("stream", true);
 
     final StringBuilder fullContent = new StringBuilder();
