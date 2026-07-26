@@ -37,17 +37,25 @@ const CodeBlock = ({ node, className, children, ...props }) => {
     return <code className={className} {...props}>{children}</code>;
 };
 
-const Message = ({ text, sender, toolCalls }) => {
+const Message = ({ text, sender, toolCalls, images }) => {
     const isUser = sender === 'user';
     let displayName = '';
     if (!isUser) {
         displayName = sender === 'assistant' ? 'AI' : sender;
     }
     const hasToolCalls = !isUser && toolCalls && toolCalls.length > 0;
+    const hasImages = images && images.length > 0;
     return (
         <div className={`message-row ${isUser ? 'user' : 'bot'}`}>
             {!isUser && <div className="message-sender">{displayName}</div>}
             <div className={`message-bubble ${isUser ? 'user' : 'bot'}`}>
+                {hasImages && (
+                    <div className="message-images">
+                        {images.map((src, i) => (
+                            <img key={i} src={src} alt={`Attachment ${i + 1}`} className="message-image-thumb" />
+                        ))}
+                    </div>
+                )}
                 {hasToolCalls && (
                     <div className="tool-calls-container">
                         {toolCalls.map((tc, i) => (

@@ -56,6 +56,21 @@
   font-weight: 500;
 }
 
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.message-image-thumb {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: var(--radius-sm, 6px);
+  object-fit: cover;
+  display: block;
+}
+
 /* Markdown content in bot bubbles */
 .message-bubble.bot p {
   margin: 0.4em 0;

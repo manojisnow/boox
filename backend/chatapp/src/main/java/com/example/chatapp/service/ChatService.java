@@ -58,7 +58,9 @@ public class ChatService {
     if (engine != null) {
       LOGGER.info(
           "Sending message to server: {}, model: {}, session: {}", server, model, sessionId);
-      return engine.sendMessage(message, model, sessionId, stream);
+      final List<String> images = request.getImages();
+      return engine.sendMessage(
+          message, images == null ? List.of() : images, model, sessionId, stream);
     }
     LOGGER.warn("Attempted to send message to unknown server: {}", server);
     return Map.of("role", "assistant", "content", "(unknown server)");
@@ -89,8 +91,13 @@ public class ChatService {
           server,
           request.getModel(),
           request.getSessionId());
+      final List<String> images = request.getImages();
       engine.streamMessage(
-          request.getMessage(), request.getModel(), request.getSessionId(), emitter);
+          request.getMessage(),
+          images == null ? List.of() : images,
+          request.getModel(),
+          request.getSessionId(),
+          emitter);
     } else {
       LOGGER.warn("Attempted to stream message to unknown server: {}", server);
       try {

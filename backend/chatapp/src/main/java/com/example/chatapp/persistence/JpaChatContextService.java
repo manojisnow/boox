@@ -4,6 +4,7 @@ import com.example.chatapp.engine.ChatContextService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Primary;
@@ -34,22 +35,32 @@ public class JpaChatContextService implements ChatContextService {
 
   @Override
   @Transactional
-  public List<Map<String, String>> getContext(final String sessionId) {
+  public List<Map<String, Object>> getContext(final String sessionId) {
     getOrCreate(sessionId);
-    final List<Map<String, String>> context = new ArrayList<>();
+    final List<Map<String, Object>> context = new ArrayList<>();
     for (final ChatMessageEntity message : messages.findByConversationIdOrderBySeqAsc(sessionId)) {
-      context.add(Map.of("role", message.getRole(), "content", nullToEmpty(message.getContent())));
+      final Map<String, Object> entry = new HashMap<>();
+      entry.put("role", message.getRole());
+      entry.put("content", nullToEmpty(message.getContent()));
+      final List<String> images = ImageCodec.fromJson(message.getImages());
+      if (!images.isEmpty()) {
+        entry.put("images", images);
+      }
+      context.add(entry);
     }
     return context;
   }
 
   @Override
   @Transactional
-  public void addMessage(final String sessionId, final String role, final String content) {
+  public void addMessage(
+      final String sessionId, final String role, final String content, final List<String> images) {
     final Conversation conversation = getOrCreate(sessionId);
     final Integer maxSeq = messages.findMaxSeq(sessionId);
     final int nextSeq = maxSeq == null ? 0 : maxSeq + 1;
-    messages.save(new ChatMessageEntity(conversation, nextSeq, role, content));
+    final ChatMessageEntity entity = new ChatMessageEntity(conversation, nextSeq, role, content);
+    entity.setImages(ImageCodec.toJson(images));
+    messages.save(entity);
     if ("user".equals(role)
         && Conversation.DEFAULT_TITLE.equals(conversation.getTitle())
         && content != null

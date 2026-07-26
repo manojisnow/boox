@@ -4,9 +4,19 @@ import java.util.List;
 import java.util.Map;
 
 public interface ChatContextService {
-  List<Map<String, String>> getContext(String sessionId);
+  /** Each message is at least {@code role}/{@code content}; may also carry {@code images}. */
+  List<Map<String, Object>> getContext(String sessionId);
 
-  void addMessage(String sessionId, String role, String content);
+  /**
+   * Adds a text-only message. Equivalent to {@code addMessage(sessionId, role, content,
+   * List.of())}.
+   */
+  default void addMessage(String sessionId, String role, String content) {
+    addMessage(sessionId, role, content, List.of());
+  }
+
+  /** Adds a message, optionally carrying base64-encoded images (no {@code data:} prefix). */
+  void addMessage(String sessionId, String role, String content, List<String> images);
 
   void setSystemPrompt(String sessionId, String systemPrompt);
 

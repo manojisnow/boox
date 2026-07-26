@@ -21,8 +21,16 @@ const ChatBox = ({
     const [systemPrompt, setSystemPrompt] = useState(() => sessionStorage.getItem('boox-system-prompt') || '');
     const [showSystemPrompt, setShowSystemPrompt] = useState(false);
     const [error, setError] = useState('');
+    const [attachedImages, setAttachedImages] = useState([]);
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
+    const fileInputRef = useRef(null);
+
+    const MAX_IMAGES = 4;
+    const MAX_IMAGE_BYTES = 7_000_000; // matches the backend's ~7MB-raw cap
+
+    const selectedModelInfo = models.find(m => m.name === selectedModel);
+    const supportsVision = Boolean(selectedModelInfo?.capabilities?.includes('vision'));
 
     // Load persisted history for this conversation on mount (component is
     // remounted with a new key whenever the active conversation changes).
@@ -33,7 +41,13 @@ const ChatBox = ({
             try {
                 const history = await getConversationMessages(conversationId);
                 if (!cancelled && history.length > 0) {
-                    setMessages(history.map(m => ({ text: m.content, sender: m.role })));
+                    setMessages(history.map(m => ({
+                        text: m.content,
+                        sender: m.role,
+                        // Stored images have no known MIME type; browsers decode a
+                        // data: URL correctly regardless of the declared type here.
+                        images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`),
+                    })));
                 }
             } catch (err) {
                 console.error('Failed to load conversation history:', err.message);
@@ -93,6 +107,51 @@ const ChatBox = ({
         }
     }, []);
 
+    // Drop staged images if the selected model can't see them (e.g. user switched
+    // to a text-only model after attaching something).
+    useEffect(() => {
+        if (!supportsVision && attachedImages.length > 0) {
+            setAttachedImages([]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [supportsVision]);
+
+    const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = ''; // allow re-selecting the same file later
+        if (files.length === 0) return;
+
+        const room = MAX_IMAGES - attachedImages.length;
+        if (room <= 0) {
+            setError(`You can attach up to ${MAX_IMAGES} images.`);
+            return;
+        }
+
+        files.slice(0, room).forEach((file) => {
+            if (!file.type.startsWith('image/')) {
+                setError('Only image files can be attached.');
+                return;
+            }
+            if (file.size > MAX_IMAGE_BYTES) {
+                setError(`${file.name} is too large (max ${Math.floor(MAX_IMAGE_BYTES / 1_000_000)}MB).`);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result;
+                const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+                setAttachedImages((prev) =>
+                    prev.length >= MAX_IMAGES ? prev : [...prev, { dataUrl, base64 }]
+                );
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const removeAttachedImage = (index) => {
+        setAttachedImages((prev) => prev.filter((_, i) => i !== index));
+    };
+
     const handleSendMessage = async (e) => {
         if (e) e.preventDefault();
         if (!selectedServer) {
@@ -108,10 +167,16 @@ const ChatBox = ({
 
         setError('');
         setChatLocked(true);
-        const userMessage = { text: input, sender: 'user' };
+        const imagesBase64 = attachedImages.map((img) => img.base64);
+        const userMessage = {
+            text: input,
+            sender: 'user',
+            images: attachedImages.map((img) => img.dataUrl),
+        };
         setMessages((prev) => [...prev, userMessage]);
         const currentInput = input.trim();
         setInput('');
+        setAttachedImages([]);
 
         // Reset textarea height after clearing input
         if (textareaRef.current) {
@@ -125,7 +190,8 @@ const ChatBox = ({
                     selectedServer.trim(),
                     selectedModel.trim(),
                     conversationId.trim(),
-                    systemPrompt
+                    systemPrompt,
+                    imagesBase64
                 );
                 // The backend has now created/updated this conversation, so surface it
                 // in the sidebar immediately — before streaming finishes — in case the
@@ -232,7 +298,8 @@ const ChatBox = ({
                     selectedModel.trim(),
                     conversationId.trim(),
                     false,
-                    systemPrompt
+                    systemPrompt,
+                    imagesBase64
                 );
                 const botMessage = { text: response.content, sender: response.role };
                 setMessages((prev) => [...prev, botMessage]);
@@ -309,7 +376,7 @@ const ChatBox = ({
                     </div>
                 ) : (
                     messages.map((msg, index) => (
-                        <Message key={index} text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} />
+                        <Message key={index} text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
                     ))
                 )}
                 {chatLocked && !isStreaming && (
@@ -337,6 +404,23 @@ const ChatBox = ({
                             />
                         </div>
                     )}
+                    {attachedImages.length > 0 && (
+                        <div className="attached-images-row">
+                            {attachedImages.map((img, index) => (
+                                <div className="attached-image-thumb" key={index}>
+                                    <img src={img.dataUrl} alt={`Attachment ${index + 1}`} />
+                                    <button
+                                        type="button"
+                                        className="attached-image-remove"
+                                        onClick={() => removeAttachedImage(index)}
+                                        aria-label="Remove image"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <div className="input-row">
                         <button
                             type="button"
@@ -350,6 +434,32 @@ const ChatBox = ({
                                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
                         </button>
+                        {supportsVision && (
+                            <>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleFileSelect}
+                                    style={{ display: 'none' }}
+                                />
+                                <button
+                                    type="button"
+                                    className="attach-image-toggle"
+                                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                                    disabled={chatLocked || attachedImages.length >= MAX_IMAGES}
+                                    title="Attach image"
+                                    aria-label="Attach image"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                        <polyline points="21 15 16 10 5 21" />
+                                    </svg>
+                                </button>
+                            </>
+                        )}
                         <textarea
                             ref={textareaRef}
                             value={input}

@@ -22,7 +22,7 @@ public class ContractTestConfig {
 
       @Override
       public Map<String, String> sendMessage(
-          String message, String model, String sessionId, boolean stream) {
+          String message, List<String> images, String model, String sessionId, boolean stream) {
         return Map.of("role", "assistant", "content", "Greetings!");
       }
 

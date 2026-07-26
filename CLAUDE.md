@@ -148,6 +148,7 @@ Environment variable overrides (Docker/runtime):
 - **Ollama container needs 8GB memory** allocation (4GB reservation) — set in docker-compose.yml
 - **Persistent chat context** — conversation history is stored in SQLite (`JpaChatContextService`, the default) and survives restarts; mount `/app/data` as a volume in Docker. `InMemoryChatContextService` still exists as a non-persistent fallback, used in unit tests
 - **Context window management** — long conversations are token-budgeted; older turns are summarized rather than sent to the model (or dropped) in full every turn — see `ContextWindowManager`
+- **Image input** — up to 4 images/message, base64 over the wire, persisted with the conversation; gated client-side by the selected model's `vision` capability (from Ollama's `/api/tags`)
 - **Container runs as a non-root user** in the production image
 
 ---

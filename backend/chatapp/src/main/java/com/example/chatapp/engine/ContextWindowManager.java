@@ -9,30 +9,33 @@ import java.util.Map;
  * older "dropped" messages that do not. Pure logic — no Spring or IO — so it is trivially testable.
  *
  * <p>Tokens are estimated as roughly one per four characters, which is accurate enough for
- * budgeting without pulling in a model-specific tokenizer.
+ * budgeting without pulling in a model-specific tokenizer. Images are estimated at a flat cost per
+ * image, informed by an empirical Ollama vision call rather than guessed from nothing.
  */
 public final class ContextWindowManager {
 
   private static final int CHARS_PER_TOKEN = 4;
+  private static final int IMAGE_TOKEN_ESTIMATE = 768;
   private static final String ROLE = "role";
   private static final String CONTENT = "content";
+  private static final String IMAGES = "images";
   private static final String ROLE_USER = "user";
 
   /** Result of splitting a message list at the context-window boundary. */
   public static final class Split {
-    private final List<Map<String, String>> dropped;
-    private final List<Map<String, String>> window;
+    private final List<Map<String, Object>> dropped;
+    private final List<Map<String, Object>> window;
 
-    Split(final List<Map<String, String>> dropped, final List<Map<String, String>> window) {
+    Split(final List<Map<String, Object>> dropped, final List<Map<String, Object>> window) {
       this.dropped = dropped;
       this.window = window;
     }
 
-    public List<Map<String, String>> getDropped() {
+    public List<Map<String, Object>> getDropped() {
       return new ArrayList<>(dropped);
     }
 
-    public List<Map<String, String>> getWindow() {
+    public List<Map<String, Object>> getWindow() {
       return new ArrayList<>(window);
     }
   }
@@ -45,8 +48,14 @@ public final class ContextWindowManager {
     return Math.max(1, text.length() / CHARS_PER_TOKEN);
   }
 
-  private int messageTokens(final Map<String, String> message) {
-    return estimateTokens(message.get(CONTENT)) + estimateTokens(message.get(ROLE));
+  private int messageTokens(final Map<String, Object> message) {
+    int tokens =
+        estimateTokens((String) message.get(CONTENT)) + estimateTokens((String) message.get(ROLE));
+    final Object images = message.get(IMAGES);
+    if (images instanceof List) {
+      tokens += ((List<?>) images).size() * IMAGE_TOKEN_ESTIMATE;
+    }
+    return tokens;
   }
 
   /**
@@ -55,7 +64,7 @@ public final class ContextWindowManager {
    * forward so it begins on a {@code user} message, avoiding an orphaned leading {@code
    * tool}/assistant-continuation turn. At least the final message is always kept.
    */
-  public Split split(final List<Map<String, String>> messages, final int budgetTokens) {
+  public Split split(final List<Map<String, Object>> messages, final int budgetTokens) {
     if (messages == null || messages.isEmpty()) {
       return new Split(new ArrayList<>(), new ArrayList<>());
     }

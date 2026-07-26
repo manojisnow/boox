@@ -194,6 +194,7 @@ boox/
 - **Context reset** — clear the current conversation's messages without restarting the server
 - **Multi-model support** — switch between any models pulled into Ollama at any point; switching mid-conversation continues the same conversation rather than starting a new one
 - **Context window management** — long conversations stay fast and coherent: once a conversation exceeds a token budget, older turns are automatically folded into a running summary instead of being sent to the model in full every turn. The full conversation is always still stored and shown — only what's *sent to the model* is trimmed. Configurable via `OLLAMA_CONTEXT_*` (see [Manual Configuration](#manual-configuration))
+- **Image input** — attach up to 4 images to a message for vision-capable models (e.g. `gemma3`/`gemma4`); the attach button only appears when the selected model reports `vision` support. Images persist with the conversation and are shown again on resume
 
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation

@@ -104,17 +104,17 @@ public class OllamaChatEngine implements ChatEngine {
           + " the schema definition. Example: {\"query\": \"your actual search terms\"},"
           + " not {\"query\": {\"type\": \"string\", \"description\": \"...\"}}.\n";
 
-  private List<Map<String, String>> buildMessagesWithSystemPrompt(final String sessionId) {
-    final List<Map<String, String>> context = chatContextService.getContext(sessionId);
+  private List<Map<String, Object>> buildMessagesWithSystemPrompt(final String sessionId) {
+    final List<Map<String, Object>> context = chatContextService.getContext(sessionId);
     final String userSystemPrompt = chatContextService.getSystemPrompt(sessionId);
     final String summary = chatContextService.getSummary(sessionId);
     final int summarizedCount =
         Math.min(chatContextService.getSummarizedCount(sessionId), context.size());
-    final List<Map<String, String>> live = context.subList(summarizedCount, context.size());
-    final List<Map<String, String>> window =
+    final List<Map<String, Object>> live = context.subList(summarizedCount, context.size());
+    final List<Map<String, Object>> window =
         windowManager.split(live, maxContextTokens).getWindow();
 
-    final List<Map<String, String>> messages = new ArrayList<>();
+    final List<Map<String, Object>> messages = new ArrayList<>();
     final StringBuilder systemContent = new StringBuilder();
     if (toolRegistry.hasTools()) {
       systemContent.append(TOOL_USAGE_HINT);
@@ -154,11 +154,11 @@ public class OllamaChatEngine implements ChatEngine {
       return;
     }
     try {
-      final List<Map<String, String>> context = chatContextService.getContext(sessionId);
+      final List<Map<String, Object>> context = chatContextService.getContext(sessionId);
       final int summarizedCount =
           Math.min(chatContextService.getSummarizedCount(sessionId), context.size());
-      final List<Map<String, String>> live = context.subList(summarizedCount, context.size());
-      final List<Map<String, String>> dropped =
+      final List<Map<String, Object>> live = context.subList(summarizedCount, context.size());
+      final List<Map<String, Object>> dropped =
           windowManager.split(live, maxContextTokens).getDropped();
       if (dropped.isEmpty()) {
         return;
@@ -177,10 +177,10 @@ public class OllamaChatEngine implements ChatEngine {
 
   @SuppressWarnings("unchecked")
   private String summarize(
-      final String model, final String existingSummary, final List<Map<String, String>> dropped)
+      final String model, final String existingSummary, final List<Map<String, Object>> dropped)
       throws java.io.IOException {
     final StringBuilder convo = new StringBuilder();
-    for (final Map<String, String> msg : dropped) {
+    for (final Map<String, Object> msg : dropped) {
       convo
           .append(msg.get("role"))
           .append(": ")
@@ -370,10 +370,19 @@ public class OllamaChatEngine implements ChatEngine {
     if (body != null && body.containsKey("models")) {
       final List<Map<String, Object>> models = (List<Map<String, Object>>) body.get("models");
       return models.stream()
-          .map(m -> new ModelInfo((String) m.get("name"), modelDescription))
+          .map(m -> new ModelInfo((String) m.get("name"), modelDescription, capabilitiesOf(m)))
           .collect(Collectors.toList());
     }
     return Collections.emptyList();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> capabilitiesOf(final Map<String, Object> model) {
+    final Object capabilities = model.get("capabilities");
+    if (capabilities instanceof List) {
+      return (List<String>) capabilities;
+    }
+    return List.of();
   }
 
   private Map<String, String> parseOllamaResponse(final Map body) {
@@ -407,14 +416,18 @@ public class OllamaChatEngine implements ChatEngine {
           "Broad exception handling is intentional for robust error reporting in a service/controller boundary.")
   @Override
   public Map<String, String> sendMessage(
-      final String message, final String model, final String sessionId, final boolean stream) {
+      final String message,
+      final List<String> images,
+      final String model,
+      final String sessionId,
+      final boolean stream) {
     try {
       if (!isOllamaRunning()) {
         LOGGER.warn("Ollama server is not running when sending message.");
         return Map.of(
             "role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.SERVER_NOT_RUNNING);
       }
-      chatContextService.addMessage(sessionId, Constants.ROLE_USER, message);
+      chatContextService.addMessage(sessionId, Constants.ROLE_USER, message, images);
       ensureSummarized(sessionId, model);
 
       final Optional<Map<String, Object>> finalResponse = executeToolLoop(model, sessionId, null);
@@ -437,7 +450,11 @@ public class OllamaChatEngine implements ChatEngine {
           "Broad exception handling is intentional for robust error reporting in SSE streaming.")
   @Override
   public void streamMessage(
-      final String message, final String model, final String sessionId, final SseEmitter emitter) {
+      final String message,
+      final List<String> images,
+      final String model,
+      final String sessionId,
+      final SseEmitter emitter) {
     try {
       if (!isOllamaRunning()) {
         LOGGER.warn("Ollama server is not running when streaming message.");
@@ -446,7 +463,7 @@ public class OllamaChatEngine implements ChatEngine {
         emitter.complete();
         return;
       }
-      chatContextService.addMessage(sessionId, Constants.ROLE_USER, message);
+      chatContextService.addMessage(sessionId, Constants.ROLE_USER, message, images);
       ensureSummarized(sessionId, model);
 
       final Optional<Map<String, Object>> finalResponse =
@@ -474,7 +491,7 @@ public class OllamaChatEngine implements ChatEngine {
       final String model, final String sessionId, final SseEmitter emitter)
       throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
     final String url = ollamaApiUrl + chatPath;
-    final List<Map<String, String>> messagesForOllama = buildMessagesWithSystemPrompt(sessionId);
+    final List<Map<String, Object>> messagesForOllama = buildMessagesWithSystemPrompt(sessionId);
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
     payload.put("messages", messagesForOllama);
