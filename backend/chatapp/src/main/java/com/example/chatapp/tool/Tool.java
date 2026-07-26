@@ -3,6 +3,7 @@ package com.example.chatapp.tool;
 import java.util.Map;
 
 /** Interface for tools that the AI can invoke during a conversation. */
+@SuppressWarnings("PMD.ShortClassName")
 public interface Tool {
   String getName();
 

@@ -5,7 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
   @Value("${chat.cors.allowed-origins}")
@@ -24,7 +23,7 @@ public class CorsConfig implements WebMvcConfigurer {
   private long maxAge;
 
   @Override
-  public void addCorsMappings(CorsRegistry registry) {
+  public void addCorsMappings(final CorsRegistry registry) {
     registry
         .addMapping("/api/**")
         .allowedOrigins(allowedOrigins.split(","))

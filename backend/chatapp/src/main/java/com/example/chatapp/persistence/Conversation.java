@@ -31,7 +31,7 @@ public class Conversation implements Persistable<String> {
 
   @Id private String id;
 
-  @Transient private boolean isNew = true;
+  @Transient private boolean newEntity = true;
 
   @Column(nullable = false)
   private String title = DEFAULT_TITLE;
@@ -88,13 +88,13 @@ public class Conversation implements Persistable<String> {
 
   @Override
   public boolean isNew() {
-    return isNew;
+    return newEntity;
   }
 
   @PostPersist
   @PostLoad
   void markNotNew() {
-    this.isNew = false;
+    this.newEntity = false;
   }
 
   public void setId(final String id) {

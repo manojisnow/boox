@@ -12,15 +12,19 @@ public interface ChatEngine {
 
   /** Text-only convenience overload. Equivalent to passing an empty image list. */
   default Map<String, String> sendMessage(
-      String message, String model, String sessionId, boolean stream) {
+      final String message, final String model, final String sessionId, final boolean stream) {
     return sendMessage(message, List.of(), model, sessionId, stream);
   }
 
   /** Stream a message response via SSE. Default implementation falls back to sendMessage. */
   default void streamMessage(
-      String message, List<String> images, String model, String sessionId, SseEmitter emitter) {
+      final String message,
+      final List<String> images,
+      final String model,
+      final String sessionId,
+      final SseEmitter emitter) {
     try {
-      Map<String, String> result = sendMessage(message, images, model, sessionId, false);
+      final Map<String, String> result = sendMessage(message, images, model, sessionId, false);
       emitter.send(SseEmitter.event().data(result.get("content")));
       emitter.send(SseEmitter.event().data("[DONE]"));
       emitter.complete();
@@ -30,7 +34,8 @@ public interface ChatEngine {
   }
 
   /** Text-only convenience overload. Equivalent to passing an empty image list. */
-  default void streamMessage(String message, String model, String sessionId, SseEmitter emitter) {
+  default void streamMessage(
+      final String message, final String model, final String sessionId, final SseEmitter emitter) {
     streamMessage(message, List.of(), model, sessionId, emitter);
   }
 

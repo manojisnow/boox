@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 public class Application {
   public static void main(final String[] args) {
     SpringApplication.run(Application.class, args);

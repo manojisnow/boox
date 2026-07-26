@@ -50,7 +50,7 @@ public class ChatService {
     final String server = request.getServer();
     final String model = request.getModel();
     final String sessionId = request.getSessionId();
-    final boolean stream = request.getStream() != null && request.getStream();
+    final boolean stream = request.isStream() != null && request.isStream();
     if (request.getSystemPrompt() != null) {
       chatContextService.setSystemPrompt(sessionId, request.getSystemPrompt());
     }

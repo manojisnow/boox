@@ -62,19 +62,10 @@
                     <printFailingErrors>true</printFailingErrors>
                     <failOnViolation>false</failOnViolation>
                     <rulesets>
-                        <ruleset>category/java/bestpractices.xml</ruleset>
-                        <ruleset>category/java/codestyle.xml</ruleset>
-                        <ruleset>category/java/design.xml</ruleset>
-                        <ruleset>category/java/errorprone.xml</ruleset>
-                        <ruleset>category/java/multithreading.xml</ruleset>
-                        <ruleset>category/java/performance.xml</ruleset>
-                        <ruleset>category/java/security.xml</ruleset>
+                        <!-- Path is relative to each module's basedir (e.g. chatapp/), not the
+                             parent's, since this config is inherited by child modules. -->
+                        <ruleset>../pmd-ruleset.xml</ruleset>
                     </rulesets>
-                    <excludeRules>
-                        <excludeRule>
-                            <ruleName>UnnecessaryImport</ruleName>
-                        </excludeRule>
-                    </excludeRules>
                     <targetJdk>21</targetJdk>
                 </configuration>
             </plugin>
