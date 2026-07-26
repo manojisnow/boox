@@ -21,4 +21,9 @@ export default defineConfig({
     // Deep ESM subpath import used by Message.jsx for the Prism theme.
     include: ['react-syntax-highlighter/dist/esm/styles/prism'],
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/setupTests.js'],
+    globals: true,
+  },
 });
