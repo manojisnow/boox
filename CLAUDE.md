@@ -98,6 +98,7 @@ backend/chatapp/src/main/java/com/example/chatapp/
     OllamaChatEngine.java        # Ollama API integration + tool loop
     ChatContextService.java      # Context abstraction (interface)
     ContextWindowManager.java    # Token-budget window + summarization split
+    GenerationConfig.java        # Per-conversation temperature/num_ctx/stop-sequence overrides
   persistence/
     JpaChatContextService.java   # Default (SQLite-backed) context implementation
     InMemoryChatContextService.java  # Non-persistent fallback, used in unit tests
@@ -149,6 +150,7 @@ Environment variable overrides (Docker/runtime):
 - **Persistent chat context** — conversation history is stored in SQLite (`JpaChatContextService`, the default) and survives restarts; mount `/app/data` as a volume in Docker. `InMemoryChatContextService` still exists as a non-persistent fallback, used in unit tests
 - **Context window management** — long conversations are token-budgeted; older turns are summarized rather than sent to the model (or dropped) in full every turn — see `ContextWindowManager`
 - **Image input** — up to 4 images/message, base64 over the wire, persisted with the conversation; gated client-side by the selected model's `vision` capability (from Ollama's `/api/tags`)
+- **Per-conversation generation config** — temperature, `num_ctx`, and stop sequences can be overridden per conversation (not just via the global `OLLAMA_API_TEMPERATURE`/`OLLAMA_CONTEXT_NUM_CTX` env vars); stored on `Conversation`, applied in `OllamaChatEngine.buildOptions(sessionId)`. Internal calls (context summarization) deliberately keep using the global-only `buildOptions()` so a user's own stop sequence can't truncate the summary the engine writes about their conversation
 - **Container runs as a non-root user** in the production image
 
 ---

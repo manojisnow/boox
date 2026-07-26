@@ -166,13 +166,13 @@ docker run -d --name boox_app \
 Available variables:
 - `OLLAMA_API_URL`: Ollama server URL
 - `OLLAMA_MODEL`: AI model to use (default: phi4-mini)
-- `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7)
+- `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7) — server-wide default; any conversation can override it via the generation settings panel (see [Features](#chat))
 - `PORT`: Backend port (default: 8080)
 - `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
 - `BOOX_DB_PATH`: SQLite database file path (default: `/app/data/boox.db` in Docker, `./data/boox.db` locally) — conversation history is stored here
 - `OLLAMA_CONTEXT_MAX_TOKENS`: token budget for what's sent to the model each turn (default: 3000); older messages are folded into a running summary rather than dropped
 - `OLLAMA_CONTEXT_SUMMARY_ENABLED`: whether to summarize messages that fall out of the context window (default: true)
-- `OLLAMA_CONTEXT_NUM_CTX`: if set (>0), passed to Ollama as `options.num_ctx` to size the model's own context window
+- `OLLAMA_CONTEXT_NUM_CTX`: if set (>0), passed to Ollama as `options.num_ctx` to size the model's own context window — server-wide default; overridable per-conversation the same way
 
 ## Project Structure
 
@@ -195,6 +195,7 @@ boox/
 - **Multi-model support** — switch between any models pulled into Ollama at any point; switching mid-conversation continues the same conversation rather than starting a new one
 - **Context window management** — long conversations stay fast and coherent: once a conversation exceeds a token budget, older turns are automatically folded into a running summary instead of being sent to the model in full every turn. The full conversation is always still stored and shown — only what's *sent to the model* is trimmed. Configurable via `OLLAMA_CONTEXT_*` (see [Manual Configuration](#manual-configuration))
 - **Image input** — attach up to 4 images to a message for vision-capable models (e.g. `gemma3`/`gemma4`); the attach button only appears when the selected model reports `vision` support. Images persist with the conversation and are shown again on resume
+- **Per-conversation generation settings** — collapsible sliders-icon panel next to the system prompt lets you override temperature, context size (`num_ctx`), and stop sequences for that conversation only; each field falls back to the server default when left blank. Settings are saved with the conversation and restored on resume, isolated from every other conversation
 
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
