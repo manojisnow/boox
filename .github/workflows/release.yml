@@ -1,10 +1,13 @@
 name: Release
 
-# Triggers when a version tag is pushed, e.g. git tag v1.0.0 && git push --tags
+# Triggers when a version tag is pushed, e.g. git tag v1.0.0 && git push --tags.
+# Also runnable manually (workflow_dispatch) to re-sync Docker Hub metadata/images
+# for the current tag without cutting a new release.
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 # Required secrets (set in GitHub → Settings → Secrets → Actions):
 #   DOCKERHUB_USERNAME  →  dumanoj
@@ -120,8 +123,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Attach docker-compose.release.yml as a downloadable asset on the release
+      - name: Update Docker Hub Description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: dumanoj/boox
+          short-description: ${{ github.event.repository.description }}
+          readme-filepath: ./README.md
+
+      # Only meaningful on an actual tag push — a workflow_dispatch run (used to
+      # re-sync Docker Hub metadata/images without cutting a release) has no tag.
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: docker-compose.release.yml
