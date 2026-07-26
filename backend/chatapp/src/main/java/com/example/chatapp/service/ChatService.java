@@ -4,6 +4,7 @@ import com.example.chatapp.controller.ResetContextRequest;
 import com.example.chatapp.controller.SendMessageRequest;
 import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.ChatEngine;
+import com.example.chatapp.engine.GenerationConfig;
 import com.example.chatapp.engine.ModelInfo;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.*;
@@ -54,6 +55,7 @@ public class ChatService {
       chatContextService.setSystemPrompt(sessionId, request.getSystemPrompt());
     }
     chatContextService.setMetadata(sessionId, server, model);
+    applyGenerationConfig(request, sessionId);
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -84,6 +86,7 @@ public class ChatService {
       chatContextService.setSystemPrompt(request.getSessionId(), request.getSystemPrompt());
     }
     chatContextService.setMetadata(request.getSessionId(), server, request.getModel());
+    applyGenerationConfig(request, request.getSessionId());
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -107,6 +110,21 @@ public class ChatService {
       } catch (Exception e) {
         emitter.completeWithError(e);
       }
+    }
+  }
+
+  /**
+   * Persists per-conversation generation overrides when the request actually carries any, so an
+   * ordinary message that doesn't touch settings never wipes a previously-saved config.
+   */
+  private void applyGenerationConfig(final SendMessageRequest request, final String sessionId) {
+    if (request.getTemperature() != null
+        || request.getNumCtx() != null
+        || (request.getStopSequences() != null && !request.getStopSequences().isEmpty())) {
+      chatContextService.setGenerationConfig(
+          sessionId,
+          new GenerationConfig(
+              request.getTemperature(), request.getNumCtx(), request.getStopSequences()));
     }
   }
 }

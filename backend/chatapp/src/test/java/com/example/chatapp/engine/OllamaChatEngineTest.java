@@ -481,6 +481,101 @@ class OllamaChatEngineTest {
   }
 
   @Test
+  void sendMessage_perConversationConfig_overridesServerDefaults() throws Exception {
+    // Arrange
+    setField(engine, "numCtx", 4096);
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext("sid")).thenReturn(List.of());
+    when(chatContextService.getGenerationConfig("sid"))
+        .thenReturn(new GenerationConfig(0.1, 8192, List.of("STOP", "END")));
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}", HttpStatus.OK));
+    ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+
+    // Act
+    engine.sendMessage("hi", "m", "sid", false);
+
+    // Assert: the conversation's own settings win over the server defaults.
+    verify(restTemplate)
+        .exchange(anyString(), eq(HttpMethod.POST), captor.capture(), eq(String.class));
+    Map<String, Object> body = (Map<String, Object>) captor.getValue().getBody();
+    Map<String, Object> options = (Map<String, Object>) body.get("options");
+    assertEquals(0.1, options.get("temperature"));
+    assertEquals(8192, options.get("num_ctx"));
+    assertEquals(List.of("STOP", "END"), options.get("stop"));
+  }
+
+  @Test
+  void sendMessage_noPerConversationConfig_fallsBackToServerDefaults() throws Exception {
+    // Arrange: mock returns null for the default getGenerationConfig() method (Mockito does not
+    // execute default method bodies), exercising the defensive null-guard in buildOptions.
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext("sid")).thenReturn(List.of());
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}", HttpStatus.OK));
+    ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+
+    // Act
+    engine.sendMessage("hi", "m", "sid", false);
+
+    // Assert
+    verify(restTemplate)
+        .exchange(anyString(), eq(HttpMethod.POST), captor.capture(), eq(String.class));
+    Map<String, Object> body = (Map<String, Object>) captor.getValue().getBody();
+    Map<String, Object> options = (Map<String, Object>) body.get("options");
+    assertEquals(0.7d, options.get("temperature"));
+    assertNull(options.get("stop"));
+  }
+
+  @Test
+  void summarize_doesNotApplyPerConversationStopSequences() throws Exception {
+    // Arrange: a conversation whose own stop sequence ("SUMMARY") would truncate the very
+    // summary the engine is asking the model to write about it — the internal summarization
+    // call must not pick up per-conversation overrides.
+    setField(engine, "summaryEnabled", true);
+    setField(engine, "maxContextTokens", 25);
+    String sessionId = "sid";
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    List<Map<String, Object>> ctx =
+        List.of(
+            Map.of("role", "user", "content", "a".repeat(40)),
+            Map.of("role", "assistant", "content", "b".repeat(40)),
+            Map.of("role", "user", "content", "c".repeat(40)),
+            Map.of("role", "assistant", "content", "d".repeat(40)));
+    when(chatContextService.getContext(sessionId)).thenReturn(ctx);
+    when(chatContextService.getSummarizedCount(sessionId)).thenReturn(0);
+    when(chatContextService.getSummary(sessionId)).thenReturn(null);
+    when(chatContextService.getGenerationConfig(sessionId))
+        .thenReturn(new GenerationConfig(null, null, List.of("SUMMARY")));
+    ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.POST), captor.capture(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"SUMMARY\"}}", HttpStatus.OK))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"final answer\"}}",
+                HttpStatus.OK));
+
+    // Act
+    engine.sendMessage("hello", "m", sessionId, false);
+
+    // Assert: the first (summarize) call's options carry no "stop" key.
+    Map<String, Object> summarizeBody =
+        (Map<String, Object>) captor.getAllValues().get(0).getBody();
+    Map<String, Object> summarizeOptions = (Map<String, Object>) summarizeBody.get("options");
+    assertNull(summarizeOptions.get("stop"));
+  }
+
+  @Test
   void sendMessage_withImages_persistsThemOnTheUserMessage() throws Exception {
     // Arrange
     String sessionId = "sid";

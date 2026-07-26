@@ -2,6 +2,7 @@ package com.example.chatapp.persistence;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.example.chatapp.engine.GenerationConfig;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -93,6 +94,32 @@ class JpaChatContextServiceTest {
     service.setSummaryState("sum1", "earlier summary", 3);
     assertEquals("earlier summary", service.getSummary("sum1"));
     assertEquals(3, service.getSummarizedCount("sum1"));
+  }
+
+  @Test
+  void generationConfig_defaultsToEmpty() {
+    GenerationConfig config = service.getGenerationConfig("gc0");
+    assertNull(config.getTemperature());
+    assertNull(config.getNumCtx());
+    assertTrue(config.getStopSequences().isEmpty());
+  }
+
+  @Test
+  void generationConfig_roundTrips() {
+    service.setGenerationConfig("gc1", new GenerationConfig(0.3, 8192, List.of("STOP", "END")));
+    GenerationConfig config = service.getGenerationConfig("gc1");
+    assertEquals(0.3, config.getTemperature());
+    assertEquals(8192, config.getNumCtx());
+    assertEquals(List.of("STOP", "END"), config.getStopSequences());
+  }
+
+  @Test
+  void generationConfig_partialUpdate_leavesOtherFieldsNull() {
+    service.setGenerationConfig("gc2", new GenerationConfig(0.9, null, List.of()));
+    GenerationConfig config = service.getGenerationConfig("gc2");
+    assertEquals(0.9, config.getTemperature());
+    assertNull(config.getNumCtx());
+    assertTrue(config.getStopSequences().isEmpty());
   }
 
   @Test

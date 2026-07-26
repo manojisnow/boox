@@ -46,4 +46,14 @@ public interface ChatContextService {
   default void setSummaryState(String sessionId, String summary, int summarizedCount) {
     // no-op
   }
+
+  /** Per-conversation generation overrides; {@link GenerationConfig#empty()} by default. */
+  default GenerationConfig getGenerationConfig(String sessionId) {
+    return GenerationConfig.empty();
+  }
+
+  /** Persists per-conversation generation overrides. No-op by default. */
+  default void setGenerationConfig(String sessionId, GenerationConfig config) {
+    // no-op
+  }
 }

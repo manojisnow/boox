@@ -37,7 +37,10 @@ class ConversationControllerTest {
   @Test
   void list_returnsSummaries() throws Exception {
     when(conversationService.list())
-        .thenReturn(List.of(new ConversationSummary("c1", "Title", "ollama", "m1", Instant.now())));
+        .thenReturn(
+            List.of(
+                new ConversationSummary(
+                    "c1", "Title", "ollama", "m1", Instant.now(), null, null, List.of())));
     mockMvc
         .perform(get("/api/conversations"))
         .andExpect(status().isOk())
@@ -62,7 +65,9 @@ class ConversationControllerTest {
   void rename_existing_returnsOk() throws Exception {
     when(conversationService.rename(eq("c1"), eq("New")))
         .thenReturn(
-            Optional.of(new ConversationSummary("c1", "New", "ollama", "m1", Instant.now())));
+            Optional.of(
+                new ConversationSummary(
+                    "c1", "New", "ollama", "m1", Instant.now(), null, null, List.of())));
     mockMvc
         .perform(
             patch("/api/conversations/c1")

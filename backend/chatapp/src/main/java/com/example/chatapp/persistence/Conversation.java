@@ -55,6 +55,16 @@ public class Conversation implements Persistable<String> {
   @Column(columnDefinition = "integer not null default 0")
   private int summarizedCount;
 
+  /** Per-conversation override of the server-default generation temperature; null = use default. */
+  private Double temperature;
+
+  /** Per-conversation override of the model's context size; null = use the server default. */
+  private Integer numCtx;
+
+  /** JSON-encoded list of stop sequences for this conversation; null when none are set. */
+  @Column(columnDefinition = "text")
+  private String stopSequences;
+
   @Column(nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -137,6 +147,30 @@ public class Conversation implements Persistable<String> {
 
   public void setSummarizedCount(final int summarizedCount) {
     this.summarizedCount = summarizedCount;
+  }
+
+  public Double getTemperature() {
+    return temperature;
+  }
+
+  public void setTemperature(final Double temperature) {
+    this.temperature = temperature;
+  }
+
+  public Integer getNumCtx() {
+    return numCtx;
+  }
+
+  public void setNumCtx(final Integer numCtx) {
+    this.numCtx = numCtx;
+  }
+
+  public String getStopSequences() {
+    return stopSequences;
+  }
+
+  public void setStopSequences(final String stopSequences) {
+    this.stopSequences = stopSequences;
   }
 
   public Instant getCreatedAt() {

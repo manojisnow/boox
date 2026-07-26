@@ -6,6 +6,7 @@ import './ChatBox.css';
 const ChatBox = ({
     conversationId,
     initialModel,
+    initialGenerationConfig,
     onConversationChanged,
     selectedServer,
     setSelectedServer,
@@ -22,6 +23,14 @@ const ChatBox = ({
     const [showSystemPrompt, setShowSystemPrompt] = useState(false);
     const [error, setError] = useState('');
     const [attachedImages, setAttachedImages] = useState([]);
+    const [showGenerationSettings, setShowGenerationSettings] = useState(false);
+    const [temperature, setTemperature] = useState(
+        () => initialGenerationConfig?.temperature ?? ''
+    );
+    const [numCtx, setNumCtx] = useState(() => initialGenerationConfig?.numCtx ?? '');
+    const [stopSequencesText, setStopSequencesText] = useState(
+        () => (initialGenerationConfig?.stopSequences || []).join(', ')
+    );
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -31,6 +40,21 @@ const ChatBox = ({
 
     const selectedModelInfo = models.find(m => m.name === selectedModel);
     const supportsVision = Boolean(selectedModelInfo?.capabilities?.includes('vision'));
+
+    // The conversation list (and this conversation's saved generation config) loads
+    // asynchronously in the parent, so it's often still null on first mount. Restore
+    // from it the first time real data arrives, then stop — initialGenerationConfig
+    // is a fresh object on every parent re-render (e.g. after each send refreshes the
+    // sidebar), so re-syncing on every change would keep clobbering the user's own
+    // in-progress edits to these fields.
+    const generationConfigRestored = useRef(false);
+    useEffect(() => {
+        if (!initialGenerationConfig || generationConfigRestored.current) return;
+        generationConfigRestored.current = true;
+        setTemperature(initialGenerationConfig.temperature ?? '');
+        setNumCtx(initialGenerationConfig.numCtx ?? '');
+        setStopSequencesText((initialGenerationConfig.stopSequences || []).join(', '));
+    }, [initialGenerationConfig]);
 
     // Load persisted history for this conversation on mount (component is
     // remounted with a new key whenever the active conversation changes).
@@ -168,6 +192,14 @@ const ChatBox = ({
         setError('');
         setChatLocked(true);
         const imagesBase64 = attachedImages.map((img) => img.base64);
+        const generationConfig = {
+            temperature: temperature === '' ? null : Number(temperature),
+            numCtx: numCtx === '' ? null : Number(numCtx),
+            stopSequences: stopSequencesText
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean),
+        };
         const userMessage = {
             text: input,
             sender: 'user',
@@ -191,7 +223,8 @@ const ChatBox = ({
                     selectedModel.trim(),
                     conversationId.trim(),
                     systemPrompt,
-                    imagesBase64
+                    imagesBase64,
+                    generationConfig
                 );
                 // The backend has now created/updated this conversation, so surface it
                 // in the sidebar immediately — before streaming finishes — in case the
@@ -299,7 +332,8 @@ const ChatBox = ({
                     conversationId.trim(),
                     false,
                     systemPrompt,
-                    imagesBase64
+                    imagesBase64,
+                    generationConfig
                 );
                 const botMessage = { text: response.content, sender: response.role };
                 setMessages((prev) => [...prev, botMessage]);
@@ -404,6 +438,45 @@ const ChatBox = ({
                             />
                         </div>
                     )}
+                    {showGenerationSettings && (
+                        <div className="generation-settings-section">
+                            <label className="generation-settings-field">
+                                <span>Temperature</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="2"
+                                    step="0.1"
+                                    value={temperature}
+                                    onChange={e => setTemperature(e.target.value)}
+                                    placeholder="server default"
+                                    disabled={chatLocked}
+                                />
+                            </label>
+                            <label className="generation-settings-field">
+                                <span>Context size</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={numCtx}
+                                    onChange={e => setNumCtx(e.target.value)}
+                                    placeholder="server default"
+                                    disabled={chatLocked}
+                                />
+                            </label>
+                            <label className="generation-settings-field generation-settings-field-wide">
+                                <span>Stop sequences</span>
+                                <input
+                                    type="text"
+                                    value={stopSequencesText}
+                                    onChange={e => setStopSequencesText(e.target.value)}
+                                    placeholder="comma-separated, e.g. END, ###"
+                                    disabled={chatLocked}
+                                />
+                            </label>
+                        </div>
+                    )}
                     {attachedImages.length > 0 && (
                         <div className="attached-images-row">
                             {attachedImages.map((img, index) => (
@@ -432,6 +505,25 @@ const ChatBox = ({
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="3" />
                                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            className={`system-prompt-toggle${(temperature !== '' || numCtx !== '' || stopSequencesText !== '') ? ' active' : ''}`}
+                            onClick={() => setShowGenerationSettings(v => !v)}
+                            title="Generation settings"
+                            aria-label="Toggle generation settings"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="4" y1="21" x2="4" y2="14" />
+                                <line x1="4" y1="10" x2="4" y2="3" />
+                                <line x1="12" y1="21" x2="12" y2="12" />
+                                <line x1="12" y1="8" x2="12" y2="3" />
+                                <line x1="20" y1="21" x2="20" y2="16" />
+                                <line x1="20" y1="12" x2="20" y2="3" />
+                                <line x1="1" y1="14" x2="7" y2="14" />
+                                <line x1="9" y1="8" x2="15" y2="8" />
+                                <line x1="17" y1="16" x2="23" y2="16" />
                             </svg>
                         </button>
                         {supportsVision && (

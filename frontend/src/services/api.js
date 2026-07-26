@@ -15,7 +15,8 @@ export const getModels = async (server) => {
     return response.data;
 };
 
-export const sendMessage = async (message, server, model, sessionId, stream, systemPrompt, images) => {
+export const sendMessage = async (message, server, model, sessionId, stream, systemPrompt, images, generationConfig) => {
+    // generationConfig: optional { temperature, numCtx, stopSequences } — only set fields are sent.
     if (!message || !message.trim()) {
         throw new Error('Message cannot be empty');
     }
@@ -43,6 +44,13 @@ export const sendMessage = async (message, server, model, sessionId, stream, sys
         if (images && images.length > 0) {
             requestBody.images = images;
         }
+        if (generationConfig) {
+            if (generationConfig.temperature != null) requestBody.temperature = generationConfig.temperature;
+            if (generationConfig.numCtx != null) requestBody.numCtx = generationConfig.numCtx;
+            if (generationConfig.stopSequences && generationConfig.stopSequences.length > 0) {
+                requestBody.stopSequences = generationConfig.stopSequences;
+            }
+        }
 
         const response = await axios.post(
             `${API_BASE_URL}/api/chat/send`,
@@ -60,7 +68,7 @@ export const sendMessage = async (message, server, model, sessionId, stream, sys
     }
 };
 
-export const streamMessage = async (message, server, model, sessionId, systemPrompt, images) => {
+export const streamMessage = async (message, server, model, sessionId, systemPrompt, images, generationConfig) => {
     const body = {
         message: message.trim(),
         server: server.trim(),
@@ -73,6 +81,13 @@ export const streamMessage = async (message, server, model, sessionId, systemPro
     }
     if (images && images.length > 0) {
         body.images = images;
+    }
+    if (generationConfig) {
+        if (generationConfig.temperature != null) body.temperature = generationConfig.temperature;
+        if (generationConfig.numCtx != null) body.numCtx = generationConfig.numCtx;
+        if (generationConfig.stopSequences && generationConfig.stopSequences.length > 0) {
+            body.stopSequences = generationConfig.stopSequences;
+        }
     }
     const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',

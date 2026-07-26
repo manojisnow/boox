@@ -31,10 +31,7 @@ public class ConversationService {
   @Transactional(readOnly = true)
   public List<ConversationSummary> list() {
     return conversations.findAllByOrderByUpdatedAtDesc().stream()
-        .map(
-            c ->
-                new ConversationSummary(
-                    c.getId(), c.getTitle(), c.getServer(), c.getModel(), c.getUpdatedAt()))
+        .map(ConversationService::toSummary)
         .toList();
   }
 
@@ -46,7 +43,9 @@ public class ConversationService {
   public List<MessageView> messages(final String conversationId) {
     return messages.findByConversationIdOrderBySeqAsc(conversationId).stream()
         .filter(ConversationService::isRenderable)
-        .map(m -> new MessageView(m.getRole(), m.getContent(), ImageCodec.fromJson(m.getImages())))
+        .map(
+            m ->
+                new MessageView(m.getRole(), m.getContent(), JsonListCodec.fromJson(m.getImages())))
         .toList();
   }
 
@@ -59,8 +58,7 @@ public class ConversationService {
             c -> {
               c.setTitle(title.trim());
               conversations.save(c);
-              return new ConversationSummary(
-                  c.getId(), c.getTitle(), c.getServer(), c.getModel(), c.getUpdatedAt());
+              return toSummary(c);
             });
   }
 
@@ -77,5 +75,17 @@ public class ConversationService {
       return true;
     }
     return ROLE_ASSISTANT.equals(role) && hasText;
+  }
+
+  private static ConversationSummary toSummary(final Conversation c) {
+    return new ConversationSummary(
+        c.getId(),
+        c.getTitle(),
+        c.getServer(),
+        c.getModel(),
+        c.getUpdatedAt(),
+        c.getTemperature(),
+        c.getNumCtx(),
+        JsonListCodec.fromJson(c.getStopSequences()));
   }
 }
