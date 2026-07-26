@@ -19,12 +19,12 @@ public class ConversationService {
   private static final String ROLE_ASSISTANT = "assistant";
 
   private final ConversationRepository conversations;
-  private final ChatMessageRepository messages;
+  private final ChatMessageRepository messageRepository;
 
   public ConversationService(
-      final ConversationRepository conversations, final ChatMessageRepository messages) {
+      final ConversationRepository conversations, final ChatMessageRepository messageRepository) {
     this.conversations = conversations;
-    this.messages = messages;
+    this.messageRepository = messageRepository;
   }
 
   /** All conversations, most-recently-updated first. */
@@ -41,7 +41,7 @@ public class ConversationService {
    */
   @Transactional(readOnly = true)
   public List<MessageView> messages(final String conversationId) {
-    return messages.findByConversationIdOrderBySeqAsc(conversationId).stream()
+    return messageRepository.findByConversationIdOrderBySeqAsc(conversationId).stream()
         .filter(ConversationService::isRenderable)
         .map(
             m ->
@@ -70,11 +70,10 @@ public class ConversationService {
 
   private static boolean isRenderable(final ChatMessageEntity message) {
     final String role = message.getRole();
-    final boolean hasText = message.getContent() != null && !message.getContent().isBlank();
-    if (ROLE_USER.equals(role)) {
-      return true;
-    }
-    return ROLE_ASSISTANT.equals(role) && hasText;
+    return ROLE_USER.equals(role)
+        || (ROLE_ASSISTANT.equals(role)
+            && message.getContent() != null
+            && !message.getContent().isBlank());
   }
 
   private static ConversationSummary toSummary(final Conversation c) {

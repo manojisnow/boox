@@ -11,7 +11,7 @@ public interface ChatContextService {
    * Adds a text-only message. Equivalent to {@code addMessage(sessionId, role, content,
    * List.of())}.
    */
-  default void addMessage(String sessionId, String role, String content) {
+  default void addMessage(final String sessionId, final String role, final String content) {
     addMessage(sessionId, role, content, List.of());
   }
 

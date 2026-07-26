@@ -76,7 +76,7 @@ public class JpaChatContextService implements ChatContextService {
   @Transactional
   public void setSystemPrompt(final String sessionId, final String systemPrompt) {
     final Conversation conversation = getOrCreate(sessionId);
-    if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
+    if (systemPrompt != null && !systemPrompt.isBlank()) {
       conversation.setSystemPrompt(systemPrompt.trim());
     } else {
       conversation.setSystemPrompt(null);

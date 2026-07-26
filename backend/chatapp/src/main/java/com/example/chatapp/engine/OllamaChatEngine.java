@@ -67,7 +67,20 @@ public class OllamaChatEngine implements ChatEngine {
   @Value("${ollama.model.description}")
   private String modelDescription;
 
-  @SuppressWarnings({"PMD.LawOfDemeter", "PMD.LongVariable"})
+  /**
+   * Tool-use hint prepended to every system message when tools are registered. Guides smaller
+   * models (e.g. llama3.2 3B) that otherwise echo the parameter schema as argument values.
+   */
+  private static final String TOOL_USAGE_HINT =
+      "You have access to tools, but you must only use them when truly necessary.\n"
+          + "Do NOT call any tool for: greetings, small talk, simple facts, math, coding"
+          + " questions, or anything you can answer confidently from your training data.\n"
+          + "Only call a tool (e.g. web_search) when the user explicitly needs current,"
+          + " real-time, or external information that you cannot reliably provide yourself.\n"
+          + "When you do call a tool, always supply plain scalar values as arguments — never"
+          + " the schema definition. Example: {\"query\": \"your actual search terms\"},"
+          + " not {\"query\": {\"type\": \"string\", \"description\": \"...\"}}.\n";
+
   public OllamaChatEngine(
       final RestTemplate restTemplate,
       final ChatContextService chatContextService,
@@ -89,20 +102,6 @@ public class OllamaChatEngine implements ChatEngine {
     public static final String ERROR_FETCHING_MODELS = "Error fetching models";
     public static final String ERROR_COMMUNICATING = "Error communicating with Ollama API";
   }
-
-  /**
-   * Tool-use hint prepended to every system message when tools are registered. Guides smaller
-   * models (e.g. llama3.2 3B) that otherwise echo the parameter schema as argument values.
-   */
-  private static final String TOOL_USAGE_HINT =
-      "You have access to tools, but you must only use them when truly necessary.\n"
-          + "Do NOT call any tool for: greetings, small talk, simple facts, math, coding"
-          + " questions, or anything you can answer confidently from your training data.\n"
-          + "Only call a tool (e.g. web_search) when the user explicitly needs current,"
-          + " real-time, or external information that you cannot reliably provide yourself.\n"
-          + "When you do call a tool, always supply plain scalar values as arguments — never"
-          + " the schema definition. Example: {\"query\": \"your actual search terms\"},"
-          + " not {\"query\": {\"type\": \"string\", \"description\": \"...\"}}.\n";
 
   private List<Map<String, Object>> buildMessagesWithSystemPrompt(final String sessionId) {
     final List<Map<String, Object>> context = chatContextService.getContext(sessionId);
@@ -205,7 +204,7 @@ public class OllamaChatEngine implements ChatEngine {
   @SuppressWarnings("unchecked")
   private String summarize(
       final String model, final String existingSummary, final List<Map<String, Object>> dropped)
-      throws java.io.IOException {
+      throws IOException {
     final StringBuilder convo = new StringBuilder();
     for (final Map<String, Object> msg : dropped) {
       convo
@@ -247,7 +246,7 @@ public class OllamaChatEngine implements ChatEngine {
       final List<Map<String, ?>> messages,
       final boolean stream,
       final String sessionId)
-      throws com.fasterxml.jackson.core.JsonProcessingException, java.io.IOException {
+      throws com.fasterxml.jackson.core.JsonProcessingException, IOException {
     final String url = ollamaApiUrl + chatPath;
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
@@ -394,7 +393,7 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   private List<ModelInfo> fetchModelsFromOllama()
-      throws java.io.IOException, com.fasterxml.jackson.core.JsonProcessingException {
+      throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
     final String url = ollamaApiUrl + tagsPath;
     final ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
     final Map body = response.getBody();
@@ -590,7 +589,7 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   @Override
-  public void resetContext(String sessionId) {
+  public void resetContext(final String sessionId) {
     chatContextService.resetContext(sessionId);
   }
 }

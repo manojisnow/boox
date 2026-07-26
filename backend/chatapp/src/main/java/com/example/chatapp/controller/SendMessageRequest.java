@@ -70,7 +70,7 @@ public class SendMessageRequest {
     this.sessionId = sessionId;
   }
 
-  public Boolean getStream() {
+  public Boolean isStream() {
     return stream;
   }
 

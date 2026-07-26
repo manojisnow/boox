@@ -182,7 +182,7 @@ public class WebSearchTool implements Tool {
   // Provider 1: DuckDuckGo Instant Answer API
   // ---------------------------------------------------------------------------
 
-  @SuppressWarnings({"unchecked", "PMD.LawOfDemeter"})
+  @SuppressWarnings("unchecked")
   Optional<String> searchDuckDuckGo(final String query) throws IOException {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = DDG_API_URL + "?q=" + encoded + "&format=json&no_html=1&skip_disambig=1";
@@ -202,7 +202,7 @@ public class WebSearchTool implements Tool {
     }
 
     final Map<String, Object> json = MAPPER.readValue(body, Map.class);
-    final StringBuilder results = new StringBuilder();
+    final StringBuilder results = new StringBuilder(64);
     results.append("Search results for: ").append(query).append("\n\n");
 
     final String abstractText = (String) json.getOrDefault("AbstractText", "");
@@ -210,7 +210,7 @@ public class WebSearchTool implements Tool {
     if (abstractText != null && !abstractText.isEmpty()) {
       results.append("Summary");
       if (abstractSource != null && !abstractSource.isEmpty()) {
-        results.append(" (").append(abstractSource).append(")");
+        results.append(" (").append(abstractSource).append(')');
       }
       results.append(": ").append(abstractText).append("\n\n");
     }
@@ -233,9 +233,9 @@ public class WebSearchTool implements Tool {
         if (text != null && !text.isEmpty()) {
           results.append("- ").append(text);
           if (firstUrl != null && !firstUrl.isEmpty()) {
-            results.append(" (").append(firstUrl).append(")");
+            results.append(" (").append(firstUrl).append(')');
           }
-          results.append("\n");
+          results.append('\n');
           count++;
         }
       }
@@ -324,9 +324,8 @@ public class WebSearchTool implements Tool {
         (Map<String, Object>) contentUrls.getOrDefault("desktop", Map.of());
     final String pageUrl = (String) desktop.getOrDefault("page", "");
 
-    final StringBuilder result = new StringBuilder();
-    result.append("Wikipedia: ").append(articleTitle).append("\n\n");
-    result.append(summary);
+    final StringBuilder result = new StringBuilder(64);
+    result.append("Wikipedia: ").append(articleTitle).append("\n\n").append(summary);
     if (!pageUrl.isEmpty()) {
       result.append("\n\nSource: ").append(pageUrl);
     }
@@ -371,7 +370,7 @@ public class WebSearchTool implements Tool {
       return Optional.empty();
     }
 
-    final StringBuilder results = new StringBuilder();
+    final StringBuilder results = new StringBuilder(64);
     results.append("News results for: ").append(query).append("\n\n");
 
     final int limit = Math.min(items.getLength(), maxResults);
@@ -382,14 +381,14 @@ public class WebSearchTool implements Tool {
       final String pubDate = getXmlText(item, "pubDate");
 
       if (!title.isEmpty()) {
-        results.append(i + 1).append(". ").append(title).append("\n");
+        results.append(i + 1).append(". ").append(title).append('\n');
         if (!pubDate.isEmpty()) {
-          results.append("   ").append(pubDate).append("\n");
+          results.append("   ").append(pubDate).append('\n');
         }
         if (!link.isEmpty()) {
-          results.append("   ").append(link).append("\n");
+          results.append("   ").append(link).append('\n');
         }
-        results.append("\n");
+        results.append('\n');
       }
     }
 

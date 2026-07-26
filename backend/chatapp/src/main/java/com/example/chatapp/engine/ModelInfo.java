@@ -2,7 +2,6 @@ package com.example.chatapp.engine;
 
 import java.util.List;
 
-@SuppressWarnings("PMD.UnnecessaryConstructor")
 public class ModelInfo {
   private final String name;
   private final String description;

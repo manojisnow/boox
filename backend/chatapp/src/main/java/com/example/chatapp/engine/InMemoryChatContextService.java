@@ -4,7 +4,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
-@SuppressWarnings("PMD.AtLeastOneConstructor")
 @Service
 public class InMemoryChatContextService implements ChatContextService {
   // TODO: Both maps grow unbounded. Add TTL-based eviction (e.g. Caffeine or a scheduled
@@ -32,7 +31,7 @@ public class InMemoryChatContextService implements ChatContextService {
 
   @Override
   public void setSystemPrompt(final String sessionId, final String systemPrompt) {
-    if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
+    if (systemPrompt != null && !systemPrompt.isBlank()) {
       systemPrompts.put(sessionId, systemPrompt.trim());
     } else {
       systemPrompts.remove(sessionId);

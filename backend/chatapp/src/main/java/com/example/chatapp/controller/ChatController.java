@@ -22,7 +22,6 @@ public class ChatController {
   private final ToolRegistry toolRegistry;
 
   @Autowired
-  @SuppressWarnings("PMD.LawOfDemeter")
   public ChatController(
       final com.example.chatapp.service.ChatService chatService, final ToolRegistry toolRegistry) {
     this.chatService = chatService;
@@ -50,7 +49,7 @@ public class ChatController {
         request.getServer(),
         request.getModel(),
         request.getSessionId(),
-        request.getStream());
+        request.isStream());
     try {
       return ResponseEntity.ok(chatService.sendMessage(request));
     } catch (Exception e) {
