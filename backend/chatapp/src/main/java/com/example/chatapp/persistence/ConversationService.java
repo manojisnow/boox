@@ -46,7 +46,7 @@ public class ConversationService {
   public List<MessageView> messages(final String conversationId) {
     return messages.findByConversationIdOrderBySeqAsc(conversationId).stream()
         .filter(ConversationService::isRenderable)
-        .map(m -> new MessageView(m.getRole(), m.getContent()))
+        .map(m -> new MessageView(m.getRole(), m.getContent(), ImageCodec.fromJson(m.getImages())))
         .toList();
   }
 

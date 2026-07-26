@@ -70,6 +70,41 @@ class OllamaChatEngineTest {
   }
 
   @Test
+  void getModels_exposesCapabilities_whenPresent() throws Exception {
+    // Arrange
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                Map.of(
+                    "models",
+                    List.of(
+                        Map.of(
+                            "name",
+                            "vision-model",
+                            "capabilities",
+                            List.of("completion", "vision")),
+                        Map.of("name", "text-model", "capabilities", List.of("completion")))),
+                HttpStatus.OK));
+    // Act
+    List<ModelInfo> models = engine.getModels();
+    // Assert
+    assertTrue(models.get(0).getCapabilities().contains("vision"));
+    assertFalse(models.get(1).getCapabilities().contains("vision"));
+  }
+
+  @Test
+  void getModels_missingCapabilities_defaultsToEmpty() throws Exception {
+    // Arrange
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(
+            new ResponseEntity<>(Map.of("models", List.of(Map.of("name", "m1"))), HttpStatus.OK));
+    // Act
+    List<ModelInfo> models = engine.getModels();
+    // Assert
+    assertTrue(models.get(0).getCapabilities().isEmpty());
+  }
+
+  @Test
   void getModels_returnsError_whenOllamaNotRunning() {
     // Arrange
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
@@ -98,7 +133,7 @@ class OllamaChatEngineTest {
     String sessionId = "sid";
     String model = "m";
     String message = "hello";
-    List<Map<String, String>> context = List.of(Map.of("role", "user", "content", message));
+    List<Map<String, Object>> context = List.of(Map.of("role", "user", "content", message));
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
     when(chatContextService.getContext(sessionId)).thenReturn(context);
@@ -115,7 +150,8 @@ class OllamaChatEngineTest {
     // Assert
     assertEquals("assistant", reply.get("role"));
     assertEquals("hi", reply.get("content"));
-    verify(chatContextService, times(1)).addMessage(eq(sessionId), eq("user"), eq(message));
+    verify(chatContextService, times(1))
+        .addMessage(eq(sessionId), eq("user"), eq(message), eq(List.of()));
     verify(chatContextService, times(1)).addMessage(eq(sessionId), eq("assistant"), eq("hi"));
   }
 
@@ -125,7 +161,7 @@ class OllamaChatEngineTest {
     String sessionId = "sid";
     String model = "m";
     String message = "search for cats";
-    List<Map<String, String>> context = List.of(Map.of("role", "user", "content", message));
+    List<Map<String, Object>> context = List.of(Map.of("role", "user", "content", message));
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
     when(chatContextService.getContext(sessionId)).thenReturn(context);
@@ -276,7 +312,7 @@ class OllamaChatEngineTest {
     // Assert
     verify(emitter, atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
     verify(emitter).complete();
-    verify(chatContextService).addMessage(eq(sessionId), eq("user"), eq("hi"));
+    verify(chatContextService).addMessage(eq(sessionId), eq("user"), eq("hi"), eq(List.of()));
     verify(chatContextService).addMessage(eq(sessionId), eq("assistant"), anyString());
   }
 
@@ -391,7 +427,7 @@ class OllamaChatEngineTest {
     String sessionId = "sid";
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
-    List<Map<String, String>> ctx =
+    List<Map<String, Object>> ctx =
         List.of(
             Map.of("role", "user", "content", "a".repeat(40)),
             Map.of("role", "assistant", "content", "b".repeat(40)),
@@ -442,6 +478,58 @@ class OllamaChatEngineTest {
     assertEquals(0.7d, options.get("temperature"));
     assertEquals(4096, options.get("num_ctx"));
     assertNull(body.get("temperature"));
+  }
+
+  @Test
+  void sendMessage_withImages_persistsThemOnTheUserMessage() throws Exception {
+    // Arrange
+    String sessionId = "sid";
+    List<String> images = List.of("base64imgA", "base64imgB");
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext(sessionId)).thenReturn(List.of());
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}", HttpStatus.OK));
+
+    // Act
+    engine.sendMessage("look at this", images, "m", sessionId, false);
+
+    // Assert
+    verify(chatContextService)
+        .addMessage(eq(sessionId), eq("user"), eq("look at this"), eq(images));
+  }
+
+  @Test
+  void sendMessage_imageBearingContextMessage_isForwardedToOllama() throws Exception {
+    // Arrange: simulate a persisted context whose user turn carries images (as a real
+    // ChatContextService implementation would return after addMessage(..., images)).
+    String sessionId = "sid";
+    Map<String, Object> imageMessage = new HashMap<>();
+    imageMessage.put("role", "user");
+    imageMessage.put("content", "what is this");
+    imageMessage.put("images", List.of("base64imgA"));
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
+    when(chatContextService.getContext(sessionId)).thenReturn(List.of(imageMessage));
+    when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+        .thenReturn(
+            new ResponseEntity<>(
+                "{\"message\":{\"role\":\"assistant\",\"content\":\"ok\"}}", HttpStatus.OK));
+    ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+
+    // Act
+    engine.sendMessage("what is this", List.of("base64imgA"), "m", sessionId, false);
+
+    // Assert: the request sent to Ollama includes the images on that message.
+    verify(restTemplate)
+        .exchange(anyString(), eq(HttpMethod.POST), captor.capture(), eq(String.class));
+    Map<String, Object> body = (Map<String, Object>) captor.getValue().getBody();
+    List<Map<String, Object>> messages = (List<Map<String, Object>>) body.get("messages");
+    Map<String, Object> sentUserMessage =
+        messages.stream().filter(m -> "user".equals(m.get("role"))).findFirst().orElseThrow();
+    assertEquals(List.of("base64imgA"), sentUserMessage.get("images"));
   }
 
   @Test

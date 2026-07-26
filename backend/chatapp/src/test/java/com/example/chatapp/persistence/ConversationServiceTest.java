@@ -50,6 +50,21 @@ class ConversationServiceTest {
   }
 
   @Test
+  void messages_includesImages_whenPresent() {
+    contextService.addMessage("c5", "user", "what is this", List.of("imgA", "imgB"));
+    List<MessageView> views = conversationService.messages("c5");
+    assertEquals(1, views.size());
+    assertEquals(List.of("imgA", "imgB"), views.get(0).getImages());
+  }
+
+  @Test
+  void messages_emptyImages_whenNoneAttached() {
+    contextService.addMessage("c6", "user", "plain text");
+    List<MessageView> views = conversationService.messages("c6");
+    assertTrue(views.get(0).getImages().isEmpty());
+  }
+
+  @Test
   void rename_existing_updatesTitle() {
     contextService.addMessage("c3", "user", "original");
     Optional<ConversationSummary> renamed = conversationService.rename("c3", "  New Name  ");

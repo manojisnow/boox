@@ -48,7 +48,10 @@ class ConversationControllerTest {
   @Test
   void messages_returnsViews() throws Exception {
     when(conversationService.messages("c1"))
-        .thenReturn(List.of(new MessageView("user", "hi"), new MessageView("assistant", "hello")));
+        .thenReturn(
+            List.of(
+                new MessageView("user", "hi", List.of()),
+                new MessageView("assistant", "hello", List.of())));
     mockMvc
         .perform(get("/api/conversations/c1/messages"))
         .andExpect(status().isOk())

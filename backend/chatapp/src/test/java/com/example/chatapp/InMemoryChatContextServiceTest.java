@@ -18,7 +18,7 @@ class InMemoryChatContextServiceTest {
 
   @Test
   void getContext_returnsEmptyListInitially() {
-    List<Map<String, String>> context = service.getContext("sid");
+    List<Map<String, Object>> context = service.getContext("sid");
     assertNotNull(context);
     assertTrue(context.isEmpty());
   }
@@ -26,7 +26,7 @@ class InMemoryChatContextServiceTest {
   @Test
   void addMessage_and_getContext() {
     service.addMessage("sid", "role", "content");
-    List<Map<String, String>> context = service.getContext("sid");
+    List<Map<String, Object>> context = service.getContext("sid");
     assertEquals(1, context.size());
     assertEquals("role", context.get(0).get("role"));
     assertEquals("content", context.get(0).get("content"));
@@ -36,7 +36,7 @@ class InMemoryChatContextServiceTest {
   void resetContext_removesContext() {
     service.addMessage("sid", "role", "content");
     service.resetContext("sid");
-    List<Map<String, String>> context = service.getContext("sid");
+    List<Map<String, Object>> context = service.getContext("sid");
     assertTrue(context.isEmpty());
   }
 

@@ -34,6 +34,10 @@ public class ChatMessageEntity {
   @Column(columnDefinition = "text")
   private String content;
 
+  /** JSON-encoded array of base64 images attached to this message; null if none. */
+  @Column(columnDefinition = "text")
+  private String images;
+
   @Column(nullable = false)
   private Instant createdAt = Instant.now();
 
@@ -85,6 +89,14 @@ public class ChatMessageEntity {
 
   public void setContent(final String content) {
     this.content = content;
+  }
+
+  public String getImages() {
+    return images;
+  }
+
+  public void setImages(final String images) {
+    this.images = images;
   }
 
   public Instant getCreatedAt() {

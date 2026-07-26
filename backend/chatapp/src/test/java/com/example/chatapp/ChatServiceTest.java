@@ -55,8 +55,38 @@ class ChatServiceTest {
     req.setSessionId("sid");
     req.setStream(false);
     Map<String, String> result = Map.of("role", "assistant", "content", "reply");
-    when(engine.sendMessage(any(), any(), any(), anyBoolean())).thenReturn(result);
+    when(engine.sendMessage(any(), any(), any(), any(), anyBoolean())).thenReturn(result);
     assertEquals(result, chatService.sendMessage(req));
+  }
+
+  @Test
+  void sendMessage_passesImagesThroughToEngine() {
+    SendMessageRequest req = new SendMessageRequest();
+    req.setServer("server1");
+    req.setMessage("what is this");
+    req.setModel("m");
+    req.setSessionId("sid");
+    req.setStream(false);
+    req.setImages(List.of("img1"));
+    when(engine.sendMessage(any(), any(), any(), any(), anyBoolean()))
+        .thenReturn(Map.of("role", "assistant", "content", "ok"));
+    chatService.sendMessage(req);
+    verify(engine)
+        .sendMessage(eq("what is this"), eq(List.of("img1")), eq("m"), eq("sid"), eq(false));
+  }
+
+  @Test
+  void sendMessage_nullImages_passesEmptyListToEngine() {
+    SendMessageRequest req = new SendMessageRequest();
+    req.setServer("server1");
+    req.setMessage("hi");
+    req.setModel("m");
+    req.setSessionId("sid");
+    req.setStream(false);
+    when(engine.sendMessage(any(), any(), any(), any(), anyBoolean()))
+        .thenReturn(Map.of("role", "assistant", "content", "ok"));
+    chatService.sendMessage(req);
+    verify(engine).sendMessage(eq("hi"), eq(List.of()), eq("m"), eq("sid"), eq(false));
   }
 
   @Test
@@ -94,7 +124,7 @@ class ChatServiceTest {
     req.setSessionId("sid");
     req.setStream(false);
     req.setSystemPrompt("Be nice");
-    when(engine.sendMessage(any(), any(), any(), anyBoolean()))
+    when(engine.sendMessage(any(), any(), any(), any(), anyBoolean()))
         .thenReturn(Map.of("role", "assistant", "content", "ok"));
     chatService.sendMessage(req);
     verify(chatContextService).setSystemPrompt("sid", "Be nice");
@@ -109,7 +139,7 @@ class ChatServiceTest {
     req.setSessionId("sid");
     SseEmitter emitter = new SseEmitter();
     chatService.streamMessage(req, emitter);
-    verify(engine).streamMessage(eq("hi"), eq("m"), eq("sid"), eq(emitter));
+    verify(engine).streamMessage(eq("hi"), eq(List.of()), eq("m"), eq("sid"), eq(emitter));
   }
 
   @Test

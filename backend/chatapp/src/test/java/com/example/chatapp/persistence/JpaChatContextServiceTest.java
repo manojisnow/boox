@@ -22,7 +22,7 @@ class JpaChatContextServiceTest {
 
   @Test
   void getContext_newSession_isEmptyAndCreatesConversation() {
-    List<Map<String, String>> context = service.getContext("s1");
+    List<Map<String, Object>> context = service.getContext("s1");
     assertTrue(context.isEmpty());
     assertTrue(conversations.findById("s1").isPresent());
   }
@@ -31,11 +31,26 @@ class JpaChatContextServiceTest {
   void addMessage_persistsInOrder() {
     service.addMessage("s2", "user", "hi");
     service.addMessage("s2", "assistant", "hello");
-    List<Map<String, String>> context = service.getContext("s2");
+    List<Map<String, Object>> context = service.getContext("s2");
     assertEquals(2, context.size());
     assertEquals("user", context.get(0).get("role"));
     assertEquals("hi", context.get(0).get("content"));
     assertEquals("assistant", context.get(1).get("role"));
+  }
+
+  @Test
+  void addMessage_withImages_roundTripsThroughGetContext() {
+    service.addMessage("s8", "user", "what is this", List.of("base64imgA", "base64imgB"));
+    List<Map<String, Object>> context = service.getContext("s8");
+    assertEquals(1, context.size());
+    assertEquals(List.of("base64imgA", "base64imgB"), context.get(0).get("images"));
+  }
+
+  @Test
+  void addMessage_withoutImages_omitsImagesKey() {
+    service.addMessage("s9", "user", "hi");
+    List<Map<String, Object>> context = service.getContext("s9");
+    assertFalse(context.get(0).containsKey("images"));
   }
 
   @Test
