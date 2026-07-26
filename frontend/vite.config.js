@@ -25,5 +25,25 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
     globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/main.jsx', // ReactDOM entrypoint; no logic to test
+        'src/setupTests.js',
+        'src/**/*.test.{js,jsx}',
+        // Orphaned components, not imported by App/ChatBox or anything else -
+        // dead code, not part of the running app.
+        'src/components/ChatControls.jsx',
+        'src/components/ChatInput.jsx',
+      ],
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        functions: 80,
+        branches: 75,
+      },
+    },
   },
 });
