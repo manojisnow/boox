@@ -24,6 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -56,6 +57,11 @@ public class WebSearchTool implements Tool {
   private static final Logger LOGGER = LoggerFactory.getLogger(WebSearchTool.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final String TOOL_NAME = "web_search";
+  // This tool's own "query" argument name (schema key + lookup key below) - distinct
+  // from the unrelated "query" key in the Wikipedia API's own response shape.
+  private static final String PARAM_QUERY = "query";
+  // Paragraph/section break used consistently across all three providers' formatted output.
+  private static final String PARAGRAPH_BREAK = "\n\n";
 
   private static final String DDG_API_URL = "https://api.duckduckgo.com/";
   private static final String WIKIPEDIA_SEARCH_URL = "https://en.wikipedia.org/w/api.php";
@@ -99,9 +105,9 @@ public class WebSearchTool implements Tool {
     final Map<String, Object> queryProp = new HashMap<>();
     queryProp.put("type", "string");
     queryProp.put("description", "The search query");
-    properties.put("query", queryProp);
+    properties.put(PARAM_QUERY, queryProp);
     schema.put("properties", properties);
-    schema.put("required", List.of("query"));
+    schema.put("required", List.of(PARAM_QUERY));
     return schema;
   }
 
@@ -112,7 +118,7 @@ public class WebSearchTool implements Tool {
   @Override
   @SuppressWarnings("unchecked")
   public String execute(final Map<String, Object> arguments) {
-    final Object queryObj = arguments.get("query");
+    final Object queryObj = arguments.get(PARAM_QUERY);
     if (queryObj == null) {
       return "Error: No search query provided.";
     }
@@ -187,7 +193,7 @@ public class WebSearchTool implements Tool {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = DDG_API_URL + "?q=" + encoded + "&format=json&no_html=1&skip_disambig=1";
 
-    final HttpHeaders headers = new HttpHeaders();
+    final MultiValueMap<String, String> headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
@@ -203,7 +209,7 @@ public class WebSearchTool implements Tool {
 
     final Map<String, Object> json = MAPPER.readValue(body, Map.class);
     final StringBuilder results = new StringBuilder(64);
-    results.append("Search results for: ").append(query).append("\n\n");
+    results.append("Search results for: ").append(query).append(PARAGRAPH_BREAK);
 
     final String abstractText = (String) json.getOrDefault("AbstractText", "");
     final String abstractSource = (String) json.getOrDefault("AbstractSource", "");
@@ -212,12 +218,12 @@ public class WebSearchTool implements Tool {
       if (abstractSource != null && !abstractSource.isEmpty()) {
         results.append(" (").append(abstractSource).append(')');
       }
-      results.append(": ").append(abstractText).append("\n\n");
+      results.append(": ").append(abstractText).append(PARAGRAPH_BREAK);
     }
 
     final String answer = (String) json.getOrDefault("Answer", "");
     if (answer != null && !answer.isEmpty()) {
-      results.append("Answer: ").append(answer).append("\n\n");
+      results.append("Answer: ").append(answer).append(PARAGRAPH_BREAK);
     }
 
     final Object relatedTopics = json.get("RelatedTopics");
@@ -241,7 +247,7 @@ public class WebSearchTool implements Tool {
       }
     }
 
-    final String header = "Search results for: " + query + "\n\n";
+    final String header = "Search results for: " + query + PARAGRAPH_BREAK;
     if (results.toString().equals(header)) {
       return Optional.empty();
     }
@@ -262,7 +268,7 @@ public class WebSearchTool implements Tool {
             + encoded
             + "&format=json&srlimit=1&srprop=snippet&utf8=1";
 
-    final HttpHeaders wikiHeaders = new HttpHeaders();
+    final MultiValueMap<String, String> wikiHeaders = new HttpHeaders();
     wikiHeaders.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
@@ -325,7 +331,7 @@ public class WebSearchTool implements Tool {
     final String pageUrl = (String) desktop.getOrDefault("page", "");
 
     final StringBuilder result = new StringBuilder(64);
-    result.append("Wikipedia: ").append(articleTitle).append("\n\n").append(summary);
+    result.append("Wikipedia: ").append(articleTitle).append(PARAGRAPH_BREAK).append(summary);
     if (!pageUrl.isEmpty()) {
       result.append("\n\nSource: ").append(pageUrl);
     }
@@ -341,7 +347,7 @@ public class WebSearchTool implements Tool {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = GOOGLE_NEWS_RSS_URL + "?q=" + encoded + "&hl=en-US&gl=US&ceid=US:en";
 
-    final HttpHeaders headers = new HttpHeaders();
+    final MultiValueMap<String, String> headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
@@ -371,7 +377,7 @@ public class WebSearchTool implements Tool {
     }
 
     final StringBuilder results = new StringBuilder(64);
-    results.append("News results for: ").append(query).append("\n\n");
+    results.append("News results for: ").append(query).append(PARAGRAPH_BREAK);
 
     final int limit = Math.min(items.getLength(), maxResults);
     for (int i = 0; i < limit; i++) {
@@ -392,7 +398,7 @@ public class WebSearchTool implements Tool {
       }
     }
 
-    final String header = "News results for: " + query + "\n\n";
+    final String header = "News results for: " + query + PARAGRAPH_BREAK;
     if (results.toString().equals(header)) {
       return Optional.empty();
     }

@@ -10,7 +10,13 @@
     exclusion has to happen inside the ruleset that references the category, like this.
   </description>
 
-  <rule ref="category/java/bestpractices.xml" />
+  <rule ref="category/java/bestpractices.xml">
+    <!-- Verified every site (ChatController, StreamController, JsonListCodec,
+         OllamaChatEngine, ToolRegistry): all are standard SLF4J parameterized calls
+         (LOGGER.info("...{}",  arg)), where argument evaluation is already cheap and
+         deferred - the exact pattern that makes explicit level guards unnecessary. -->
+    <exclude name="GuardLogStatement" />
+  </rule>
 
   <rule ref="category/java/codestyle.xml">
     <!-- Checkstyle (google_checks.xml, UnusedImports) already enforces this. -->
@@ -36,10 +42,54 @@
          (ConversationSummary, SendMessageRequest, etc.) are plain classes by necessity:
          Checkstyle here can't parse Java records. -->
     <exclude name="DataClass" />
+    <!-- Verified every site: all are deliberate resilience boundaries (Ollama HTTP
+         calls, third-party Tool.execute(), SSE emitter completion) that must catch
+         anything so one failure can't crash the request/stream. Narrowing them would
+         defeat the boundary's purpose, not fix a bug. -->
+    <exclude name="AvoidCatchingGenericException" />
+    <!-- Requires explicit package/class config that was never provided - the rule
+         doesn't run, it only emits a <configerror> ("No packages or classes
+         specified") on every analysis. Not analyzing anything; safe to drop. -->
+    <exclude name="LoosePackageCoupling" />
   </rule>
 
-  <rule ref="category/java/errorprone.xml" />
-  <rule ref="category/java/multithreading.xml" />
-  <rule ref="category/java/performance.xml" />
+  <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+    <properties>
+      <!-- "unchecked" in @SuppressWarnings("unchecked") repeats across every
+           unchecked-cast site, but that value must be a literal - it's the
+           standard Java idiom, not something to extract into a constant. -->
+      <property name="skipAnnotations" value="true" />
+    </properties>
+  </rule>
+
+  <rule ref="category/java/errorprone.xml">
+    <exclude name="AvoidDuplicateLiterals" />
+    <!-- Both flagged sites are SendMessageRequest's nullable defensive-copy getters
+         (`return images == null ? null : List.copyOf(images);`). Returning null here
+         is intentional - it's how ChatService distinguishes "field not present on this
+         request" from "explicitly cleared" for the optional generation-config
+         overrides; collapsing to an empty list would lose that distinction. -->
+    <exclude name="NullAssignment" />
+    <!-- Both sites are `int x = counter++;` and `while ((line = reader.readLine())
+         != null)` - standard, well-understood Java idioms (the latter is the
+         canonical JDK I/O read-loop pattern). Rewriting to avoid them adds lines
+         without improving readability. -->
+    <exclude name="AssignmentInOperand" />
+  </rule>
+
+  <rule ref="category/java/multithreading.xml">
+    <!-- Verified every site: all are short-lived, method-local maps (request
+         payload/options/schema builders) or a singleton's write-once-in-constructor,
+         read-only-after map - never mutated concurrently. Not a thread-safety bug. -->
+    <exclude name="UseConcurrentHashMap" />
+  </rule>
+
+  <rule ref="category/java/performance.xml">
+    <!-- Both sites build one new Map per loop iteration to hold that iteration's own
+         data (a per-tool-call message, a per-database-row context entry) - the
+         allocation is not loop-invariant and can't be hoisted out. -->
+    <exclude name="AvoidInstantiatingObjectsInLoops" />
+  </rule>
+
   <rule ref="category/java/security.xml" />
 </ruleset>

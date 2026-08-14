@@ -25,6 +25,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -91,10 +92,15 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   public static class Constants {
+    public static final String ROLE = "role";
     public static final String ROLE_ASSISTANT = "assistant";
     public static final String ROLE_USER = "user";
     public static final String CONTENT = "content";
+    public static final String NAME = "name";
     public static final String MESSAGE = "message";
+    // SSE sentinel signaling the end of a stream; the frontend matches this exact
+    // token (ChatBox.jsx) to stop parsing the response.
+    public static final String SSE_DONE = "[DONE]";
     public static final String NO_CONTENT = "No content";
     public static final String NO_RESPONSE = "No response";
     public static final String NO_VALID_RESPONSE = "No valid response";
@@ -122,12 +128,15 @@ public class OllamaChatEngine implements ChatEngine {
       systemContent.append(userSystemPrompt);
     }
     if (systemContent.length() > 0) {
-      messages.add(Map.of("role", "system", Constants.CONTENT, systemContent.toString()));
+      messages.add(Map.of(Constants.ROLE, "system", Constants.CONTENT, systemContent.toString()));
     }
     if (summary != null && !summary.isEmpty()) {
       messages.add(
           Map.of(
-              "role", "system", Constants.CONTENT, "Summary of earlier conversation:\n" + summary));
+              Constants.ROLE,
+              "system",
+              Constants.CONTENT,
+              "Summary of earlier conversation:\n" + summary));
     }
     messages.addAll(window);
     return messages;
@@ -208,7 +217,7 @@ public class OllamaChatEngine implements ChatEngine {
     final StringBuilder convo = new StringBuilder();
     for (final Map<String, Object> msg : dropped) {
       convo
-          .append(msg.get("role"))
+          .append(msg.get(Constants.ROLE))
           .append(": ")
           .append(msg.getOrDefault(Constants.CONTENT, ""))
           .append('\n');
@@ -224,11 +233,11 @@ public class OllamaChatEngine implements ChatEngine {
     final String url = ollamaApiUrl + chatPath;
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
-    payload.put("messages", List.of(Map.of("role", "user", Constants.CONTENT, prompt)));
+    payload.put("messages", List.of(Map.of(Constants.ROLE, "user", Constants.CONTENT, prompt)));
     payload.put("stream", false);
     payload.put("options", buildOptions());
-    final HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
+    final MultiValueMap<String, String> headers = new HttpHeaders();
+    headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
     final ResponseEntity<String> response =
         restTemplate.exchange(
             url, HttpMethod.POST, new HttpEntity<>(payload, headers), String.class);
@@ -257,8 +266,8 @@ public class OllamaChatEngine implements ChatEngine {
       payload.put("tools", toolRegistry.getToolDefinitions());
     }
 
-    final HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
+    final MultiValueMap<String, String> headers = new HttpHeaders();
+    headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
     final HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
     final ResponseEntity<String> response =
@@ -351,7 +360,7 @@ public class OllamaChatEngine implements ChatEngine {
       // Execute each tool call
       for (final Map<String, Object> toolCall : toolCalls) {
         final Map<String, Object> function = (Map<String, Object>) toolCall.get("function");
-        final String toolName = (String) function.get("name");
+        final String toolName = (String) function.get(Constants.NAME);
         final Map<String, Object> args = resolveArguments(function);
         final int currentIndex = toolIndex++;
 
@@ -361,7 +370,13 @@ public class OllamaChatEngine implements ChatEngine {
                   .name("tool_call")
                   .data(
                       MAPPER.writeValueAsString(
-                          Map.of("name", toolName, "arguments", args, "index", currentIndex))));
+                          Map.of(
+                              Constants.NAME,
+                              toolName,
+                              "arguments",
+                              args,
+                              "index",
+                              currentIndex))));
         }
 
         LOGGER.info("Tool call: {} with args: {}", toolName, args);
@@ -374,7 +389,8 @@ public class OllamaChatEngine implements ChatEngine {
                   .name("tool_result")
                   .data(
                       MAPPER.writeValueAsString(
-                          Map.of("name", toolName, "result", result, "index", currentIndex))));
+                          Map.of(
+                              Constants.NAME, toolName, "result", result, "index", currentIndex))));
         }
       }
     }
@@ -400,7 +416,10 @@ public class OllamaChatEngine implements ChatEngine {
     if (body != null && body.containsKey("models")) {
       final List<Map<String, Object>> models = (List<Map<String, Object>>) body.get("models");
       return models.stream()
-          .map(m -> new ModelInfo((String) m.get("name"), modelDescription, capabilitiesOf(m)))
+          .map(
+              m ->
+                  new ModelInfo(
+                      (String) m.get(Constants.NAME), modelDescription, capabilitiesOf(m)))
           .collect(Collectors.toList());
     }
     return Collections.emptyList();
@@ -418,12 +437,14 @@ public class OllamaChatEngine implements ChatEngine {
   private Map<String, String> parseOllamaResponse(final Map body) {
     if (body != null && body.containsKey(Constants.MESSAGE)) {
       final Map messageObj = (Map) body.get(Constants.MESSAGE);
-      final String role = messageObj.getOrDefault("role", Constants.ROLE_ASSISTANT).toString();
+      final String role =
+          messageObj.getOrDefault(Constants.ROLE, Constants.ROLE_ASSISTANT).toString();
       final String content =
           messageObj.getOrDefault(Constants.CONTENT, Constants.NO_CONTENT).toString();
-      return Map.of("role", role, Constants.CONTENT, content);
+      return Map.of(Constants.ROLE, role, Constants.CONTENT, content);
     }
-    return Map.of("role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);
+    return Map.of(
+        Constants.ROLE, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);
   }
 
   @Override
@@ -455,22 +476,30 @@ public class OllamaChatEngine implements ChatEngine {
       if (!isOllamaRunning()) {
         LOGGER.warn("Ollama server is not running when sending message.");
         return Map.of(
-            "role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.SERVER_NOT_RUNNING);
+            Constants.ROLE,
+            Constants.ROLE_ASSISTANT,
+            Constants.CONTENT,
+            Constants.SERVER_NOT_RUNNING);
       }
       chatContextService.addMessage(sessionId, Constants.ROLE_USER, message, images);
       ensureSummarized(sessionId, model);
 
       final Optional<Map<String, Object>> finalResponse = executeToolLoop(model, sessionId, null);
       if (finalResponse.isEmpty()) {
-        return Map.of("role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);
+        return Map.of(
+            Constants.ROLE, Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.NO_RESPONSE);
       }
       final Map<String, String> reply = parseOllamaResponse(finalResponse.get());
-      chatContextService.addMessage(sessionId, reply.get("role"), reply.get(Constants.CONTENT));
+      chatContextService.addMessage(
+          sessionId, reply.get(Constants.ROLE), reply.get(Constants.CONTENT));
       return reply;
     } catch (Exception e) {
       LOGGER.error("Error communicating with Ollama: {}", e.getMessage(), e);
       return Map.of(
-          "role", Constants.ROLE_ASSISTANT, Constants.CONTENT, Constants.ERROR_COMMUNICATING);
+          Constants.ROLE,
+          Constants.ROLE_ASSISTANT,
+          Constants.CONTENT,
+          Constants.ERROR_COMMUNICATING);
     }
   }
 
@@ -489,7 +518,7 @@ public class OllamaChatEngine implements ChatEngine {
       if (!isOllamaRunning()) {
         LOGGER.warn("Ollama server is not running when streaming message.");
         emitter.send(SseEmitter.event().data(Constants.SERVER_NOT_RUNNING));
-        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.send(SseEmitter.event().data(Constants.SSE_DONE));
         emitter.complete();
         return;
       }
@@ -500,7 +529,7 @@ public class OllamaChatEngine implements ChatEngine {
           executeToolLoop(model, sessionId, emitter);
       if (finalResponse.isEmpty()) {
         emitter.send(SseEmitter.event().data(Constants.NO_RESPONSE));
-        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.send(SseEmitter.event().data(Constants.SSE_DONE));
         emitter.complete();
         return;
       }
@@ -509,7 +538,7 @@ public class OllamaChatEngine implements ChatEngine {
       LOGGER.error("Error streaming from Ollama: {}", e.getMessage(), e);
       try {
         emitter.send(SseEmitter.event().data(Constants.ERROR_COMMUNICATING));
-        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.send(SseEmitter.event().data(Constants.SSE_DONE));
         emitter.complete();
       } catch (Exception inner) {
         emitter.completeWithError(inner);
@@ -583,7 +612,7 @@ public class OllamaChatEngine implements ChatEngine {
       chatContextService.addMessage(sessionId, Constants.ROLE_ASSISTANT, fullContent.toString());
     }
     if (clientConnected.get()) {
-      emitter.send(SseEmitter.event().data("[DONE]"));
+      emitter.send(SseEmitter.event().data(Constants.SSE_DONE));
       emitter.complete();
     }
   }
