@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Message from './Message';
-import { sendMessage, streamMessage, getModels, getConversationMessages } from '../services/api';
+import AgentRunPanel from './AgentRunPanel';
+import {
+    sendMessage,
+    streamMessage,
+    getModels,
+    getConversationMessages,
+    createAgentRun,
+    getAgentRun,
+    cancelAgentRun,
+} from '../services/api';
 import './ChatBox.css';
 
 const ChatBox = ({
@@ -24,6 +33,8 @@ const ChatBox = ({
     const [error, setError] = useState('');
     const [attachedImages, setAttachedImages] = useState([]);
     const [showGenerationSettings, setShowGenerationSettings] = useState(false);
+    const [interactionMode, setInteractionMode] = useState('ask');
+    const [activeAgentRun, setActiveAgentRun] = useState(null);
     const [temperature, setTemperature] = useState(
         () => initialGenerationConfig?.temperature ?? ''
     );
@@ -34,6 +45,7 @@ const ChatBox = ({
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
+    const completedAgentRuns = useRef(new Set());
 
     const MAX_IMAGES = 4;
     const MAX_IMAGE_BYTES = 7_000_000; // matches the backend's ~7MB-raw cap
@@ -80,6 +92,43 @@ const ChatBox = ({
         loadHistory();
         return () => { cancelled = true; };
     }, [conversationId]);
+
+    useEffect(() => {
+        if (!activeAgentRun) return undefined;
+        const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeAgentRun.status);
+        if (terminal) {
+            if (activeAgentRun.status === 'COMPLETED' && !completedAgentRuns.current.has(activeAgentRun.id)) {
+                completedAgentRuns.current.add(activeAgentRun.id);
+                setMessages((prev) => [...prev, {
+                    text: activeAgentRun.finalOutput || 'The agent completed this task.',
+                    sender: 'assistant',
+                }]);
+            }
+            if (activeAgentRun.status === 'FAILED' && activeAgentRun.error) {
+                setError(activeAgentRun.error);
+            }
+            setChatLocked(false);
+            if (onConversationChanged) onConversationChanged();
+            return undefined;
+        }
+
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            try {
+                const run = await getAgentRun(activeAgentRun.id);
+                if (!cancelled) setActiveAgentRun(run);
+            } catch (err) {
+                if (!cancelled) {
+                    setError('Could not refresh agent activity.');
+                    setChatLocked(false);
+                }
+            }
+        }, 800);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [activeAgentRun, onConversationChanged]);
 
     // Fetch models when server changes; prefer the conversation's own model on resume.
     useEffect(() => {
@@ -213,6 +262,23 @@ const ChatBox = ({
         // Reset textarea height after clearing input
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
+        }
+
+        if (interactionMode === 'agent') {
+            try {
+                const run = await createAgentRun(
+                    currentInput,
+                    conversationId,
+                    selectedServer,
+                    selectedModel
+                );
+                setActiveAgentRun(run);
+            } catch (err) {
+                console.error('Agent run failed to start:', err.message);
+                setError('Failed to start agent task. Please try again.');
+                setChatLocked(false);
+            }
+            return;
         }
 
         if (streamEnabled) {
@@ -367,6 +433,15 @@ const ChatBox = ({
         resizeTextarea();
     };
 
+    const handleCancelAgentRun = async (runId) => {
+        try {
+            setActiveAgentRun(await cancelAgentRun(runId));
+        } catch (err) {
+            console.error('Could not cancel agent run:', err.message);
+            setError('Could not cancel agent task.');
+        }
+    };
+
     const showPlaceholder = messages.length === 0;
 
     return (
@@ -413,7 +488,8 @@ const ChatBox = ({
                         <Message key={index} text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
                     ))
                 )}
-                {chatLocked && !isStreaming && (
+                {activeAgentRun && <AgentRunPanel run={activeAgentRun} onCancel={handleCancelAgentRun} />}
+                {chatLocked && interactionMode === 'ask' && !isStreaming && (
                     <div className="message-row bot">
                         <div className="message-bubble bot typing-indicator">
                             <span className="dot"></span>
@@ -495,6 +571,24 @@ const ChatBox = ({
                         </div>
                     )}
                     <div className="input-row">
+                        <div className="interaction-mode-toggle" role="group" aria-label="Response mode">
+                            <button
+                                type="button"
+                                className={interactionMode === 'ask' ? 'active' : ''}
+                                onClick={() => setInteractionMode('ask')}
+                                disabled={chatLocked}
+                            >
+                                Ask
+                            </button>
+                            <button
+                                type="button"
+                                className={interactionMode === 'agent' ? 'active' : ''}
+                                onClick={() => setInteractionMode('agent')}
+                                disabled={chatLocked}
+                            >
+                                Agent
+                            </button>
+                        </div>
                         <button
                             type="button"
                             className={`system-prompt-toggle${systemPrompt ? ' active' : ''}`}

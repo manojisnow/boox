@@ -206,6 +206,12 @@ boox/
 - **Live tool call cards** — while the model is searching, a pulsing card appears in the chat; it expands with the result once done
 - **Extensible framework** — add new tools by implementing the `Tool` interface and registering as a Spring `@Component`; no other wiring needed
 
+### Agent Mode
+- **Ask / Agent switch** — Ask remains the fast, normal chat path. Agent creates a tracked task and uses the same local model and registered tools to work toward a goal.
+- **Persistent task activity** — agent runs and their visible steps are stored in SQLite, can be cancelled, and remain associated with their conversation.
+- **Local-first execution** — no cloud agent SDK or external model API is required; the first agent runs through the existing Ollama tool loop.
+- **Safe initial scope** — the initial agent only has the tools Boox already exposes. File-writing and other consequential tools will be added only with an explicit approval flow.
+
 To enable web search, set in `backend/chatapp/src/main/resources/application.properties`:
 ```properties
 tools.websearch.enabled=true
@@ -240,4 +246,3 @@ tools.websearch.enabled=true
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/manojisnow/boox/blob/main/LICENSE) file for details.
-

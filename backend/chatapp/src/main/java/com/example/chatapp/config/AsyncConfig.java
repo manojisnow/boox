@@ -26,4 +26,16 @@ public class AsyncConfig {
     executor.initialize();
     return executor;
   }
+
+  /** Bounded executor for agent tasks, isolated from long-lived SSE response streams. */
+  @Bean(name = "agentTaskExecutor")
+  public ThreadPoolTaskExecutor agentTaskExecutor() {
+    final ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(2);
+    executor.setMaxPoolSize(4);
+    executor.setQueueCapacity(20);
+    executor.setThreadNamePrefix("agent-run-");
+    executor.initialize();
+    return executor;
+  }
 }

@@ -34,6 +34,8 @@ yarn-error.log*
 
 # Claude Code
 .claude/
+CLAUDE.md
+GEMINI.md
 
 # Boox local SQLite database
 backend/chatapp/data/
