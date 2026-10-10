@@ -29,8 +29,8 @@ For zero-setup quick start:
 - Docker and Docker Compose (that's all!)
 
 For local development:
-- Java 21
-- Node.js 20+
+- Java 25 LTS
+- Node.js 24.15+ (Node 24 LTS; `frontend/.nvmrc`)
 - Maven
 - [Ollama](https://ollama.ai/) with your preferred model (default: phi4-mini)
 
@@ -251,3 +251,5 @@ tools.websearch.enabled=true
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/manojisnow/boox/blob/main/LICENSE) file for details.
+
+Framework versions, migration details, and rollback guidance: [framework upgrade](docs/framework-upgrade.md).

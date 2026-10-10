@@ -13,7 +13,7 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, Axios, Vite |
-| Backend | Spring Boot 3.5.3, Java 21, Maven |
+| Backend | Spring Boot 4.1.1, Java 25, Maven |
 | AI Engine | Ollama (phi4-mini default) |
 | HTTP Client | Spring RestTemplate |
 | Containerization | Docker, Docker Compose |
@@ -140,8 +140,8 @@ Environment variable overrides (Docker/runtime):
 
 ## Important Notes
 
-- **Java 21 LTS required** — runs on Spring Boot 3.x (Jakarta EE namespace)
-- **Node 20+ required** for frontend builds
+- **Java 25 LTS required** — runs on Spring Boot 4.x (Jakarta EE namespace)
+- **Node 24.15+ required** for frontend builds
 - **Maven 3.8+ required** for backend
 - **90% code coverage** enforced via JaCoCo — tests must be written for new backend code
 - **Google Java Format** enforced via Spotless — always run `mvn spotless:apply` before committing Java changes

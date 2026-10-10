@@ -1,13 +1,13 @@
 package com.example.chatapp.agent;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Strict, time-bounded Ollama transport; errors are never converted into successful replies. */
 @Component
@@ -65,7 +65,7 @@ public class AgentModelClient {
             "The model reached its output limit. Try a narrower request.");
       }
       return response.get("message");
-    } catch (java.io.IOException exception) {
+    } catch (tools.jackson.core.JacksonException exception) {
       throw new IllegalStateException("The model returned malformed JSON.", exception);
     }
   }

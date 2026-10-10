@@ -1,11 +1,11 @@
 package com.example.chatapp.persistence;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Encodes/decodes a {@code List<String>} to and from the JSON text stored in a single text column —
@@ -28,7 +28,7 @@ final class JsonListCodec {
     }
     try {
       return MAPPER.writeValueAsString(values);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       LOGGER.warn("Failed to encode list; storing none: {}", e.getMessage());
       return null;
     }
@@ -41,7 +41,7 @@ final class JsonListCodec {
     }
     try {
       return MAPPER.readValue(json, STRING_LIST);
-    } catch (JsonProcessingException e) {
+    } catch (JacksonException e) {
       LOGGER.warn("Failed to decode stored list; returning none: {}", e.getMessage());
       return List.of();
     }

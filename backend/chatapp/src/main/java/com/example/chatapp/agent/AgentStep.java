@@ -19,6 +19,7 @@ public class AgentStep {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(columnDefinition = "integer")
   private Long id;
 
   @ManyToOne(optional = false)

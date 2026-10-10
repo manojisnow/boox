@@ -7,8 +7,6 @@ import static org.mockito.Mockito.*;
 import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.GenerationConfig;
 import com.example.chatapp.tool.ToolRegistry;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +14,8 @@ import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 class AgentExecutionServiceTest {
   private final AgentModelClient client = mock(AgentModelClient.class);

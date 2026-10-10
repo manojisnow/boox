@@ -4,9 +4,6 @@ import com.example.chatapp.controller.SendMessageRequest;
 import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.GenerationConfig;
 import com.example.chatapp.tool.ToolRegistry;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -15,6 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Executes a bounded research/file-analysis task using isolated evidence and a review pass. */
 @Service

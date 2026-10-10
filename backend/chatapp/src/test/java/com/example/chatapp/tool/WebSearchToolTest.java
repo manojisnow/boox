@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +16,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class WebSearchToolTest {
@@ -240,7 +240,7 @@ class WebSearchToolTest {
             eq(HttpMethod.GET),
             any(HttpEntity.class),
             eq(String.class)))
-        .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
+        .thenReturn(ResponseEntity.ok().build());
 
     String result = tool.execute(Map.of("query", "xyznonexistent"));
     assertTrue(result.contains("No results found"));

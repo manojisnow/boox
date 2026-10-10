@@ -1,7 +1,6 @@
 package com.example.chatapp.engine;
 
 import com.example.chatapp.tool.ToolRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -25,9 +24,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 @Profile("!contract-test")
 @Component("ollama")
@@ -236,7 +235,7 @@ public class OllamaChatEngine implements ChatEngine {
     payload.put("messages", List.of(Map.of(Constants.ROLE, "user", Constants.CONTENT, prompt)));
     payload.put("stream", false);
     payload.put("options", buildOptions());
-    final MultiValueMap<String, String> headers = new HttpHeaders();
+    final HttpHeaders headers = new HttpHeaders();
     headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
     final ResponseEntity<String> response =
         restTemplate.exchange(
@@ -255,7 +254,7 @@ public class OllamaChatEngine implements ChatEngine {
       final List<Map<String, ?>> messages,
       final boolean stream,
       final String sessionId)
-      throws com.fasterxml.jackson.core.JsonProcessingException, IOException {
+      throws tools.jackson.core.JacksonException, IOException {
     final String url = ollamaApiUrl + chatPath;
     final Map<String, Object> payload = new HashMap<>();
     payload.put("model", model);
@@ -266,7 +265,7 @@ public class OllamaChatEngine implements ChatEngine {
       payload.put("tools", toolRegistry.getToolDefinitions());
     }
 
-    final MultiValueMap<String, String> headers = new HttpHeaders();
+    final HttpHeaders headers = new HttpHeaders();
     headers.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
     final HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
@@ -313,7 +312,7 @@ public class OllamaChatEngine implements ChatEngine {
       if (!json.isEmpty()) {
         try {
           return MAPPER.readValue(json, Map.class);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
           LOGGER.warn("Could not parse tool arguments as JSON: {}", json);
         }
       }
@@ -333,7 +332,7 @@ public class OllamaChatEngine implements ChatEngine {
   @SuppressWarnings("unchecked")
   private Optional<Map<String, Object>> executeToolLoop(
       final String model, final String sessionId, final SseEmitter emitter)
-      throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
+      throws IOException, tools.jackson.core.JacksonException {
     int toolIndex = 0;
     for (int i = 0; i < MAX_TOOL_ITERATIONS; i++) {
       final List<Map<String, ?>> msgs = new ArrayList<>(buildMessagesWithSystemPrompt(sessionId));
@@ -409,7 +408,7 @@ public class OllamaChatEngine implements ChatEngine {
   }
 
   private List<ModelInfo> fetchModelsFromOllama()
-      throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
+      throws IOException, tools.jackson.core.JacksonException {
     final String url = ollamaApiUrl + tagsPath;
     final ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
     final Map body = response.getBody();
@@ -548,7 +547,7 @@ public class OllamaChatEngine implements ChatEngine {
 
   private void streamFinalResponse(
       final String model, final String sessionId, final SseEmitter emitter)
-      throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
+      throws IOException, tools.jackson.core.JacksonException {
     final String url = ollamaApiUrl + chatPath;
     final List<Map<String, Object>> messagesForOllama = buildMessagesWithSystemPrompt(sessionId);
     final Map<String, Object> payload = new HashMap<>();
@@ -598,7 +597,7 @@ public class OllamaChatEngine implements ChatEngine {
                     }
                   }
                 }
-              } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+              } catch (tools.jackson.core.JacksonException e) {
                 LOGGER.debug("Malformed line in streamed response: {}", line);
               }
             }

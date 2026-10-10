@@ -10,7 +10,6 @@ import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.ChatEngine;
 import com.example.chatapp.engine.ModelInfo;
 import com.example.chatapp.service.ChatService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +19,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 class ChatServiceTest {
   @Mock private ChatEngine engine;

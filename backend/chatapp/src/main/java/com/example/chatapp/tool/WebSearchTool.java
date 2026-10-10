@@ -1,6 +1,5 @@
 package com.example.chatapp.tool;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -24,12 +23,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Web search tool using a three-provider fallback chain — all free, no API keys required.
@@ -195,7 +194,7 @@ public class WebSearchTool implements Tool {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = DDG_API_URL + "?q=" + encoded + "&format=json&no_html=1&skip_disambig=1";
 
-    final MultiValueMap<String, String> headers = new HttpHeaders();
+    final HttpHeaders headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
@@ -274,7 +273,7 @@ public class WebSearchTool implements Tool {
             + encoded
             + "&format=json&srlimit=1&srprop=snippet&utf8=1";
 
-    final MultiValueMap<String, String> wikiHeaders = new HttpHeaders();
+    final HttpHeaders wikiHeaders = new HttpHeaders();
     wikiHeaders.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
@@ -353,7 +352,7 @@ public class WebSearchTool implements Tool {
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String url = GOOGLE_NEWS_RSS_URL + "?q=" + encoded + "&hl=en-US&gl=US&ceid=US:en";
 
-    final MultiValueMap<String, String> headers = new HttpHeaders();
+    final HttpHeaders headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
         "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");

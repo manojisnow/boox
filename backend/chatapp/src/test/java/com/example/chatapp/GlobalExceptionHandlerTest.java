@@ -29,7 +29,8 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleNoResourceFound_returnsNotFound() {
-    NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/missing.js");
+    NoResourceFoundException ex =
+        new NoResourceFoundException(HttpMethod.GET, "/missing.js", "/missing.js");
     GlobalExceptionHandler handler = new GlobalExceptionHandler();
     ResponseEntity<Map<String, String>> response = handler.handleNoResourceFound(ex);
     assertEquals(404, response.getStatusCode().value());
