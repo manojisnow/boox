@@ -88,3 +88,19 @@
 @keyframes agent-pulse {
     50% { opacity: 0.35; }
 }
+
+.agent-evidence {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+}
+.agent-review-note, .agent-connection-message, .agent-mode-help {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+.agent-mode-help { padding: 0.5rem 0.75rem; }
+.agent-mode-help ul { margin: 0.4rem 0; padding-left: 1.25rem; }
+.agent-mode-help button { margin-left: 0.5rem; cursor: pointer; }

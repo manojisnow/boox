@@ -12,6 +12,7 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +24,10 @@ import org.springframework.data.domain.Persistable;
 public class AgentRun implements Persistable<String> {
 
   @Id private String id;
+  @Version private Long version;
+
+  @Column(columnDefinition = "text")
+  private String requestJson;
 
   @Transient private boolean newEntity = true;
 
@@ -57,6 +62,14 @@ public class AgentRun implements Persistable<String> {
   @OneToMany(mappedBy = "agentRun", cascade = CascadeType.ALL, orphanRemoval = true)
   @OrderBy("sequence ASC")
   private List<AgentStep> steps = new ArrayList<>();
+
+  public String getRequestJson() {
+    return requestJson;
+  }
+
+  public void setRequestJson(final String requestJson) {
+    this.requestJson = requestJson;
+  }
 
   public AgentRun() {}
 

@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatBox from './ChatBox';
-import { sendMessage, streamMessage, getModels, getConversationMessages } from '../services/api';
+import { sendMessage, streamMessage, getModels, getConversationMessages, listAgentRuns, createAgentRun, getAgentRun, cancelAgentRun } from '../services/api';
 
 vi.mock('../services/api', () => ({
     sendMessage: vi.fn(),
     streamMessage: vi.fn(),
     getModels: vi.fn(),
     getConversationMessages: vi.fn(),
+    listAgentRuns: vi.fn(), createAgentRun: vi.fn(), getAgentRun: vi.fn(), cancelAgentRun: vi.fn(),
 }));
 
 const baseProps = {
@@ -24,6 +25,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
     getConversationMessages.mockResolvedValue([]);
+    listAgentRuns.mockResolvedValue([]);
     getModels.mockResolvedValue([
         { name: 'qwen2.5:14b', capabilities: [] },
     ]);
@@ -654,5 +656,89 @@ describe('ChatBox generation settings inputs', () => {
 
         expect(screen.getByLabelText(/context size/i)).toHaveValue(4096);
         expect(screen.getByLabelText(/stop sequences/i)).toHaveValue('END, ###');
+    });
+});
+
+describe('Agent tasks', () => {
+    it('submits settings and selected text files and restores Ask after completion', async () => {
+        const user = userEvent.setup();
+        createAgentRun.mockResolvedValue({ id: 'run-1', status: 'RUNNING', steps: [] });
+        getAgentRun.mockResolvedValue({ id: 'run-1', status: 'COMPLETED', finalOutput: 'The total is 12', steps: [] });
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        const fileInput = document.querySelector('input[accept*=".txt"]');
+        await user.upload(fileInput, new File(['name,value\na,5\nb,7'], 'data.csv', { type: 'text/csv' }));
+        await screen.findByRole('button', { name: 'Remove file data.csv' });
+        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+        expect(screen.getByRole('checkbox', { name: '⌁' })).toBeDisabled();
+        await user.type(screen.getByPlaceholderText('Message...'), 'Calculate total');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false));
+        getConversationMessages.mockResolvedValue([{ role: 'user', content: 'Calculate total' }, { role: 'assistant', content: 'The total is 12' }]);
+        await screen.findByText('The total is 12');
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
+        await user.click(screen.getByRole('button', { name: 'Ask', exact: true }));
+    });
+
+    it('offers visible web and mixed scopes without requiring tool names', async () => {
+        const user = userEvent.setup();
+        createAgentRun.mockResolvedValue({ id: 'mixed', status: 'RUNNING', steps: [] });
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        expect(screen.getByRole('checkbox', { name: 'Include web sources' })).toBeChecked();
+        await user.upload(document.querySelector('input[accept*=".txt"]'), new File(['amount\n7'], 'data.csv', { type: 'text/csv' }));
+        await screen.findByRole('button', { name: 'Remove file data.csv' });
+        expect(screen.getByRole('checkbox', { name: 'Include web sources' })).not.toBeChecked();
+        await user.click(screen.getByRole('checkbox', { name: 'Include web sources' }));
+        expect(screen.getByText(/Scope: Files \+ Web/)).toBeInTheDocument();
+        await user.type(screen.getByPlaceholderText('Message...'), 'Compare these figures with published figures');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true));
+    });
+
+    it('restores an active run after reload and cancels it', async () => {
+        const user = userEvent.setup();
+        listAgentRuns.mockResolvedValue([{ id: 'resumed', status: 'RUNNING', steps: [] }]);
+        cancelAgentRun.mockResolvedValue({ id: 'resumed', status: 'CANCEL_REQUESTED', steps: [] });
+        getAgentRun.mockResolvedValue({ id: 'resumed', status: 'CANCELLED', steps: [] });
+        render(<ChatBox {...baseProps} />);
+        await user.click(await screen.findByRole('button', { name: 'Cancel', exact: true }));
+        expect(cancelAgentRun).toHaveBeenCalledWith('resumed');
+        await screen.findByText(/Cancellation takes effect/);
+        await screen.findByText('Agent · Cancelled');
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
+    });
+
+    it('restores input when task creation fails', async () => {
+        const user = userEvent.setup();
+        createAgentRun.mockRejectedValue({ response: { data: { error: 'Conversation already busy' } } });
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await user.type(screen.getByPlaceholderText('Message...'), 'Review my goal');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await screen.findByText('Conversation already busy');
+        expect(screen.getByPlaceholderText('Message...')).toHaveValue('Review my goal');
+    });
+
+    it('retries polling failures without unlocking an unfinished task', async () => {
+        listAgentRuns.mockResolvedValue([{ id: 'run-offline', status: 'RUNNING', steps: [] }]);
+        getAgentRun.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ id: 'run-offline', status: 'COMPLETED', steps: [] });
+        render(<ChatBox {...baseProps} />);
+        await screen.findByText(/Connection interrupted/, {}, { timeout: 2000 });
+        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+        await screen.findByText('Agent · Response ready', {}, { timeout: 3000 });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
+    });
+
+    it('removes files and rejects oversized attachments', async () => {
+        const user = userEvent.setup();
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        const input = document.querySelector('input[accept*=".txt"]');
+        await user.upload(input, new File(['some text'], 'notes.md', { type: 'text/markdown' }));
+        await user.click(await screen.findByRole('button', { name: 'Remove file notes.md' }));
+        expect(screen.queryByRole('button', { name: 'Remove file notes.md' })).not.toBeInTheDocument();
+        await user.upload(input, new File(['x'.repeat(24_001)], 'large.txt', { type: 'text/plain' }));
+        await screen.findByText(/24,000 characters total/);
     });
 });

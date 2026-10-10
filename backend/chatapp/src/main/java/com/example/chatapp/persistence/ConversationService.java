@@ -19,11 +19,15 @@ public class ConversationService {
   private static final String ROLE_ASSISTANT = "assistant";
 
   private final ConversationRepository conversations;
+  private final com.example.chatapp.agent.AgentRunRepository agentRuns;
   private final ChatMessageRepository messageRepository;
 
   public ConversationService(
-      final ConversationRepository conversations, final ChatMessageRepository messageRepository) {
+      final ConversationRepository conversations,
+      final ChatMessageRepository messageRepository,
+      final com.example.chatapp.agent.AgentRunRepository agentRuns) {
     this.conversations = conversations;
+    this.agentRuns = agentRuns;
     this.messageRepository = messageRepository;
   }
 
@@ -65,6 +69,17 @@ public class ConversationService {
   /** Deletes a conversation and its messages. Idempotent. */
   @Transactional
   public void delete(final String conversationId) {
+    if (agentRuns.existsByConversationIdAndStatusIn(
+        conversationId,
+        List.of(
+            com.example.chatapp.agent.AgentRunStatus.QUEUED,
+            com.example.chatapp.agent.AgentRunStatus.RUNNING,
+            com.example.chatapp.agent.AgentRunStatus.CANCEL_REQUESTED))) {
+      throw new org.springframework.web.server.ResponseStatusException(
+          org.springframework.http.HttpStatus.CONFLICT,
+          "Cancel the active agent task before deleting this conversation.");
+    }
+    agentRuns.deleteAll(agentRuns.findByConversationIdOrderByCreatedAtDesc(conversationId));
     conversations.deleteById(conversationId);
   }
 

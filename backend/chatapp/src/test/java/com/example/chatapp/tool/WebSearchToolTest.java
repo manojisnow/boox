@@ -145,6 +145,7 @@ class WebSearchToolTest {
         Map.of(
             "AbstractText", "Cats are domesticated mammals.",
             "AbstractSource", "Wikipedia",
+            "AbstractURL", "https://en.wikipedia.org/wiki/Cat",
             "RelatedTopics",
                 List.of(
                     Map.of(
@@ -161,6 +162,7 @@ class WebSearchToolTest {
 
     String result = tool.execute(Map.of("query", "cats"));
     assertTrue(result.contains("Cats are domesticated mammals."));
+    assertTrue(result.contains("Source: https://en.wikipedia.org/wiki/Cat"));
     assertTrue(result.contains("Wikipedia"));
   }
 

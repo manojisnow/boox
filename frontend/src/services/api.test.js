@@ -11,6 +11,7 @@ import {
     getConversationMessages,
     renameConversation,
     deleteConversation,
+    createAgentRun, listAgentRuns, getAgentRun, cancelAgentRun,
 } from './api';
 
 vi.mock('axios', () => ({
@@ -279,5 +280,23 @@ describe('conversation persistence endpoints', () => {
         axios.delete.mockResolvedValue({});
         await deleteConversation('1');
         expect(axios.delete).toHaveBeenCalledWith('/api/conversations/1');
+    });
+});
+
+
+describe('agent run API', () => {
+    it('sends task settings/files and supports resume and cancellation', async () => {
+        axios.post.mockResolvedValue({ data: { id: 'r' } });
+        axios.get.mockResolvedValue({ data: [] });
+        expect(await createAgentRun(' goal ', ' c ', ' ollama ', ' model ', 'Be concise', [], { temperature: 0.3, numCtx: 8192, stopSequences: [] }, [{ name: 'a.txt', content: 'Evidence' }])).toEqual({ id: 'r' });
+        expect(axios.post.mock.calls[0][1]).toMatchObject({ goal: 'goal', conversationId: 'c', chatRequest: { systemPrompt: 'Be concise', replaceGenerationConfig: true, temperature: 0.3, numCtx: 8192 }, attachments: [{ name: 'a.txt', content: 'Evidence' }] });
+        await createAgentRun('goal', 'c', 'ollama', 'model');
+        expect(axios.post.mock.calls[1][1].chatRequest.replaceGenerationConfig).toBe(false);
+        expect(await listAgentRuns('c')).toEqual([]);
+        expect(axios.get).toHaveBeenCalledWith('/api/agent-runs', { params: { conversationId: 'c' } });
+        await getAgentRun('a/b');
+        expect(axios.get).toHaveBeenCalledWith('/api/agent-runs/a%2Fb');
+        await cancelAgentRun('a/b');
+        expect(axios.post).toHaveBeenCalledWith('/api/agent-runs/a%2Fb/cancel');
     });
 });

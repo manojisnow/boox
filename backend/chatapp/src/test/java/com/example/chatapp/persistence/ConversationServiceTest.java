@@ -24,6 +24,7 @@ class ConversationServiceTest {
   @Autowired private ConversationService conversationService;
   @Autowired private JpaChatContextService contextService;
   @Autowired private TestEntityManager entityManager;
+  @Autowired private com.example.chatapp.agent.AgentRunRepository agentRuns;
 
   @Test
   void list_returnsSummaries() {
@@ -86,6 +87,24 @@ class ConversationServiceTest {
   @Test
   void rename_missing_returnsEmpty() {
     assertTrue(conversationService.rename("nope", "x").isEmpty());
+  }
+
+  @Test
+  void delete_blocksActiveTasksAndCleansUpFinishedRuns() {
+    contextService.addMessage("active", "user", "task");
+    final com.example.chatapp.agent.AgentRun run =
+        new com.example.chatapp.agent.AgentRun("r", "active", "task", "ollama", "model");
+    agentRuns.saveAndFlush(run);
+    assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> conversationService.delete("active"));
+    run.setStatus(com.example.chatapp.agent.AgentRunStatus.COMPLETED);
+    agentRuns.saveAndFlush(run);
+    entityManager.flush();
+    entityManager.clear();
+    conversationService.delete("active");
+    assertTrue(agentRuns.findById("r").isEmpty());
+    assertTrue(conversationService.messages("active").isEmpty());
   }
 
   @Test

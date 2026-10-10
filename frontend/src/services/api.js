@@ -123,13 +123,24 @@ export const resetContext = async (server, sessionId) => {
 
 // --- Agent runs ---
 
-export const createAgentRun = async (goal, conversationId, server, model) => {
+export const createAgentRun = async (goal, conversationId, server, model, systemPrompt, images, generationConfig, attachments, allowWebSearch) => {
+    const chatRequest = {
+        message: goal.trim(), sessionId: conversationId.trim(), server: server.trim(), model: model.trim(),
+        stream: false, systemPrompt: systemPrompt || '', images: images || [],
+        replaceGenerationConfig: Boolean(generationConfig),
+        temperature: generationConfig?.temperature ?? null,
+        numCtx: generationConfig?.numCtx ?? null,
+        stopSequences: generationConfig?.stopSequences || [],
+    };
     const response = await axios.post(`${API_BASE_URL}/api/agent-runs`, {
-        goal: goal.trim(),
-        conversationId: conversationId.trim(),
-        server: server.trim(),
-        model: model.trim(),
+        goal: goal.trim(), conversationId: conversationId.trim(), server: server.trim(), model: model.trim(),
+        chatRequest, attachments: attachments || [], allowWebSearch,
     });
+    return response.data;
+};
+
+export const listAgentRuns = async (conversationId) => {
+    const response = await axios.get(`${API_BASE_URL}/api/agent-runs`, { params: { conversationId } });
     return response.data;
 };
 

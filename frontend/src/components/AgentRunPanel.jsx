@@ -6,7 +6,7 @@ const STATUS_LABELS = {
     RUNNING: 'Working',
     WAITING_FOR_APPROVAL: 'Needs approval',
     CANCEL_REQUESTED: 'Cancelling after current step',
-    COMPLETED: 'Completed',
+    COMPLETED: 'Response ready',
     FAILED: 'Could not complete',
     CANCELLED: 'Cancelled',
 };
@@ -18,7 +18,7 @@ const AgentRunPanel = ({ run, onCancel }) => {
     const canCancel = active && run.status !== 'CANCEL_REQUESTED';
 
     return (
-        <section className="agent-run-panel" aria-label="Agent task activity">
+        <section className="agent-run-panel" aria-label="Agent task activity" aria-live="polite">
             <div className="agent-run-header">
                 <span className={`agent-run-status ${active ? 'active' : ''}`}>
                     <span className="agent-run-status-dot" />
@@ -36,11 +36,16 @@ const AgentRunPanel = ({ run, onCancel }) => {
                         <span className="agent-run-step-mark">
                             {step.status === 'COMPLETED' ? '✓' : step.status === 'FAILED' ? '!' : '·'}
                         </span>
-                        <span>{step.summary}</span>
+                        <div>
+                            <span>{step.summary}</span>
+                            {step.detail && <details><summary>View evidence</summary><pre className="agent-evidence">{step.detail}</pre></details>}
+                        </div>
                     </li>
                 ))}
             </ol>
             {run.error && <p className="agent-run-error">{run.error}</p>}
+            {run.status === 'CANCEL_REQUESTED' && <p>Cancellation takes effect after the current model or search request returns.</p>}
+            {run.status === 'COMPLETED' && <p className="agent-review-note">Draft reviewed by the same model against available evidence. Check sources for important decisions.</p>}
         </section>
     );
 };

@@ -32,8 +32,7 @@ public class AgentRunController {
   @PostMapping
   public ResponseEntity<AgentRunView> create(
       @Valid @RequestBody final AgentRunStartRequest request) {
-    final AgentRunView run = agentRunService.create(request);
-    agentOrchestrator.schedule(run.getId());
+    final AgentRunView run = agentOrchestrator.start(request);
     return ResponseEntity.accepted().body(run);
   }
 

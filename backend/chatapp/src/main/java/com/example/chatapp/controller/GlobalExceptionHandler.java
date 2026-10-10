@@ -38,6 +38,13 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
   }
 
+  @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+  public ResponseEntity<Map<String, String>> handleStatusException(
+      final org.springframework.web.server.ResponseStatusException exception) {
+    return ResponseEntity.status(exception.getStatusCode())
+        .body(Map.of("error", defaultString(exception.getReason())));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Map<String, String>> handleGenericException(final Exception exception) {
     final Map<String, String> error = new ConcurrentHashMap<>();

@@ -1,5 +1,7 @@
 package com.example.chatapp.service;
 
+import com.example.chatapp.agent.AgentRunRepository;
+import com.example.chatapp.agent.AgentRunStatus;
 import com.example.chatapp.controller.ResetContextRequest;
 import com.example.chatapp.controller.SendMessageRequest;
 import com.example.chatapp.engine.ChatContextService;
@@ -11,7 +13,9 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
@@ -22,12 +26,16 @@ public class ChatService {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChatService.class);
   private final Map<String, ChatEngine> engines;
   private final ChatContextService chatContextService;
+  private final AgentRunRepository agentRuns;
 
   @Autowired
   public ChatService(
-      final Map<String, ChatEngine> engines, final ChatContextService chatContextService) {
+      final Map<String, ChatEngine> engines,
+      final ChatContextService chatContextService,
+      final AgentRunRepository agentRuns) {
     this.engines = new HashMap<>(engines);
     this.chatContextService = chatContextService;
+    this.agentRuns = agentRuns;
   }
 
   public List<String> getServers() {
@@ -46,6 +54,7 @@ public class ChatService {
   }
 
   public Map<String, String> sendMessage(final SendMessageRequest request) {
+    assertConversationIdle(request.getSessionId());
     final String message = request.getMessage();
     final String server = request.getServer();
     final String model = request.getModel();
@@ -69,6 +78,7 @@ public class ChatService {
   }
 
   public void resetContext(final ResetContextRequest request) {
+    assertConversationIdle(request.getSessionId());
     final String server = request.getServer();
     final String sessionId = request.getSessionId();
     final ChatEngine engine = engines.get(server);
@@ -110,6 +120,16 @@ public class ChatService {
       } catch (Exception e) {
         emitter.completeWithError(e);
       }
+    }
+  }
+
+  public void assertConversationIdle(final String sessionId) {
+    if (agentRuns.existsByConversationIdAndStatusIn(
+        sessionId,
+        List.of(AgentRunStatus.QUEUED, AgentRunStatus.RUNNING, AgentRunStatus.CANCEL_REQUESTED))) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "An agent task is active in this conversation. Wait for it or cancel it first.");
     }
   }
 
