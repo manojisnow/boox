@@ -36,7 +36,7 @@
     animation: agent-pulse 1.3s ease-in-out infinite;
 }
 
-.agent-run-cancel {
+.agent-run-cancel, .agent-run-toggle {
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -46,7 +46,7 @@
     font-size: 0.78rem;
 }
 
-.agent-run-cancel:hover {
+.agent-run-cancel:hover, .agent-run-toggle:hover {
     color: var(--color-text-primary);
 }
 
@@ -104,3 +104,11 @@
 .agent-mode-help { padding: 0.5rem 0.75rem; }
 .agent-mode-help ul { margin: 0.4rem 0; padding-left: 1.25rem; }
 .agent-mode-help button { margin-left: 0.5rem; cursor: pointer; }
+
+.agent-run-toggle {
+    margin-left: auto;
+    color: var(--color-text-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.agent-run-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }

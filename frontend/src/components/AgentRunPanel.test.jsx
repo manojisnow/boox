@@ -18,4 +18,27 @@ describe('AgentRunPanel', () => {
         rerender(<AgentRunPanel run={null} />);
         expect(screen.queryByLabelText('Agent task activity')).not.toBeInTheDocument();
     });
+    it('collapses on completion, preserves expandable evidence, and opens the next task', () => {
+        const steps = [{ sequence: 1, status: 'COMPLETED', summary: 'Search result', detail: 'Retrieved source' }];
+        const { rerender } = render(<AgentRunPanel run={{ id: 'one', status: 'RUNNING', steps }} />);
+        expect(screen.getByRole('button', { name: 'Hide activity' })).toHaveAttribute('aria-expanded', 'true');
+        rerender(<AgentRunPanel run={{ id: 'one', status: 'COMPLETED', steps }} />);
+        expect(screen.getByRole('button', { name: 'Show activity (1 step)' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByText('Search result')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Show activity (1 step)' }));
+        expect(screen.getByText('Search result')).toBeVisible();
+        fireEvent.click(screen.getByText('View evidence'));
+        expect(screen.getByText('Retrieved source')).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide activity' }));
+        rerender(<AgentRunPanel run={{ id: 'two', status: 'RUNNING', steps }} />);
+        expect(screen.getByText('Search result')).toBeVisible();
+    });
+
+    it('starts saved terminal tasks collapsed but leaves failure messages visible', () => {
+        render(<AgentRunPanel run={{ id: 'saved', status: 'FAILED', error: 'Model unavailable', steps: [{ sequence: 1, status: 'FAILED', summary: 'Failed step' }] }} />);
+        expect(screen.getByRole('button', { name: 'Show activity (1 step)' })).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByText('Model unavailable')).toBeVisible();
+        expect(screen.queryByText('Failed step')).not.toBeInTheDocument();
+    });
+
 });
