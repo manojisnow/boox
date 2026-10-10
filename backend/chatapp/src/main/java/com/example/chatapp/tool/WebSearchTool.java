@@ -343,7 +343,10 @@ public class WebSearchTool implements Tool {
     }
 
     final String answer = (String) json.getOrDefault("Answer", "");
-    if (answer != null && !answer.isBlank() && !SITE.matcher(query).find()) {
+    if (answer != null
+        && !answer.isBlank()
+        && !answer.startsWith("URL Decoded:")
+        && !SITE.matcher(query).find()) {
       results.append("Answer: ").append(answer).append(PARAGRAPH_BREAK);
     }
 
@@ -516,7 +519,12 @@ public class WebSearchTool implements Tool {
     }
 
     final StringBuilder results = new StringBuilder(64);
-    results.append("News results for: ").append(query).append(PARAGRAPH_BREAK);
+    results
+        .append("News results for: ")
+        .append(query)
+        .append(PARAGRAPH_BREAK)
+        .append(
+            "Headlines only, not full articles. A version mentioned here does not establish the latest stable release or official compatibility.\n\n");
 
     int count = 0;
     final int limit = items.getLength();
@@ -541,7 +549,11 @@ public class WebSearchTool implements Tool {
       }
     }
 
-    final String header = "News results for: " + query + PARAGRAPH_BREAK;
+    final String header =
+        "News results for: "
+            + query
+            + PARAGRAPH_BREAK
+            + "Headlines only, not full articles. A version mentioned here does not establish the latest stable release or official compatibility.\n\n";
     if (results.toString().equals(header)) {
       return Optional.empty();
     }

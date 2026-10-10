@@ -154,6 +154,18 @@ class AgentExecutionServiceTest {
   }
 
   @Test
+  void opaqueCitationMarkersCannotBypassEvidenceChecks() throws Exception {
+    for (final String marker : List.of("【10†source】", "citeturn1search0")) {
+      when(client.chat(any(), any(), any(), any()))
+          .thenReturn(
+              json("{\"content\":\"draft\"}"), json("{\"content\":\"Claim " + marker + "\"}"));
+      final String answer = service.execute(run());
+      assertTrue(answer.contains("unsupported citations"));
+      assertFalse(answer.contains(marker));
+    }
+  }
+
+  @Test
   void citationRepairFallsBackOnBlankAnswersAndChecksCancellation() throws Exception {
     when(client.chat(any(), any(), any(), any()))
         .thenReturn(

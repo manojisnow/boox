@@ -209,7 +209,7 @@ public class AgentExecutionService {
             "user",
             "The latest user request is: "
                 + run.getGoal()
-                + "\nAnswer this latest request, not an earlier task. If it asks for explanation, explain the method step by step rather than repeating the previous result. Check current file access in the latest task: if no files are available, never claim direct file verification based on earlier chat excerpts. Review the draft above against the latest request, attached files, and actual tool results. Return ONLY the final answer, correcting unsupported claims. Cite source URLs only if present in tool results; for files cite filenames and exact lines or excerpts. Distinguish verified evidence from inference and missing information. If search failed or the evidence is insufficient, say so; never fill gaps with invented facts or citations. Do not claim independent fact-checking or file edits. For reasoning tasks, check calculations and assumptions. Do not merely repeat the draft."));
+                + "\nAnswer this latest request, not an earlier task. If it asks for explanation, explain the method step by step rather than repeating the previous result. Check current file access in the latest task: if no files are available, never claim direct file verification based on earlier chat excerpts. Review the draft above against the latest request, attached files, and actual tool results. News headlines mentioning a release do not establish which release is currently the latest stable version. Example tutorials do not establish official compatibility requirements. If official sources were requested but not retrieved, explicitly say they were not verified. Use concise descriptive Markdown links to exact evidence URLs, never invented numbered source markers. Return ONLY the final answer, correcting unsupported claims. Cite source URLs only if present in tool results; for files cite filenames and exact lines or excerpts. Distinguish verified evidence from inference and missing information. If search failed or the evidence is insufficient, say so; never fill gaps with invented facts or citations. Do not claim independent fact-checking or file edits. For reasoning tasks, check calculations and assumptions. Do not merely repeat the draft."));
     final Map<String, Object> options = options(config);
     options.remove("stop");
     options.put("temperature", 0.1);
@@ -235,7 +235,7 @@ public class AgentExecutionService {
                   + evidenceUrls.stream()
                       .sorted()
                       .collect(java.util.stream.Collectors.joining("\n"))
-                  + "\nRemove every other URL, including suggested websites and guessed publisher links. Do not use unverified claims from the rejected draft as evidence. If the available sources do not establish the requested current facts or official references, clearly say you could not verify them. Return only the corrected answer."));
+                  + "\nRemove every other URL, including suggested websites and guessed publisher links. Remove opaque or numbered citation markers such as 【10†source】; cite evidence using descriptive Markdown links only. News headlines mentioning a version cannot confirm it is the latest stable release; tutorials cannot establish official compatibility. Do not use unverified claims from the rejected draft as evidence. If the available sources do not establish the requested current facts or official references, clearly say you could not verify them. Return only the corrected answer."));
       answer = client.chat(run.getModel(), messages, options, List.of()).path("content").asText();
       checkCancelled(run.getId());
       if (answer.isBlank() || hasUnsupportedCitations(answer, evidenceUrls))
@@ -252,8 +252,12 @@ public class AgentExecutionService {
     while (matcher.find()) evidenceUrls.add(matcher.group().replaceAll("[.,;:]+$", ""));
   }
 
+  private static final java.util.regex.Pattern OPAQUE_CITATIONS =
+      java.util.regex.Pattern.compile("【[^】]*†[^】]*】|cite[^]*");
+
   private static boolean hasUnsupportedCitations(
       final String answer, final java.util.Set<String> evidenceUrls) {
+    if (OPAQUE_CITATIONS.matcher(answer).find()) return true;
     final java.util.regex.Matcher cited = URLS.matcher(answer);
     while (cited.find()) {
       if (!evidenceUrls.contains(cited.group().replaceAll("[.,;:]+$", ""))) return true;

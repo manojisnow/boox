@@ -303,6 +303,17 @@ class WebSearchToolTest {
   }
 
   @Test
+  void urlDecodingIsNotSearchEvidence() throws Exception {
+    when(restTemplate.exchange(
+            contains("duckduckgo.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(jsonResponse(Map.of("Answer", "URL Decoded: spring.io/projects/spring-boot")));
+    assertTrue(tool.searchDuckDuckGo("spring.io/projects/spring-boot").isEmpty());
+  }
+
+  @Test
   void rejectsUnrelatedFallbackResultsAndContinuesAfterProviderOutage() throws Exception {
     when(restTemplate.exchange(
             contains("duckduckgo.com"),
