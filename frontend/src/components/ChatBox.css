@@ -436,6 +436,35 @@
   pointer-events: auto;
 }
 
+.interaction-mode-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-secondary);
+}
+
+.interaction-mode-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+  line-height: 1;
+  padding: 0.45rem 0.5rem;
+}
+
+.interaction-mode-toggle button.active {
+  background: var(--color-accent);
+  color: white;
+}
+
+.interaction-mode-toggle button:disabled {
+  cursor: not-allowed;
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .chat-window {

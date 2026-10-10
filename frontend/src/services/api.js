@@ -121,6 +121,28 @@ export const resetContext = async (server, sessionId) => {
     }
 };
 
+// --- Agent runs ---
+
+export const createAgentRun = async (goal, conversationId, server, model) => {
+    const response = await axios.post(`${API_BASE_URL}/api/agent-runs`, {
+        goal: goal.trim(),
+        conversationId: conversationId.trim(),
+        server: server.trim(),
+        model: model.trim(),
+    });
+    return response.data;
+};
+
+export const getAgentRun = async (runId) => {
+    const response = await axios.get(`${API_BASE_URL}/api/agent-runs/${encodeURIComponent(runId)}`);
+    return response.data;
+};
+
+export const cancelAgentRun = async (runId) => {
+    const response = await axios.post(`${API_BASE_URL}/api/agent-runs/${encodeURIComponent(runId)}/cancel`);
+    return response.data;
+};
+
 // --- Conversation persistence & management ---
 
 export const listConversations = async () => {
