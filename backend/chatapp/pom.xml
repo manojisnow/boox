@@ -12,13 +12,23 @@
     <description>Chat application integrating React and Spring Boot with Llama model and DuckDuckGo search.</description>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -41,7 +51,7 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.49.1.0</version>
+            <version>3.53.4.0</version>
         </dependency>
         <!-- Hibernate community dialects provide SQLiteDialect (version BOM-managed). -->
         <dependency>
@@ -51,41 +61,43 @@
         <!-- Testcontainers version is managed by the Spring Boot dependencies BOM. -->
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>mockserver</artifactId>
+            <artifactId>testcontainers-mockserver</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mock-server</groupId>
             <artifactId>mockserver-client-java</artifactId>
-            <version>5.15.0</version>
+            <version>8.0.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.github.spotbugs</groupId>
             <artifactId>spotbugs-annotations</artifactId>
-            <version>4.9.3</version>
+            <version>4.10.4</version>
             <scope>compile</scope>
         </dependency>
-        <!-- REST Assured version (5.x, jakarta-based) is managed by the Spring Boot dependencies BOM. -->
+        <!-- REST Assured is not managed by the Spring Boot 4 BOM. -->
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>spring-mock-mvc</artifactId>
+            <version>6.1.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <version>6.1.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.toomuchcoding.jsonassert</groupId>
             <artifactId>jsonassert</artifactId>
-            <version>0.4.14</version>
+            <version>0.8.0</version>
             <scope>test</scope>
         </dependency>
         <!-- Mockito (5.x) and Byte Buddy versions are managed by the Spring Boot dependencies BOM. -->
@@ -110,7 +122,11 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>3.5.3</version>
+                <version>${spring-boot.version}</version>
+                <configuration>
+                    <!-- SQLite JDBC loads native code; explicitly opt in on Java 25. -->
+                    <jvmArguments>--enable-native-access=ALL-UNNAMED</jvmArguments>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -125,9 +141,9 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <version>3.16.0</version>
                 <configuration>
-                    <release>21</release>
+                    <release>${java.version}</release>
                     <!-- Retain method parameter names in bytecode. Spring 6 dropped the
                          debug-symbol fallback, so @RequestParam/@PathVariable without an
                          explicit name need this flag (starter-parent sets it by default;
@@ -138,12 +154,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.3</version>
+                <version>3.6.0</version>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>checkstyle</id>
@@ -181,13 +197,13 @@
                         <!-- ../../pmd-ruleset.xml: this config runs with chatapp/ as basedir. -->
                         <ruleset>../pmd-ruleset.xml</ruleset>
                     </rulesets>
-                    <targetJdk>21</targetJdk>
+                    <targetJdk>25</targetJdk>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.44.0</version>
+                <version>3.10.4</version>
                 <executions>
                     <execution>
                         <id>spotless-check</id>
@@ -200,7 +216,7 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.17.0</version>
+                            <version>1.36.0</version>
                         </googleJavaFormat>
                     </java>
                 </configuration>
@@ -208,7 +224,7 @@
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.9.3.0</version>
+                <version>4.10.4.1</version>
                 <executions>
                     <execution>
                         <goals>
@@ -226,7 +242,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -289,7 +305,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.5.1</version>
                 <executions>
                     <execution>
                         <goals>

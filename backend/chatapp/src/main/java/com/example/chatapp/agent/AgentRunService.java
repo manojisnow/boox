@@ -1,6 +1,5 @@
 package com.example.chatapp.agent;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 /** Owns the durable lifecycle and visible audit trail for agent tasks. */
 @Service
@@ -42,7 +42,7 @@ public class AgentRunService {
       final AgentRunStartRequest stored;
       try {
         stored = MAPPER.readValue(storedJson, AgentRunStartRequest.class);
-      } catch (java.io.IOException exception) {
+      } catch (tools.jackson.core.JacksonException exception) {
         throw new IllegalStateException("Stored task evidence could not be read.", exception);
       }
       if (request.getAllowWebSearch() == null) request.setAllowWebSearch(stored.permitsWebSearch());

@@ -65,9 +65,9 @@ public final class AgentRunView {
     try {
       return requestJson == null
           ? new AgentRunStartRequest()
-          : new com.fasterxml.jackson.databind.ObjectMapper()
+          : new tools.jackson.databind.ObjectMapper()
               .readValue(requestJson, AgentRunStartRequest.class);
-    } catch (java.io.IOException exception) {
+    } catch (tools.jackson.core.JacksonException exception) {
       throw new IllegalStateException("Stored task scope could not be read.", exception);
     }
   }

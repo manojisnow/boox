@@ -6,6 +6,9 @@ services:
       - "8080:8080"
     environment:
       - OLLAMA_API_URL=http://ollama:11434
+      - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID:-}
       - OLLAMA_MODEL=phi4-mini
       - OLLAMA_API_TEMPERATURE=0.7
       - CORS_ALLOWED_ORIGINS=http://localhost:3000

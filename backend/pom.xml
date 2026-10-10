@@ -11,12 +11,41 @@
     </modules>
     <name>ChatApp Backend Parent</name>
     <description>Parent module for ChatApp backend, aggregating app, unit, integration, and contract test modules.</description>
+    <properties>
+        <spring-boot.version>4.1.1</spring-boot.version>
+        <!-- Security fixes newer than Boot's managed versions; keep the whole families aligned. -->
+        <tomcat.version>11.0.26</tomcat.version>
+        <jackson.version>3.2.3</jackson.version>
+    </properties>
     <dependencyManagement>
         <dependencies>
+            <!-- First imported BOM wins when both BOMs manage Jackson artifacts. -->
+            <dependency>
+                <groupId>tools.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-core</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-el</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tomcat.embed</groupId>
+                <artifactId>tomcat-embed-websocket</artifactId>
+                <version>${tomcat.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>3.5.3</version>
+                <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -27,7 +56,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.1.2</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>checkstyle</id>
@@ -66,13 +95,13 @@
                              parent's, since this config is inherited by child modules. -->
                         <ruleset>../pmd-ruleset.xml</ruleset>
                     </rulesets>
-                    <targetJdk>21</targetJdk>
+                    <targetJdk>25</targetJdk>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.44.0</version>
+                <version>3.10.4</version>
                 <executions>
                     <execution>
                         <id>spotless-check</id>
@@ -85,7 +114,7 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.17.0</version>
+                            <version>1.36.0</version>
                         </googleJavaFormat>
                     </java>
                 </configuration>
@@ -93,7 +122,7 @@
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.9.3.0</version>
+                <version>4.10.4.1</version>
                 <executions>
                     <execution>
                         <goals>
@@ -110,7 +139,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>

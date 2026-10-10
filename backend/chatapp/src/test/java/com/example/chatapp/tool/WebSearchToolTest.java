@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +16,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class WebSearchToolTest {
@@ -180,15 +180,23 @@ class WebSearchToolTest {
   }
 
   @Test
-  void execute_ddg_returnsSearchFailed_whenApiThrows() {
+  void execute_returnsNoEvidence_whenAllProvidersFail() {
     when(restTemplate.exchange(
             contains("duckduckgo.com"),
             eq(HttpMethod.GET),
             any(HttpEntity.class),
             eq(String.class)))
         .thenThrow(new RuntimeException("Connection refused"));
-
-    assertTrue(tool.execute(Map.of("query", "test")).contains("Search failed"));
+    when(restTemplate.exchange(
+            contains("wikipedia.org"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+        .thenThrow(new RuntimeException("offline"));
+    when(restTemplate.exchange(
+            contains("news.google.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenThrow(new RuntimeException("offline"));
+    assertTrue(tool.execute(Map.of("query", "test")).startsWith("No results"));
   }
 
   // ---------------------------------------------------------------------------
@@ -240,7 +248,7 @@ class WebSearchToolTest {
             eq(HttpMethod.GET),
             any(HttpEntity.class),
             eq(String.class)))
-        .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
+        .thenReturn(ResponseEntity.ok().build());
 
     String result = tool.execute(Map.of("query", "xyznonexistent"));
     assertTrue(result.contains("No results found"));
@@ -259,7 +267,7 @@ class WebSearchToolTest {
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
             + "<rss version=\"2.0\"><channel>"
             + "<item>"
-            + "<title>Modi announces new policy - BBC News</title>"
+            + "<title>India: Modi announces new policy - BBC News</title>"
             + "<link>https://news.google.com/rss/articles/test</link>"
             + "<pubDate>Sat, 22 Feb 2026 12:00:00 GMT</pubDate>"
             + "</item>"
@@ -292,6 +300,245 @@ class WebSearchToolTest {
         .thenReturn(new ResponseEntity<>(emptyRss, HttpStatus.OK));
 
     assertTrue(tool.execute(Map.of("query", "xyznotfound")).contains("No results found"));
+  }
+
+  @Test
+  void urlDecodingIsNotSearchEvidence() throws Exception {
+    when(restTemplate.exchange(
+            contains("duckduckgo.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(jsonResponse(Map.of("Answer", "URL Decoded: spring.io/projects/spring-boot")));
+    assertTrue(tool.searchDuckDuckGo("spring.io/projects/spring-boot").isEmpty());
+  }
+
+  @Test
+  void rejectsUnrelatedFallbackResultsAndContinuesAfterProviderOutage() throws Exception {
+    when(restTemplate.exchange(
+            contains("duckduckgo.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenThrow(new org.springframework.web.client.ResourceAccessException("offline"));
+    when(restTemplate.exchange(
+            contains("w/api.php"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+        .thenReturn(
+            jsonResponse(
+                Map.of(
+                    "query",
+                    Map.of(
+                        "search",
+                        List.of(
+                            Map.of(
+                                "title",
+                                "Windows 11 version history",
+                                "snippet",
+                                "Microsoft Windows"))))));
+    when(restTemplate.exchange(
+            contains("news.google.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            ResponseEntity.ok(
+                "<rss><channel><item><title>UEFI release</title><link>https://example.com/uefi</link></item></channel></rss>"));
+    final String result = tool.execute(Map.of("query", "Spring Boot latest stable release"));
+    assertTrue(result.startsWith("No results"));
+    assertTrue(result.contains("Full web search is not configured"));
+    verify(restTemplate, never()).exchange(contains("rest_v1"), any(), any(), eq(String.class));
+  }
+
+  @Test
+  void googleSearchUsesConfiguredProviderAndKeepsOnlyRelevantRequestedDomain() throws Exception {
+    setField(tool, "googleApiKey", "test-key");
+    setField(tool, "googleSearchEngineId", "test-engine");
+    when(restTemplate.exchange(
+            contains("googleapis.com/customsearch"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            jsonResponse(
+                Map.of(
+                    "items",
+                    List.of(
+                        Map.of(
+                            "title",
+                            "Spring Boot",
+                            "snippet",
+                            "Release requires Java 17 or later.",
+                            "link",
+                            "https://docs.spring.io/spring-boot/system-requirements.html"),
+                        Map.of(
+                            "title",
+                            "Spring Boot",
+                            "snippet",
+                            "Unofficial claims",
+                            "link",
+                            "https://spring.io.evil.example/"),
+                        Map.of(
+                            "title",
+                            "Windows 11",
+                            "snippet",
+                            "Windows release",
+                            "link",
+                            "https://spring.io/windows")))));
+    final String result =
+        tool.execute(Map.of("query", "Spring Boot supported Java site:spring.io"));
+    assertTrue(result.contains("https://docs.spring.io/"));
+    assertFalse(result.contains("evil.example"));
+    assertFalse(result.contains("Windows"));
+    verify(restTemplate, never()).exchange(contains("duckduckgo"), any(), any(), eq(String.class));
+  }
+
+  @Test
+  void braveUsesHeaderAuthenticationAndFiltersUnrelatedExcerpts() throws Exception {
+    setField(tool, "braveApiKey", "test-token");
+    setField(tool, "maxResults", 1);
+    when(restTemplate.exchange(
+            contains("api.search.brave.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            jsonResponse(
+                Map.of(
+                    "web",
+                    Map.of(
+                        "results",
+                        List.of(
+                            Map.of(
+                                "title",
+                                "Windows",
+                                "description",
+                                "Unrelated release",
+                                "url",
+                                "https://example.com/windows"),
+                            Map.of(
+                                "title",
+                                "Spring Boot",
+                                "description",
+                                "<b>Spring Boot</b> requires Java 17 or later",
+                                "url",
+                                "https://docs.spring.io/requirements"),
+                            Map.of(
+                                "title",
+                                "Spring Boot",
+                                "description",
+                                "Other result",
+                                "url",
+                                "https://spring.io/other"))))));
+    final String result =
+        tool.execute(Map.of("query", "Spring Boot Java requirements site:spring.io"));
+    assertTrue(result.contains("requires Java 17"));
+    assertFalse(result.contains("<b>"));
+    assertFalse(result.contains("Windows"));
+    assertFalse(result.contains("Other result"));
+    final org.mockito.ArgumentCaptor<HttpEntity> request =
+        org.mockito.ArgumentCaptor.forClass(HttpEntity.class);
+    verify(restTemplate)
+        .exchange(
+            org.mockito.ArgumentMatchers.<String>argThat(url -> !url.contains("test-token")),
+            eq(HttpMethod.GET),
+            request.capture(),
+            eq(String.class));
+    assertEquals("test-token", request.getValue().getHeaders().getFirst("X-Subscription-Token"));
+  }
+
+  @Test
+  void searchApisTreatEmptyAndMalformedResultsAsNoEvidence() throws Exception {
+    setField(tool, "braveApiKey", "test-token");
+    when(restTemplate.exchange(
+            contains("api.search.brave.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            ResponseEntity.ok().build(),
+            ResponseEntity.ok(""),
+            ResponseEntity.ok("{}"),
+            ResponseEntity.ok("{\"web\":{\"results\":null}}"),
+            ResponseEntity.ok("{\"web\":{\"results\":[false,{}]}}"));
+    for (int i = 0; i < 5; i++) assertTrue(tool.searchBrave("Spring Boot").isEmpty());
+    setField(tool, "googleApiKey", "test-key");
+    setField(tool, "googleSearchEngineId", "test-engine");
+    when(restTemplate.exchange(
+            contains("googleapis.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            ResponseEntity.ok().build(),
+            ResponseEntity.ok(""),
+            ResponseEntity.ok("{}"),
+            ResponseEntity.ok(
+                "{\"items\":[false,{}, {\"title\":\"Spring Boot\",\"snippet\":\"\",\"link\":\"https://spring.io\"}]}"));
+    for (int i = 0; i < 4; i++) assertTrue(tool.searchGoogle("Spring Boot").isEmpty());
+  }
+
+  @Test
+  void wikipediaTrimsLeadingNewlinesAndChoosesRelevantCandidate() throws Exception {
+    when(restTemplate.exchange(
+            contains("w/api.php"), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+        .thenReturn(
+            jsonResponse(
+                Map.of(
+                    "query",
+                    Map.of(
+                        "search",
+                        List.of(Map.of("title", "Windows 11"), Map.of("title", "Spring Boot"))))));
+    when(restTemplate.exchange(
+            contains("rest_v1/page/summary"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            jsonResponse(
+                Map.of(
+                    "extract",
+                    "\n\nSpring Boot is a Java framework.\nSecond paragraph",
+                    "content_urls",
+                    Map.of(
+                        "desktop", Map.of("page", "https://en.wikipedia.org/wiki/Spring_Boot")))));
+    final String result = tool.searchWikipedia("Spring Boot latest release").orElseThrow();
+    assertTrue(result.contains("Spring Boot is a Java framework."));
+    assertFalse(result.contains("Second paragraph"));
+  }
+
+  @Test
+  void siteRestrictionSkipsWikipediaAndFiltersNewsPublisher() throws Exception {
+    stubDdgEmpty();
+    when(restTemplate.exchange(
+            contains("news.google.com"),
+            eq(HttpMethod.GET),
+            any(HttpEntity.class),
+            eq(String.class)))
+        .thenReturn(
+            ResponseEntity.ok(
+                "<rss><channel><item><title>Spring Boot release</title><link>https://news.google.com/rss/articles/abc</link><source url=\"https://spring.io\">Spring</source></item><item><title>Spring Boot rumors</title><link>https://news.google.com/rss/articles/def</link><source url=\"https://example.com\">Other</source></item></channel></rss>"));
+    final String result = tool.execute(Map.of("query", "Spring Boot release site:spring.io"));
+    assertTrue(result.contains("Spring Boot release"));
+    assertFalse(result.contains("rumors"));
+    verify(restTemplate, never()).exchange(contains("wikipedia"), any(), any(), eq(String.class));
+  }
+
+  @Test
+  void relevanceRequiresTopicWordsAndSiteFilterChecksHostBoundary() {
+    assertFalse(
+        WebSearchTool.relevant(
+            "Spring Boot latest stable release 2026", "Windows 11 version history"));
+    assertFalse(WebSearchTool.relevant("Spring Boot", "Spring season"));
+    assertTrue(WebSearchTool.relevant("Spring Boot latest release", "Spring Boot Java framework"));
+    assertFalse(WebSearchTool.relevant("Spring Boot", ""));
+    assertFalse(WebSearchTool.relevant("Spring Boot", null));
+    assertTrue(WebSearchTool.relevant("latest 2026", "A release"));
+    assertTrue(WebSearchTool.matchesSite("site:spring.io", "https://docs.spring.io/page"));
+    assertFalse(WebSearchTool.matchesSite("site:spring.io", "https://spring.io.evil.example/page"));
+    assertFalse(WebSearchTool.matchesSite("site:spring.io", "https://evilspring.io/page"));
+    assertFalse(WebSearchTool.matchesSite("site:spring.io", "file:///etc/passwd"));
+    assertFalse(WebSearchTool.matchesSite("site:spring.io", ""));
+    assertFalse(WebSearchTool.matchesSite("topic", "not a url"));
   }
 
   // ---------------------------------------------------------------------------

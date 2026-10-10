@@ -10,7 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.context.WebApplicationContext;
 
-@SpringBootTest
+@org.springframework.test.context.ActiveProfiles("test")
+@SpringBootTest(properties = "spring.datasource.url=jdbc:sqlite:target/boox-contract-test.db")
 public abstract class BaseContractTest {
 
   @Autowired private WebApplicationContext context;

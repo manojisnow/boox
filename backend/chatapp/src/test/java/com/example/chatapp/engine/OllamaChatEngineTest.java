@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.example.chatapp.tool.ToolRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +20,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.ResponseExtractor;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class OllamaChatEngineTest {
@@ -246,7 +246,7 @@ class OllamaChatEngineTest {
     when(chatContextService.getContext(sessionId)).thenReturn(List.of());
     when(restTemplate.exchange(
             anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
-        .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
+        .thenReturn(ResponseEntity.ok().build());
     // Act
     Map<String, String> reply = engine.sendMessage("msg", "m", sessionId, false);
     // Assert
@@ -697,7 +697,7 @@ class OllamaChatEngineTest {
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
     when(chatContextService.getContext("sid")).thenReturn(List.of());
     when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
-        .thenReturn(new ResponseEntity<>(null, HttpStatus.OK));
+        .thenReturn(ResponseEntity.ok().build());
     SseEmitter emitter = mock(SseEmitter.class);
 
     // Act

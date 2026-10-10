@@ -4,9 +4,6 @@ import com.example.chatapp.controller.SendMessageRequest;
 import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.GenerationConfig;
 import com.example.chatapp.tool.ToolRegistry;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -15,6 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Executes a bounded research/file-analysis task using isolated evidence and a review pass. */
 @Service
@@ -129,6 +129,13 @@ public class AgentExecutionService {
     int calls = 0;
     for (int turn = 0; turn <= MAX_TOOLS; turn++) {
       checkCancelled(run.getId());
+      if (calls >= MAX_TOOLS) {
+        messages.add(
+            message(
+                "user",
+                "The search budget is exhausted. Finish using only retrieved evidence. Clearly explain anything you could not verify; do not guess current facts or invent citations."));
+        return review(run, messages, config, evidenceUrls);
+      }
       final JsonNode reply = client.chat(run.getModel(), messages, options, allowed);
       final JsonNode requestedTools = reply.path("tool_calls");
       if (!requestedTools.isArray() || requestedTools.isEmpty()) {
@@ -140,9 +147,11 @@ public class AgentExecutionService {
       }
       messages.add(MAPPER.convertValue(reply, new TypeReference<Map<String, Object>>() {}));
       for (final JsonNode call : requestedTools) {
-        if (++calls > MAX_TOOLS)
-          throw new IllegalStateException(
-              "The agent reached its search limit. Try a narrower task.");
+        if (calls >= MAX_TOOLS) {
+          messages.add(message("tool", "Search budget exhausted; this search was not executed."));
+          continue;
+        }
+        calls++;
         checkCancelled(run.getId());
         final String name = call.path("function").path("name").asText();
         if (!"web_search".equals(name) || allowed.isEmpty())
@@ -164,20 +173,23 @@ public class AgentExecutionService {
             raw.length() <= MAX_EVIDENCE_CHARS
                 ? raw
                 : raw.substring(0, MAX_EVIDENCE_CHARS) + "\n[Search result truncated]";
-        if (!raw.startsWith("Error") && !raw.startsWith("No results"))
-          collectUrls(evidence, evidenceUrls);
+        if (!failedSearch(raw)) collectUrls(evidence, evidenceUrls);
         runs.progress(
             run.getId(),
             AgentStepType.TOOL,
             "Search result: " + query,
             evidence,
-            raw.startsWith("Error") || raw.startsWith("No results")
-                ? AgentStepStatus.FAILED
-                : AgentStepStatus.COMPLETED);
+            failedSearch(raw) ? AgentStepStatus.FAILED : AgentStepStatus.COMPLETED);
         messages.add(new HashMap<>(Map.of("role", "tool", "tool_name", name, "content", evidence)));
       }
     }
     throw new IllegalStateException("The agent reached its step limit. Try a narrower task.");
+  }
+
+  private static boolean failedSearch(final String result) {
+    return result.startsWith("Error")
+        || result.startsWith("No results")
+        || result.startsWith("Search failed");
   }
 
   private String review(
@@ -197,17 +209,38 @@ public class AgentExecutionService {
             "user",
             "The latest user request is: "
                 + run.getGoal()
-                + "\nAnswer this latest request, not an earlier task. If it asks for explanation, explain the method step by step rather than repeating the previous result. Check current file access in the latest task: if no files are available, never claim direct file verification based on earlier chat excerpts. Review the draft above against the latest request, attached files, and actual tool results. Return ONLY the final answer, correcting unsupported claims. Cite source URLs only if present in tool results; for files cite filenames and exact lines or excerpts. Distinguish verified evidence from inference and missing information. If search failed or the evidence is insufficient, say so; never fill gaps with invented facts or citations. Do not claim independent fact-checking or file edits. For reasoning tasks, check calculations and assumptions. Do not merely repeat the draft."));
+                + "\nAnswer this latest request, not an earlier task. If it asks for explanation, explain the method step by step rather than repeating the previous result. Check current file access in the latest task: if no files are available, never claim direct file verification based on earlier chat excerpts. Review the draft above against the latest request, attached files, and actual tool results. News headlines mentioning a release do not establish which release is currently the latest stable version. Example tutorials do not establish official compatibility requirements. If official sources were requested but not retrieved, explicitly say they were not verified. Use concise descriptive Markdown links to exact evidence URLs, never invented numbered source markers. Return ONLY the final answer, correcting unsupported claims. Cite source URLs only if present in tool results; for files cite filenames and exact lines or excerpts. Distinguish verified evidence from inference and missing information. If search failed or the evidence is insufficient, say so; never fill gaps with invented facts or citations. Do not claim independent fact-checking or file edits. For reasoning tasks, check calculations and assumptions. Do not merely repeat the draft."));
     final Map<String, Object> options = options(config);
     options.remove("stop");
     options.put("temperature", 0.1);
-    final String answer =
+    options.put("num_predict", Math.min(4_096, ((Number) options.get("num_ctx")).intValue() / 4));
+    String answer =
         client.chat(run.getModel(), messages, options, List.of()).path("content").asText();
     checkCancelled(run.getId());
     if (answer.isBlank())
       throw new IllegalStateException(
           "The model could not produce a checked answer. Please retry.");
-    validateCitations(answer, evidenceUrls);
+    if (hasUnsupportedCitations(answer, evidenceUrls)) {
+      runs.progress(
+          run.getId(),
+          AgentStepType.MODEL,
+          "Correcting unsupported citations",
+          null,
+          AgentStepStatus.RUNNING);
+      messages.add(message("assistant", answer));
+      messages.add(
+          message(
+              "user",
+              "Your draft contained URLs absent from retrieved evidence. Correct the answer using only actual evidence. The ONLY allowed URLs are: "
+                  + evidenceUrls.stream()
+                      .sorted()
+                      .collect(java.util.stream.Collectors.joining("\n"))
+                  + "\nRemove every other URL, including suggested websites and guessed publisher links. Remove opaque or numbered citation markers such as 【10†source】; cite evidence using descriptive Markdown links only. News headlines mentioning a version cannot confirm it is the latest stable release; tutorials cannot establish official compatibility. Do not use unverified claims from the rejected draft as evidence. If the available sources do not establish the requested current facts or official references, clearly say you could not verify them. Return only the corrected answer."));
+      answer = client.chat(run.getModel(), messages, options, List.of()).path("content").asText();
+      checkCancelled(run.getId());
+      if (answer.isBlank() || hasUnsupportedCitations(answer, evidenceUrls))
+        return "I couldn't produce an answer supported by the available evidence. The attempted answer contained unsupported citations, so I haven't included it. Please provide relevant source material or try again.";
+    }
     return answer;
   }
 
@@ -219,14 +252,17 @@ public class AgentExecutionService {
     while (matcher.find()) evidenceUrls.add(matcher.group().replaceAll("[.,;:]+$", ""));
   }
 
-  private static void validateCitations(
+  private static final java.util.regex.Pattern OPAQUE_CITATIONS =
+      java.util.regex.Pattern.compile("【[^】]*†[^】]*】|cite[^]*");
+
+  private static boolean hasUnsupportedCitations(
       final String answer, final java.util.Set<String> evidenceUrls) {
+    if (OPAQUE_CITATIONS.matcher(answer).find()) return true;
     final java.util.regex.Matcher cited = URLS.matcher(answer);
     while (cited.find()) {
-      if (!evidenceUrls.contains(cited.group().replaceAll("[.,;:]+$", "")))
-        throw new IllegalStateException(
-            "The model cited a URL that was not in the retrieved evidence. Please retry or provide source material.");
+      if (!evidenceUrls.contains(cited.group().replaceAll("[.,;:]+$", ""))) return true;
     }
+    return false;
   }
 
   private void checkCancelled(final String runId) {

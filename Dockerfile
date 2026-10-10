@@ -1,6 +1,6 @@
 # Stage 1: Build the React frontend
 # We build the frontend first so its static assets are ready for the backend.
-FROM node:20-slim AS builder-frontend
+FROM node:24.21.0-slim AS builder-frontend
 WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci
@@ -8,7 +8,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the Spring Boot backend and package frontend assets into the JAR
-FROM maven:3.9.10-amazoncorretto-21 AS builder-backend
+FROM maven:3.10.0-eclipse-temurin-25-noble AS builder-backend
 WORKDIR /app
 # Copy the entire project context to leverage build caching
 COPY . .
@@ -20,7 +20,7 @@ RUN mvn -f backend/pom.xml -pl chatapp -am clean package -DskipTests
 
 # Stage 3: Final, lean, and secure production image
 # eclipse-temurin is the actively maintained successor to the deprecated openjdk Docker images.
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 # Install curl for the HEALTHCHECK.
@@ -62,4 +62,4 @@ EXPOSE 8080
 USER boox
 
 # The command is now simple, direct, and manages a single process.
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar"]
