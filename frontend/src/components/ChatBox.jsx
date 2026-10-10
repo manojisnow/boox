@@ -39,6 +39,8 @@ const ChatBox = ({
     const [agentRefreshError, setAgentRefreshError] = useState('');
     const [agentPollAttempt, setAgentPollAttempt] = useState(0);
     const [attachedFiles, setAttachedFiles] = useState([]);
+    const [retainedFiles, setRetainedFiles] = useState([]);
+    const [clearAttachments, setClearAttachments] = useState(false);
     const [allowWebSearch, setAllowWebSearch] = useState(true);
     const [filesLoading, setFilesLoading] = useState(false);
     const textFileInputRef = useRef(null);
@@ -90,8 +92,10 @@ const ChatBox = ({
                     const active = ['QUEUED', 'RUNNING', 'CANCEL_REQUESTED'].includes(latest.status);
                     if (!active) completedAgentRuns.current.add(latest.id);
                     setActiveAgentRun(latest);
+                    if (typeof latest.allowWebSearch === 'boolean') setAllowWebSearch(latest.allowWebSearch);
+                    setRetainedFiles(latest.attachedFileNames || []);
                     setChatLocked(active);
-                    if (active) setInteractionMode('agent');
+                    setInteractionMode('agent');
                 }
                 if (!cancelled && history.length > 0) {
                     setMessages(history.map(m => ({
@@ -323,9 +327,13 @@ const ChatBox = ({
                     imagesBase64,
                     generationConfig,
                     attachedFiles,
-                    allowWebSearch
+                    allowWebSearch,
+                    clearAttachments
                 );
                 setAttachedFiles([]);
+                setClearAttachments(false);
+                setRetainedFiles(run.attachedFileNames || []);
+                if (typeof run.allowWebSearch === 'boolean') setAllowWebSearch(run.allowWebSearch);
                 setAgentRefreshError('');
                 setAgentPollAttempt(0);
                 setActiveAgentRun(run);
@@ -615,9 +623,10 @@ const ChatBox = ({
                     )}
                     {interactionMode === 'agent' && (
                         <div className="agent-mode-help">
-                            <p>Scope: {allowWebSearch ? (attachedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
+                            <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
                             <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={chatLocked} /> Include web sources</label>
                             <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information.</p>
+                            {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={chatLocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
                             {filesLoading && <p role="status">Reading selected files…</p>}
                             {attachedFiles.length > 0 && <ul>{attachedFiles.map((file, index) => (
                                 <li key={index}>{file.name} <button type="button" aria-label={`Remove file ${file.name}`} onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))} disabled={chatLocked}>Remove</button></li>

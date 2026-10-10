@@ -123,7 +123,7 @@ export const resetContext = async (server, sessionId) => {
 
 // --- Agent runs ---
 
-export const createAgentRun = async (goal, conversationId, server, model, systemPrompt, images, generationConfig, attachments, allowWebSearch) => {
+export const createAgentRun = async (goal, conversationId, server, model, systemPrompt, images, generationConfig, attachments, allowWebSearch, clearAttachments = false) => {
     const chatRequest = {
         message: goal.trim(), sessionId: conversationId.trim(), server: server.trim(), model: model.trim(),
         stream: false, systemPrompt: systemPrompt || '', images: images || [],
@@ -134,7 +134,7 @@ export const createAgentRun = async (goal, conversationId, server, model, system
     };
     const response = await axios.post(`${API_BASE_URL}/api/agent-runs`, {
         goal: goal.trim(), conversationId: conversationId.trim(), server: server.trim(), model: model.trim(),
-        chatRequest, attachments: attachments || [], allowWebSearch,
+        chatRequest, attachments: attachments || [], allowWebSearch, clearAttachments,
     });
     return response.data;
 };

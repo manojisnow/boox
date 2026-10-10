@@ -5,6 +5,7 @@ import java.util.List;
 
 /** Immutable API representation of an agent run and its visible activity. */
 public final class AgentRunView {
+  private String requestJson;
   private final String id;
   private final String conversationId;
   private final String goal;
@@ -43,18 +44,40 @@ public final class AgentRunView {
   }
 
   static AgentRunView from(final AgentRun run) {
-    return new AgentRunView(
-        run.getId(),
-        run.getConversationId(),
-        run.getGoal(),
-        run.getServer(),
-        run.getModel(),
-        run.getStatus(),
-        run.getFinalOutput(),
-        run.getError(),
-        run.getCreatedAt(),
-        run.getUpdatedAt(),
-        run.getSteps().stream().map(AgentStepView::from).toList());
+    final AgentRunView view =
+        new AgentRunView(
+            run.getId(),
+            run.getConversationId(),
+            run.getGoal(),
+            run.getServer(),
+            run.getModel(),
+            run.getStatus(),
+            run.getFinalOutput(),
+            run.getError(),
+            run.getCreatedAt(),
+            run.getUpdatedAt(),
+            run.getSteps().stream().map(AgentStepView::from).toList());
+    view.requestJson = run.getRequestJson();
+    return view;
+  }
+
+  private AgentRunStartRequest request() {
+    try {
+      return requestJson == null
+          ? new AgentRunStartRequest()
+          : new com.fasterxml.jackson.databind.ObjectMapper()
+              .readValue(requestJson, AgentRunStartRequest.class);
+    } catch (java.io.IOException exception) {
+      throw new IllegalStateException("Stored task scope could not be read.", exception);
+    }
+  }
+
+  public boolean isAllowWebSearch() {
+    return request().permitsWebSearch();
+  }
+
+  public List<String> getAttachedFileNames() {
+    return request().getAttachments().stream().map(AgentAttachment::getName).toList();
   }
 
   public String getId() {

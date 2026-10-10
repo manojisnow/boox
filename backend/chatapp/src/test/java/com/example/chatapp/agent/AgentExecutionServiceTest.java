@@ -28,6 +28,7 @@ class AgentExecutionServiceTest {
   @BeforeEach
   void setup() {
     service = new AgentExecutionService(client, tools, runs, context);
+    when(runs.priorEvidence(any(), any())).thenReturn("");
     when(context.getGenerationConfig("conv")).thenReturn(GenerationConfig.empty());
     when(context.getContext("conv")).thenReturn(List.of());
     when(tools.getToolDefinitions())
@@ -200,5 +201,68 @@ class AgentExecutionServiceTest {
     when(runs.requestJson("run")).thenReturn("{\"allowWebSearch\":false}");
     assertEquals("answer", service.execute(run()));
     verify(client, times(2)).chat(any(), any(), any(), eq(List.of()));
+  }
+
+  @Test
+  void followUpReceivesOriginalFileAndReviewTargetsLatestQuestion() throws Exception {
+    when(runs.requestJson("run"))
+        .thenReturn(
+            "{\"attachments\":[{\"name\":\"totals.csv\",\"content\":\"amount\\n5\\n7\"}],\"allowWebSearch\":false}");
+    when(context.getContext("conv"))
+        .thenReturn(
+            List.of(
+                Map.of("role", "user", "content", "Calculate total"),
+                Map.of("role", "assistant", "content", "12"),
+                Map.of("role", "user", "content", "Explain")));
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"Add 5 and 7\"}"),
+            json("{\"content\":\"Start at 5, add 7, yielding 12\"}"));
+    assertEquals("Start at 5, add 7, yielding 12", service.execute(run()));
+    final ArgumentCaptor<List<Map<String, Object>>> transcript =
+        ArgumentCaptor.forClass(List.class);
+    verify(client, times(2)).chat(any(), transcript.capture(), any(), eq(List.of()));
+    assertTrue(
+        transcript
+            .getValue()
+            .getLast()
+            .get("content")
+            .toString()
+            .contains("latest user request is: Explain"));
+    assertTrue(
+        transcript.getValue().stream()
+            .anyMatch(row -> row.get("content").toString().contains("amount\n5\n7")));
+  }
+
+  @Test
+  void followUpCanCitePreviouslyRetrievedEvidence() throws Exception {
+    when(runs.priorEvidence("conv", "run")).thenReturn("Source https://example.com/facts");
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"draft\"}"),
+            json("{\"content\":\"Source https://example.com/facts\"}"));
+    assertEquals("Source https://example.com/facts", service.execute(run()));
+  }
+
+  @Test
+  void absentFilesAreExplicitEvenWhenHistoryContainsOldFileExcerpt() throws Exception {
+    when(context.getContext("conv"))
+        .thenReturn(List.of(Map.of("role", "assistant", "content", "totals.csv: b,7")));
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(json("{\"content\":\"No current file access\"}"));
+    service.execute(run());
+    final ArgumentCaptor<List<Map<String, Object>>> transcript =
+        ArgumentCaptor.forClass(List.class);
+    verify(client, times(2)).chat(any(), transcript.capture(), any(), any());
+    assertTrue(
+        transcript.getValue().stream()
+            .anyMatch(row -> row.get("content").toString().contains("Current file access: NONE")));
+    assertTrue(
+        transcript
+            .getValue()
+            .getLast()
+            .get("content")
+            .toString()
+            .contains("never claim direct file verification"));
   }
 }

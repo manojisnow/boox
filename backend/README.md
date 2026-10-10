@@ -85,6 +85,8 @@ backend/
 
 `POST /api/agent-runs` accepts `goal`, `conversationId`, `server` (`ollama`), `model`, optional `attachments` (`[{"name":"notes.md","content":"..."}]`), and optional `chatRequest` using the validated chat request shape for prompt/settings/images. It returns HTTP 202 with a durable run. Only one agent task may be active per conversation (HTTP 409 for a duplicate).
 
+Follow-ups inherit retained text files and web-access scope in the same conversation. Set `allowWebSearch` explicitly to change scope, or omit it to inherit; new text uploads default to Files only. New files replace retained files with the same name. Set `clearAttachments: true` to discard retained files for this and future turns (new attachments in that request are still accepted). Responses include `attachedFileNames` and `allowWebSearch` so clients can restore scope and show retained evidence.
+
 Poll `GET /api/agent-runs/{id}`, restore tasks with `GET /api/agent-runs?conversationId=...`, or request cancellation with `POST /api/agent-runs/{id}/cancel`. Statuses are `QUEUED`, `RUNNING`, `CANCEL_REQUESTED`, `COMPLETED`, `FAILED`, or `CANCELLED`. `COMPLETED` indicates a returned response, not independent factual verification. The model/tool transcript is isolated from the conversation's system prompt; the submitted goal, final response, task snapshot, and evidence are persisted locally.
 
 ## Code Quality & Formatting

@@ -22,6 +22,55 @@ public class AgentRunService {
     this.runs = runs;
   }
 
+  /** Carry evidence and access scope forward, while allowing explicit replacement or clearing. */
+  @Transactional(readOnly = true)
+  public void inheritEvidence(final AgentRunStartRequest request) {
+    if (request.getAllowWebSearch() == null && !request.getAttachments().isEmpty())
+      request.setAllowWebSearch(false);
+    final java.util.Map<String, AgentAttachment> files = new java.util.LinkedHashMap<>();
+    final List<AgentRun> previous =
+        runs.findByConversationIdOrderByCreatedAtDesc(request.getConversationId().trim());
+    for (final AgentRun run : previous) {
+      final String storedJson = run.getRequestJson();
+      if (storedJson == null) continue;
+      final AgentRunStartRequest stored;
+      try {
+        stored = MAPPER.readValue(storedJson, AgentRunStartRequest.class);
+      } catch (java.io.IOException exception) {
+        throw new IllegalStateException("Stored task evidence could not be read.", exception);
+      }
+      if (request.getAllowWebSearch() == null) request.setAllowWebSearch(stored.permitsWebSearch());
+      if (!request.isClearAttachments()) {
+        for (final AgentAttachment file : stored.getAttachments())
+          files.putIfAbsent(file.getName(), file);
+      }
+      if (!stored.getAttachments().isEmpty() || stored.isClearAttachments()) break;
+    }
+    for (final AgentAttachment file : request.getAttachments()) files.put(file.getName(), file);
+    request.setAttachments(List.copyOf(files.values()));
+    if (request.getAllowWebSearch() == null) request.setAllowWebSearch(request.permitsWebSearch());
+  }
+
+  /** Bounded source excerpts from completed tasks, so follow-ups can reuse actual evidence. */
+  @Transactional(readOnly = true)
+  public String priorEvidence(final String conversationId, final String currentId) {
+    final StringBuilder evidence = new StringBuilder();
+    for (final AgentRun run : runs.findByConversationIdOrderByCreatedAtDesc(conversationId)) {
+      if (java.util.Objects.equals(run.getId(), currentId)
+          || run.getStatus() != AgentRunStatus.COMPLETED) continue;
+      for (final AgentStep step : run.getSteps()) {
+        if (step.getType() != AgentStepType.TOOL
+            || step.getStatus() != AgentStepStatus.COMPLETED
+            || step.getDetail() == null
+            || !step.getSummary().startsWith("Search result:")) continue;
+        final String excerpt = "\n" + step.getSummary() + "\n" + step.getDetail();
+        if (evidence.length() + excerpt.length() > 8_000) return evidence.toString();
+        evidence.append(excerpt);
+      }
+    }
+    return evidence.toString();
+  }
+
   /** Creates a queued run. The orchestrator is responsible for claiming and executing it. */
   @Transactional
   public AgentRunView create(final AgentRunStartRequest request) {

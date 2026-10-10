@@ -21,6 +21,16 @@ public class AgentRunStartRequest {
   // Reuses chat validation for settings, system prompt, and optional image attachments.
   @Valid private SendMessageRequest chatRequest;
 
+  private boolean clearAttachments;
+
+  public boolean isClearAttachments() {
+    return clearAttachments;
+  }
+
+  public void setClearAttachments(final boolean clearAttachments) {
+    this.clearAttachments = clearAttachments;
+  }
+
   private Boolean allowWebSearch;
 
   public Boolean getAllowWebSearch() {

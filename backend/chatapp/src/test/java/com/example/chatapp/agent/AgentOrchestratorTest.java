@@ -143,4 +143,59 @@ class AgentOrchestratorTest {
         .execute(any());
     assertEquals(AgentRunStatus.CANCELLED, orchestrator.start(request()).getStatus());
   }
+
+  @Test
+  void followUpsRetainFilesAndScopeAcrossNewRequestsAndCanClearOrReplaceFiles() throws Exception {
+    when(execution.execute(any())).thenReturn("answer");
+    when(repository.findByConversationIdOrderByCreatedAtDesc("conv"))
+        .thenAnswer(
+            invocation ->
+                saved.values().stream()
+                    .sorted(java.util.Comparator.comparing(AgentRun::getCreatedAt).reversed())
+                    .toList());
+    final AgentRunStartRequest first = request();
+    final AgentAttachment file = new AgentAttachment();
+    file.setName("totals.csv");
+    file.setContent("amount\n5\n7");
+    first.setAttachments(List.of(file));
+    final AgentRunView original = orchestrator.start(first);
+    assertFalse(original.isAllowWebSearch());
+    final AgentRunStartRequest followUp = request();
+    followUp.setGoal("Explain that calculation");
+    final AgentRunView next = orchestrator.start(followUp);
+    assertEquals(List.of("totals.csv"), next.getAttachedFileNames());
+    assertFalse(next.isAllowWebSearch());
+    final AgentAttachment replacement = new AgentAttachment();
+    replacement.setName("totals.csv");
+    replacement.setContent("amount\n9");
+    final AgentRunStartRequest changed = request();
+    changed.setAttachments(List.of(replacement));
+    final AgentRunView replaced = orchestrator.start(changed);
+    assertTrue(runs.requestJson(replaced.getId()).contains("amount\\n9"));
+    final AgentRunStartRequest clear = request();
+    clear.setClearAttachments(true);
+    clear.setAllowWebSearch(true);
+    assertTrue(orchestrator.start(clear).getAttachedFileNames().isEmpty());
+    assertTrue(orchestrator.start(request()).getAttachedFileNames().isEmpty());
+    final AgentRunStartRequest other = request();
+    other.setConversationId("other");
+    assertTrue(orchestrator.start(other).getAttachedFileNames().isEmpty());
+  }
+
+  @Test
+  void followUpsReuseOnlyCompletedSearchEvidence() throws Exception {
+    when(repository.findByConversationIdOrderByCreatedAtDesc("conv"))
+        .thenAnswer(invocation -> List.copyOf(saved.values()));
+    final AgentRunView first = runs.create(request());
+    runs.markRunning(first.getId());
+    runs.progress(
+        first.getId(),
+        AgentStepType.TOOL,
+        "Search result: facts",
+        "Source https://example.com/facts",
+        AgentStepStatus.COMPLETED);
+    runs.complete(first.getId(), "answer");
+    assertTrue(runs.priorEvidence("conv", "next").contains("https://example.com/facts"));
+    assertEquals("", runs.priorEvidence("conv", first.getId()));
+  }
 }

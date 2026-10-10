@@ -673,7 +673,7 @@ describe('Agent tasks', () => {
         expect(screen.getByRole('checkbox', { name: '⌁' })).toBeDisabled();
         await user.type(screen.getByPlaceholderText('Message...'), 'Calculate total');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
-        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false, false));
         getConversationMessages.mockResolvedValue([{ role: 'user', content: 'Calculate total' }, { role: 'assistant', content: 'The total is 12' }]);
         await screen.findByText('The total is 12');
         await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
@@ -693,7 +693,22 @@ describe('Agent tasks', () => {
         expect(screen.getByText(/Scope: Files \+ Web/)).toBeInTheDocument();
         await user.type(screen.getByPlaceholderText('Message...'), 'Compare these figures with published figures');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
-        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true, false));
+    });
+
+    it('restores retained files and scope, submits a follow-up, and supports clearing evidence', async () => {
+        const user = userEvent.setup();
+        listAgentRuns.mockResolvedValue([{ id: 'previous', status: 'COMPLETED', steps: [], attachedFileNames: ['totals.csv'], allowWebSearch: false }]);
+        createAgentRun.mockResolvedValue({ id: 'follow-up', status: 'RUNNING', steps: [], attachedFileNames: [], allowWebSearch: false });
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await screen.findByText(/Available for follow-ups: totals.csv/);
+        expect(screen.getByRole('button', { name: 'Agent', exact: true })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('checkbox', { name: 'Include web sources' })).not.toBeChecked();
+        await user.click(screen.getByRole('button', { name: 'Clear retained files' }));
+        await user.type(screen.getByPlaceholderText('Message...'), 'Explain that calculation');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Explain that calculation', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), [], false, true));
     });
 
     it('restores an active run after reload and cancels it', async () => {

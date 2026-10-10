@@ -41,6 +41,11 @@ public class AgentOrchestrator {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "Agent mode currently supports Ollama only.");
     }
+    runs.inheritEvidence(request);
+    if (request.getAttachments().size() > 4)
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Retained and new files exceed four files. Clear retained files first.");
     final int fileChars =
         request.getAttachments().stream().mapToInt(file -> file.getContent().length()).sum();
     if (fileChars > 24_000)
