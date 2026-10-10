@@ -80,6 +80,35 @@ describe('ChatBox generation config restore', () => {
 });
 
 describe('ChatBox send with generation config', () => {
+    it.each([true, false])('sends cleared saved settings with streaming=%s', async (streaming) => {
+        const user = userEvent.setup();
+        sendMessage.mockResolvedValue({ content: 'hi', role: 'assistant' });
+        streamMessage.mockResolvedValue({
+            body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) },
+        });
+        render(
+            <ChatBox
+                {...baseProps}
+                initialGenerationConfig={{ temperature: 0.5, numCtx: 4096, stopSequences: ['END'] }}
+            />
+        );
+        await openGenerationSettings(user);
+        await user.clear(screen.getByLabelText(/temperature/i));
+        await user.clear(screen.getByLabelText(/context size/i));
+        await user.clear(screen.getByLabelText(/stop sequences/i));
+        if (!streaming) await user.click(screen.getByRole('checkbox'));
+        await user.type(screen.getByPlaceholderText('Message...'), 'Use the defaults');
+        await user.click(screen.getByRole('button', { name: /send/i }));
+
+        const send = streaming ? streamMessage : sendMessage;
+        await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+        expect(send.mock.calls[0][streaming ? 6 : 7]).toEqual({
+            temperature: null,
+            numCtx: null,
+            stopSequences: [],
+        });
+    });
+
     it('sends the current temperature/numCtx/stopSequences fields with the message', async () => {
         const user = userEvent.setup();
         streamMessage.mockResolvedValue({

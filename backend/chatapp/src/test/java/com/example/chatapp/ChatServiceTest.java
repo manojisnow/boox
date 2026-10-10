@@ -10,10 +10,13 @@ import com.example.chatapp.engine.ChatContextService;
 import com.example.chatapp.engine.ChatEngine;
 import com.example.chatapp.engine.ModelInfo;
 import com.example.chatapp.service.ChatService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -164,5 +167,64 @@ class ChatServiceTest {
     SseEmitter emitter = mock(SseEmitter.class);
     chatService.streamMessage(req, emitter);
     verify(emitter).complete();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void generationSettings_canBeSavedPreservedAndExplicitlyCleared(final boolean streaming)
+      throws Exception {
+    final SendMessageRequest request = new SendMessageRequest();
+    request.setServer("server1");
+    request.setMessage("hi");
+    request.setModel("m");
+    request.setSessionId("sid");
+    request.setStream(streaming);
+    request.setTemperature(0.4);
+    request.setNumCtx(4096);
+    request.setStopSequences(List.of("END"));
+    sendRequest(request, streaming);
+    verify(chatContextService)
+        .setGenerationConfig(
+            eq("sid"),
+            argThat(
+                config ->
+                    Double.valueOf(0.4).equals(config.getTemperature())
+                        && Integer.valueOf(4096).equals(config.getNumCtx())
+                        && config.getStopSequences().equals(List.of("END"))));
+
+    // A client that does not send settings must retain the previously saved overrides.
+    clearInvocations(chatContextService);
+    request.setTemperature(null);
+    request.setNumCtx(null);
+    request.setStopSequences(null);
+    sendRequest(request, streaming);
+    verify(chatContextService, never()).setGenerationConfig(any(), any());
+
+    // Exercise JSON binding as well as both service paths for an explicit reset request.
+    final SendMessageRequest reset =
+        new ObjectMapper()
+            .readValue(
+                """
+                {"server":"server1","model":"m","message":"hi","sessionId":"sid",
+                 "stream":false,"replaceGenerationConfig":true}
+                """,
+                SendMessageRequest.class);
+    sendRequest(reset, streaming);
+    verify(chatContextService)
+        .setGenerationConfig(
+            eq("sid"),
+            argThat(
+                config ->
+                    config.getTemperature() == null
+                        && config.getNumCtx() == null
+                        && config.getStopSequences().isEmpty()));
+  }
+
+  private void sendRequest(final SendMessageRequest request, final boolean streaming) {
+    if (streaming) {
+      chatService.streamMessage(request, new SseEmitter());
+    } else {
+      chatService.sendMessage(request);
+    }
   }
 }

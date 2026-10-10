@@ -82,6 +82,8 @@ backend/
 | `DELETE /api/conversations/{id}` | Delete a conversation |
 
 ## Code Quality & Formatting
+
+Chat requests can set `replaceGenerationConfig: true` to replace all saved generation overrides with the supplied `temperature`, `numCtx`, and `stopSequences`. Missing or blank values then use server defaults; sending the flag alone clears every override. Requests omitting the flag and all settings preserve the saved configuration.
 All bound to the `verify` phase (so `mvn clean verify` runs everything below), or run individually:
 - **Checkstyle** (Google Java Style): `mvn checkstyle:check`
 - **PMD** (static analysis): `mvn pmd:check`

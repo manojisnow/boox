@@ -17,7 +17,7 @@ export const getModels = async (server) => {
 };
 
 export const sendMessage = async (message, server, model, sessionId, stream, systemPrompt, images, generationConfig) => {
-    // generationConfig: optional { temperature, numCtx, stopSequences } — only set fields are sent.
+    // A supplied config replaces saved overrides; blank fields use server defaults.
     if (!message || !message.trim()) {
         throw new Error('Message cannot be empty');
     }
@@ -46,6 +46,7 @@ export const sendMessage = async (message, server, model, sessionId, stream, sys
             requestBody.images = images;
         }
         if (generationConfig) {
+            requestBody.replaceGenerationConfig = true;
             if (generationConfig.temperature != null) requestBody.temperature = generationConfig.temperature;
             if (generationConfig.numCtx != null) requestBody.numCtx = generationConfig.numCtx;
             if (generationConfig.stopSequences && generationConfig.stopSequences.length > 0) {
@@ -84,6 +85,7 @@ export const streamMessage = async (message, server, model, sessionId, systemPro
         body.images = images;
     }
     if (generationConfig) {
+        body.replaceGenerationConfig = true;
         if (generationConfig.temperature != null) body.temperature = generationConfig.temperature;
         if (generationConfig.numCtx != null) body.numCtx = generationConfig.numCtx;
         if (generationConfig.stopSequences && generationConfig.stopSequences.length > 0) {

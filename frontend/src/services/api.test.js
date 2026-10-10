@@ -82,6 +82,7 @@ describe('sendMessage request body', () => {
             { headers: { 'Content-Type': 'application/json' } }
         );
         expect(result).toEqual({ content: 'hi', role: 'assistant' });
+        expect(axios.post.mock.calls[0][1]).not.toHaveProperty('replaceGenerationConfig');
     });
 
     it('trims message/server/model/sessionId and coerces stream to boolean', async () => {
@@ -122,7 +123,7 @@ describe('sendMessage request body', () => {
             numCtx: null,
             stopSequences: [],
         });
-        expect(axios.post.mock.calls[0][1]).toMatchObject({ temperature: 0.1 });
+        expect(axios.post.mock.calls[0][1]).toMatchObject({ temperature: 0.1, replaceGenerationConfig: true });
         expect(axios.post.mock.calls[0][1]).not.toHaveProperty('numCtx');
         expect(axios.post.mock.calls[0][1]).not.toHaveProperty('stopSequences');
 
@@ -133,6 +134,20 @@ describe('sendMessage request body', () => {
         });
         expect(axios.post.mock.calls[1][1]).toMatchObject({ numCtx: 4096, stopSequences: ['END'] });
         expect(axios.post.mock.calls[1][1]).not.toHaveProperty('temperature');
+    });
+
+    it('explicitly replaces saved settings when every field has been cleared', async () => {
+        axios.post.mockResolvedValue({ data: {} });
+        await sendMessage('hi', 'ollama', 'phi4-mini', 'sid', false, '', [], {
+            temperature: null,
+            numCtx: null,
+            stopSequences: [],
+        });
+        const body = axios.post.mock.calls[0][1];
+        expect(body).toHaveProperty('replaceGenerationConfig', true);
+        expect(body).not.toHaveProperty('temperature');
+        expect(body).not.toHaveProperty('numCtx');
+        expect(body).not.toHaveProperty('stopSequences');
     });
 
     it('logs and rethrows when the request fails', async () => {
@@ -174,6 +189,7 @@ describe('streamMessage', () => {
             systemPrompt: 'be nice',
             images: ['b64'],
             temperature: 0.5,
+            replaceGenerationConfig: true,
         });
         expect(body).not.toHaveProperty('numCtx');
         expect(body).not.toHaveProperty('stopSequences');
@@ -196,6 +212,24 @@ describe('streamMessage', () => {
         await expect(streamMessage('hi', 'ollama', 'phi4-mini', 'sid')).rejects.toThrow(
             'Stream request failed: 500'
         );
+    });
+
+    it('explicitly resets cleared settings but preserves them when config is omitted', async () => {
+        global.fetch.mockResolvedValue({ ok: true, body: {} });
+        await streamMessage('hi', 'ollama', 'phi4-mini', 'sid', '', [], {
+            temperature: null,
+            numCtx: null,
+            stopSequences: [],
+        });
+        const resetBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(resetBody).toHaveProperty('replaceGenerationConfig', true);
+        expect(resetBody).not.toHaveProperty('temperature');
+        expect(resetBody).not.toHaveProperty('numCtx');
+        expect(resetBody).not.toHaveProperty('stopSequences');
+
+        await streamMessage('hi', 'ollama', 'phi4-mini', 'sid');
+        const untouchedBody = JSON.parse(global.fetch.mock.calls[1][1].body);
+        expect(untouchedBody).not.toHaveProperty('replaceGenerationConfig');
     });
 });
 
