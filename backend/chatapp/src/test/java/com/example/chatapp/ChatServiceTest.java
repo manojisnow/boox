@@ -23,13 +23,14 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 class ChatServiceTest {
   @Mock private ChatEngine engine;
+  @Mock private com.example.chatapp.agent.AgentRunRepository agentRuns;
   @Mock private ChatContextService chatContextService;
   private ChatService chatService;
 
   @BeforeEach
   void setUp() {
     MockitoAnnotations.openMocks(this);
-    chatService = new ChatService(Map.of("server1", engine), chatContextService);
+    chatService = new ChatService(Map.of("server1", engine), chatContextService, agentRuns);
   }
 
   @Test
@@ -218,6 +219,22 @@ class ChatServiceTest {
                     config.getTemperature() == null
                         && config.getNumCtx() == null
                         && config.getStopSequences().isEmpty()));
+  }
+
+  @Test
+  void activeAgentTaskBlocksChatAndContextReset() {
+    when(agentRuns.existsByConversationIdAndStatusIn(eq("sid"), any())).thenReturn(true);
+    final SendMessageRequest request = new SendMessageRequest();
+    request.setSessionId("sid");
+    assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> chatService.sendMessage(request));
+    final ResetContextRequest reset = new ResetContextRequest();
+    reset.setSessionId("sid");
+    assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> chatService.resetContext(reset));
+    verifyNoInteractions(engine);
   }
 
   private void sendRequest(final SendMessageRequest request, final boolean streaming) {

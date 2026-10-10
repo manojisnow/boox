@@ -39,6 +39,7 @@ public class StreamController {
         request.getModel(),
         request.getSessionId());
 
+    chatService.assertConversationIdle(request.getSessionId());
     final SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
     emitter.onCompletion(() -> LOGGER.debug("SSE connection completed"));
     emitter.onTimeout(

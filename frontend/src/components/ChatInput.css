@@ -1,0 +1,96 @@
+.chat-input-container {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-lg);
+    gap: var(--spacing-sm);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    transition: var(--transition-slow);
+}
+
+.chat-input-container:focus-within {
+    border-color: var(--accent-primary);
+    background: var(--bg-glass-heavy);
+}
+
+.chat-textarea {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    resize: none;
+    padding: 8px 0;
+    width: 100%;
+    min-height: 24px;
+    font-family: inherit;
+}
+
+.chat-textarea::placeholder {
+    color: var(--text-secondary);
+}
+
+.input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-glass);
+    padding-top: var(--spacing-sm);
+}
+
+.stream-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.stream-toggle input {
+    display: none;
+}
+
+.stream-indicator {
+    font-size: 1.1rem;
+    filter: grayscale(1);
+    transition: var(--transition-fast);
+}
+
+.stream-toggle input:checked+.stream-indicator {
+    filter: grayscale(0);
+    transform: scale(1.1);
+}
+
+.send-button {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    box-shadow: 0 4px 12px rgba(123, 97, 255, 0.3);
+}
+
+.send-button:hover:not(:disabled) {
+    background: var(--accent-secondary);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(123, 97, 255, 0.4);
+}
+
+.send-button:disabled {
+    background: var(--border-glass);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.send-button svg {
+    margin-left: 2px;
+    margin-top: -1px;
+}

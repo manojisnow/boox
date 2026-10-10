@@ -1,0 +1,114 @@
+.agent-run-panel {
+    align-self: stretch;
+    max-width: min(680px, 100%);
+    margin: 0.4rem 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-surface) 82%, var(--color-accent));
+    color: var(--color-text-primary);
+}
+
+.agent-run-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.agent-run-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.agent-run-status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--color-text-muted);
+}
+
+.agent-run-status.active .agent-run-status-dot {
+    background: var(--color-accent);
+    animation: agent-pulse 1.3s ease-in-out infinite;
+}
+
+.agent-run-cancel, .agent-run-toggle {
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+.agent-run-cancel:hover, .agent-run-toggle:hover {
+    color: var(--color-text-primary);
+}
+
+.agent-run-steps {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.65rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.82rem;
+}
+
+.agent-run-step {
+    display: flex;
+    gap: 0.45rem;
+    color: var(--color-text-muted);
+}
+
+.agent-run-step.completed {
+    color: var(--color-text-primary);
+}
+
+.agent-run-step.failed {
+    color: var(--color-error);
+}
+
+.agent-run-step-mark {
+    width: 0.8rem;
+    color: var(--color-accent);
+    text-align: center;
+}
+
+.agent-run-error {
+    margin: 0.65rem 0 0;
+    color: var(--color-error);
+    font-size: 0.82rem;
+}
+
+@keyframes agent-pulse {
+    50% { opacity: 0.35; }
+}
+
+.agent-evidence {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+}
+.agent-review-note, .agent-connection-message, .agent-mode-help {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+.agent-mode-help { padding: 0.5rem 0.75rem; }
+.agent-mode-help ul { margin: 0.4rem 0; padding-left: 1.25rem; }
+.agent-mode-help button { margin-left: 0.5rem; cursor: pointer; }
+
+.agent-run-toggle {
+    margin-left: auto;
+    color: var(--color-text-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.agent-run-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }

@@ -10,6 +10,8 @@
     <Or>
       <Class name="com.example.chatapp.persistence.Conversation"/>
       <Class name="com.example.chatapp.persistence.ChatMessageEntity"/>
+      <Class name="com.example.chatapp.agent.AgentRun"/>
+      <Class name="com.example.chatapp.agent.AgentStep"/>
     </Or>
     <Or>
       <Bug pattern="EI_EXPOSE_REP"/>

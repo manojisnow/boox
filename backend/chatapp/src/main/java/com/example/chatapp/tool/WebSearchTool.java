@@ -78,7 +78,9 @@ public class WebSearchTool implements Tool {
   @Value("${tools.websearch.max-results:5}")
   private int maxResults;
 
-  public WebSearchTool(final RestTemplate restTemplate) {
+  public WebSearchTool(
+      @org.springframework.beans.factory.annotation.Qualifier("toolRestTemplate")
+          final RestTemplate restTemplate) {
     this.restTemplate = restTemplate;
   }
 
@@ -93,8 +95,8 @@ public class WebSearchTool implements Tool {
 
   @Override
   public String getDescription() {
-    return "Search the web for current information, news, facts, and general knowledge."
-        + " Use when the user needs up-to-date information that may not be in your training data.";
+    return "Retrieve reference summaries and news headlines via DuckDuckGo, Wikipedia, and Google News."
+        + " Results are limited excerpts, not full pages; cite returned URLs and do not infer details absent from the result.";
   }
 
   @Override
@@ -213,12 +215,16 @@ public class WebSearchTool implements Tool {
 
     final String abstractText = (String) json.getOrDefault("AbstractText", "");
     final String abstractSource = (String) json.getOrDefault("AbstractSource", "");
+    final String abstractUrl = (String) json.getOrDefault("AbstractURL", "");
     if (abstractText != null && !abstractText.isEmpty()) {
       results.append("Summary");
       if (abstractSource != null && !abstractSource.isEmpty()) {
         results.append(" (").append(abstractSource).append(')');
       }
       results.append(": ").append(abstractText).append(PARAGRAPH_BREAK);
+      if (abstractUrl != null && !abstractUrl.isBlank()) {
+        results.append("Source: ").append(abstractUrl).append(PARAGRAPH_BREAK);
+      }
     }
 
     final String answer = (String) json.getOrDefault("Answer", "");

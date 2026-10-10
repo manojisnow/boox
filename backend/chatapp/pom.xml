@@ -262,6 +262,13 @@
                                 <exclude>com/example/chatapp/persistence/ChatMessageEntity.class</exclude>
                                 <exclude>com/example/chatapp/persistence/*Repository*</exclude>
                                 <exclude>com/example/chatapp/controller/dto/*</exclude>
+                                <!-- Agent DTOs/entities follow the same exclusions as chat DTOs/JPA entities. -->
+                                <exclude>com/example/chatapp/agent/*View*</exclude>
+                                <exclude>com/example/chatapp/agent/AgentRunStartRequest*</exclude>
+                                <exclude>com/example/chatapp/agent/AgentAttachment*</exclude>
+                                <exclude>com/example/chatapp/agent/AgentRun.class</exclude>
+                                <exclude>com/example/chatapp/agent/AgentStep.class</exclude>
+                                <exclude>com/example/chatapp/agent/*Repository*</exclude>
                             </excludes>
                             <rules>
                                 <rule>

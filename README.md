@@ -197,13 +197,23 @@ boox/
 - **Image input** — attach up to 4 images to a message for vision-capable models (e.g. `gemma3`/`gemma4`); the attach button only appears when the selected model reports `vision` support. Images persist with the conversation and are shown again on resume
 - **Per-conversation generation settings** — collapsible sliders-icon panel next to the system prompt lets you override temperature, context size (`num_ctx`), and stop sequences for that conversation only; each field falls back to the server default when left blank. Settings are saved with the conversation and restored on resume, isolated from every other conversation. To reset saved overrides, clear the fields and send your next message.
 
+### Agent mode
+- Ask naturally; no tool names are needed. The model chooses tools within the permitted scope. The visible **Include web sources** control selects Web or Files + Web. Attaching text files defaults to **Files only**, enforced by the backend; enable web sources for mixed research. API callers can set `allowWebSearch`; when omitted it defaults to false with text attachments and true otherwise.
+- Switch from **Ask** to **Agent** for a bounded research or file-analysis task. The agent can use the existing web-search tool (reference summaries and news headlines) and then reviews its draft against the available evidence before returning a response.
+- Run `python3 scripts/verify-agent-followups.py` against the local app with `qwen2.5:14b` installed for the five-turn regression: total, explanation, hypothetical adjustment, original-file lookup, and explicit clearing.
+- **Follow-ups** reuse retained text files, the saved web-access scope, and up to 8,000 characters of prior retrieved source excerpts within the same conversation. New uploads replace retained files with the same name. **Clear retained files** removes them from the next task; a new conversation starts without prior evidence. History and evidence remain bounded; this is not unlimited conversation memory.
+- **Files** accepts up to 4 text, Markdown, CSV, JSON, or code files, with a combined limit of 24,000 characters. File attachments are stored in the local conversation database; selecting a cloud Ollama model sends task input to that model's provider. PDF, Office documents, editing files, and executing code are not supported in this version.
+- Progress shows actual searches, expandable evidence, and the draft-review step. Reloading or changing conversations restores the latest task. A temporary connection failure retries status checks without starting another task.
+- **Cancel** stops at the next checkpoint after an in-flight request returns. Model calls have a 3-minute read timeout; search-provider calls have a 30-second read timeout. Tasks interrupted by a server restart are marked failed with a retry message.
+- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence are rejected, but you should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages.
+
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
 - **Sidebar** — lists all conversations (newest first); click to resume, rename inline, or delete
 - **Auto-titled** — each conversation is titled from your first message
 
 ### Tool Calling
-- **Web search** — powered by the DuckDuckGo Instant Answer API; the model can look up facts and entities on its own when needed
+- **Web search** — retrieves DuckDuckGo reference summaries, with Wikipedia and Google News fallback; source URLs are included when returned by the provider
 - **Live tool call cards** — while the model is searching, a pulsing card appears in the chat; it expands with the result once done
 - **Extensible framework** — add new tools by implementing the `Tool` interface and registering as a Spring `@Component`; no other wiring needed
 

@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Message from './Message';
-import { sendMessage, streamMessage, getModels, getConversationMessages } from '../services/api';
+import AgentRunPanel from './AgentRunPanel';
+import {
+    sendMessage,
+    streamMessage,
+    getModels,
+    getConversationMessages,
+    createAgentRun,
+    getAgentRun,
+    listAgentRuns,
+    cancelAgentRun,
+} from '../services/api';
 import './ChatBox.css';
 
 const ChatBox = ({
@@ -24,6 +34,16 @@ const ChatBox = ({
     const [error, setError] = useState('');
     const [attachedImages, setAttachedImages] = useState([]);
     const [showGenerationSettings, setShowGenerationSettings] = useState(false);
+    const [interactionMode, setInteractionMode] = useState('ask');
+    const [activeAgentRun, setActiveAgentRun] = useState(null);
+    const [agentRefreshError, setAgentRefreshError] = useState('');
+    const [agentPollAttempt, setAgentPollAttempt] = useState(0);
+    const [attachedFiles, setAttachedFiles] = useState([]);
+    const [retainedFiles, setRetainedFiles] = useState([]);
+    const [clearAttachments, setClearAttachments] = useState(false);
+    const [allowWebSearch, setAllowWebSearch] = useState(true);
+    const [filesLoading, setFilesLoading] = useState(false);
+    const textFileInputRef = useRef(null);
     const [temperature, setTemperature] = useState(
         () => initialGenerationConfig?.temperature ?? ''
     );
@@ -34,6 +54,7 @@ const ChatBox = ({
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
+    const completedAgentRuns = useRef(new Set());
 
     const MAX_IMAGES = 4;
     const MAX_IMAGE_BYTES = 7_000_000; // matches the backend's ~7MB-raw cap
@@ -61,6 +82,8 @@ const ChatBox = ({
     useEffect(() => {
         if (!conversationId) return;
         let cancelled = false;
+        let retryTimer;
+        setChatLocked(true);
         const loadHistory = async () => {
             try {
                 const history = await getConversationMessages(conversationId);
@@ -77,9 +100,76 @@ const ChatBox = ({
                 console.error('Failed to load conversation history:', err.message);
             }
         };
-        loadHistory();
-        return () => { cancelled = true; };
+        const historyLoaded = loadHistory();
+        const restoreRuns = async (attempt = 0) => {
+            try {
+                const runs = await listAgentRuns(conversationId);
+                // Apply the initial history before allowing terminal refresh to replace it.
+                await historyLoaded;
+                if (cancelled) return;
+                setAgentRefreshError('');
+                if (runs.length === 0) {
+                    setChatLocked(false);
+                    return;
+                }
+                const latest = runs[0];
+                setActiveAgentRun(latest);
+                if (typeof latest.allowWebSearch === 'boolean') setAllowWebSearch(latest.allowWebSearch);
+                setRetainedFiles(latest.attachedFileNames || []);
+                setInteractionMode('agent');
+            } catch (err) {
+                if (cancelled) return;
+                setAgentRefreshError('Could not restore task status. Retrying; sending is paused until status is known.');
+                retryTimer = setTimeout(() => restoreRuns(attempt + 1), Math.min(800 + attempt * 500, 5000));
+            }
+        };
+        restoreRuns();
+        return () => { cancelled = true; clearTimeout(retryTimer); };
     }, [conversationId]);
+
+    useEffect(() => {
+        if (!activeAgentRun) return undefined;
+        let cancelled = false;
+        let timer;
+        const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeAgentRun.status);
+        if (terminal) {
+            if (!completedAgentRuns.current.has(activeAgentRun.id)) {
+                getConversationMessages(conversationId).then(history => {
+                    if (cancelled) return;
+                    setMessages(history.map(m => ({ text: m.content, sender: m.role,
+                        images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`) })));
+                    completedAgentRuns.current.add(activeAgentRun.id);
+                    setAgentRefreshError('');
+                    setChatLocked(false);
+                    if (onConversationChanged) onConversationChanged();
+                }).catch(() => {
+                    if (cancelled) return;
+                    setAgentRefreshError('Could not refresh conversation history. Retrying before enabling follow-ups.');
+                    timer = setTimeout(() => setAgentPollAttempt(attempt => attempt + 1), Math.min(800 + agentPollAttempt * 500, 5000));
+                });
+            } else setChatLocked(false);
+            return () => { cancelled = true; clearTimeout(timer); };
+        }
+
+        timer = setTimeout(async () => {
+            try {
+                const run = await getAgentRun(activeAgentRun.id);
+                if (!cancelled) {
+                    setAgentRefreshError('');
+                    setActiveAgentRun(run);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setAgentRefreshError('Connection interrupted. Retrying task status; the agent may still be working.');
+                    setAgentPollAttempt(attempt => attempt + 1);
+                }
+            }
+        }, Math.min(800 + agentPollAttempt * 500, 5000));
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [activeAgentRun, onConversationChanged, conversationId, agentPollAttempt]);
 
     // Fetch models when server changes; prefer the conversation's own model on resume.
     useEffect(() => {
@@ -140,6 +230,37 @@ const ChatBox = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [supportsVision]);
 
+    const handleTextFileSelect = async (event) => {
+        const selected = Array.from(event.target.files || []);
+        event.target.value = '';
+        if (attachedFiles.length + selected.length > 4) { setError('Attach up to 4 text files.'); return; }
+        setFilesLoading(true);
+        try {
+            const loaded = await Promise.all(selected.map(async file => {
+                if (!/\.(txt|md|csv|tsv|json|log|java|py|js|jsx|ts|tsx|html|css|xml|yaml|yml|sql)$/i.test(file.name)) throw new Error('Select text, CSV, JSON, or code files. PDF and binary files are not supported.');
+                if (file.size > 100_000) throw new Error(`${file.name} is too large. Select a smaller file or excerpt.`);
+                const content = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+                    reader.readAsText(file);
+                });
+                if (content.includes('\0')) throw new Error(`${file.name} appears to be a binary file.`);
+                return { name: file.name, content };
+            }));
+            if (attachedFiles.length === 0 && loaded.length > 0) setAllowWebSearch(false);
+            setAttachedFiles(previous => {
+                const next = [...previous, ...loaded];
+                if (next.length > 4 || next.reduce((sum, file) => sum + file.content.length, 0) > 24_000) {
+                    setError('Attach up to 4 files with at most 24,000 characters total. Use excerpts for larger files.');
+                    return previous;
+                }
+                return next;
+            });
+        } catch (err) { setError(err.message); }
+        finally { setFilesLoading(false); }
+    };
+
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files || []);
         e.target.value = ''; // allow re-selecting the same file later
@@ -187,7 +308,7 @@ const ChatBox = ({
             return;
         }
         if (!input.trim()) return;
-        if (chatLocked) return;
+        if (chatLocked || filesLoading) return;
 
         setError('');
         setChatLocked(true);
@@ -201,7 +322,7 @@ const ChatBox = ({
                 .filter(Boolean),
         };
         const userMessage = {
-            text: input,
+            text: input + (interactionMode === 'agent' ? attachedFiles.map(file => `\n\nAttached file: ${file.name}`).join('') : ''),
             sender: 'user',
             images: attachedImages.map((img) => img.dataUrl),
         };
@@ -213,6 +334,38 @@ const ChatBox = ({
         // Reset textarea height after clearing input
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
+        }
+
+        if (interactionMode === 'agent') {
+            try {
+                const run = await createAgentRun(
+                    currentInput,
+                    conversationId,
+                    selectedServer,
+                    selectedModel,
+                    systemPrompt,
+                    imagesBase64,
+                    generationConfig,
+                    attachedFiles,
+                    allowWebSearch,
+                    clearAttachments
+                );
+                setAttachedFiles([]);
+                setClearAttachments(false);
+                setRetainedFiles(run.attachedFileNames || []);
+                if (typeof run.allowWebSearch === 'boolean') setAllowWebSearch(run.allowWebSearch);
+                setAgentRefreshError('');
+                setAgentPollAttempt(0);
+                setActiveAgentRun(run);
+                if (onConversationChanged) onConversationChanged();
+            } catch (err) {
+                console.error('Agent run failed to start:', err.message);
+                setError(err.response?.data?.error || 'Failed to start agent task. Please try again.');
+                setInput(currentInput);
+                setMessages(prev => prev.slice(0, -1));
+                setChatLocked(false);
+            }
+            return;
         }
 
         if (streamEnabled) {
@@ -367,6 +520,15 @@ const ChatBox = ({
         resizeTextarea();
     };
 
+    const handleCancelAgentRun = async (runId) => {
+        try {
+            setActiveAgentRun(await cancelAgentRun(runId));
+        } catch (err) {
+            console.error('Could not cancel agent run:', err.message);
+            setError('Could not cancel agent task.');
+        }
+    };
+
     const showPlaceholder = messages.length === 0;
 
     return (
@@ -413,7 +575,9 @@ const ChatBox = ({
                         <Message key={index} text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
                     ))
                 )}
-                {chatLocked && !isStreaming && (
+                {activeAgentRun && <AgentRunPanel run={activeAgentRun} onCancel={handleCancelAgentRun} />}
+                {agentRefreshError && <p role="status" className="agent-connection-message">{agentRefreshError}</p>}
+                {chatLocked && interactionMode === 'ask' && !isStreaming && (
                     <div className="message-row bot">
                         <div className="message-bubble bot typing-indicator">
                             <span className="dot"></span>
@@ -477,6 +641,18 @@ const ChatBox = ({
                             </label>
                         </div>
                     )}
+                    {interactionMode === 'agent' && (
+                        <div className="agent-mode-help">
+                            <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
+                            <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={chatLocked} /> Include web sources</label>
+                            <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information.</p>
+                            {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={chatLocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
+                            {filesLoading && <p role="status">Reading selected files…</p>}
+                            {attachedFiles.length > 0 && <ul>{attachedFiles.map((file, index) => (
+                                <li key={index}>{file.name} <button type="button" aria-label={`Remove file ${file.name}`} onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))} disabled={chatLocked}>Remove</button></li>
+                            ))}</ul>}
+                        </div>
+                    )}
                     {attachedImages.length > 0 && (
                         <div className="attached-images-row">
                             {attachedImages.map((img, index) => (
@@ -495,6 +671,26 @@ const ChatBox = ({
                         </div>
                     )}
                     <div className="input-row">
+                        <div className="interaction-mode-toggle" role="group" aria-label="Response mode">
+                            <button
+                                type="button"
+                                className={interactionMode === 'ask' ? 'active' : ''}
+                                onClick={() => setInteractionMode('ask')}
+                                aria-pressed={interactionMode === 'ask'}
+                                disabled={chatLocked || filesLoading || attachedFiles.length > 0}
+                            >
+                                Ask
+                            </button>
+                            <button
+                                type="button"
+                                className={interactionMode === 'agent' ? 'active' : ''}
+                                onClick={() => setInteractionMode('agent')}
+                                aria-pressed={interactionMode === 'agent'}
+                                disabled={chatLocked}
+                            >
+                                Agent
+                            </button>
+                        </div>
                         <button
                             type="button"
                             className={`system-prompt-toggle${systemPrompt ? ' active' : ''}`}
@@ -526,6 +722,10 @@ const ChatBox = ({
                                 <line x1="17" y1="16" x2="23" y2="16" />
                             </svg>
                         </button>
+                        {interactionMode === 'agent' && <>
+                            <input ref={textFileInputRef} type="file" multiple accept=".txt,.md,.csv,.tsv,.json,.log,.java,.py,.js,.jsx,.ts,.tsx,.html,.css,.xml,.yaml,.yml,.sql" onChange={handleTextFileSelect} style={{ display: 'none' }} />
+                            <button type="button" className="attach-image-toggle" onClick={() => textFileInputRef.current?.click()} disabled={chatLocked || filesLoading || attachedFiles.length >= 4} aria-label="Attach text files" title="Attach text, CSV, JSON, or code files">Files</button>
+                        </>}
                         {supportsVision && (
                             <>
                                 <input
@@ -565,19 +765,19 @@ const ChatBox = ({
                             type="submit"
                             className="send-btn"
                             aria-label="Send"
-                            disabled={chatLocked || !input.trim() || !selectedServer || !selectedModel}
+                            disabled={chatLocked || filesLoading || !input.trim() || !selectedServer || !selectedModel}
                         >
                             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                                 <circle cx="16" cy="16" r="16" fill="currentColor" style={{ color: 'var(--color-accent)' }}/>
                                 <path d="M16 10L16 22M16 10L11 15M16 10L21 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                         </button>
-                        <label className="stream-toggle-inline" title="Stream response">
+                        <label className="stream-toggle-inline" title={interactionMode === 'agent' ? 'Agent responses appear after evidence review' : 'Stream response'}>
                             <input
                                 type="checkbox"
                                 checked={streamEnabled}
+                                disabled={interactionMode === 'agent' || chatLocked}
                                 onChange={e => setStreamEnabled(e.target.checked)}
-                                disabled={chatLocked}
                             />
                             <span className="stream-icon">&#x2301;</span>
                         </label>
