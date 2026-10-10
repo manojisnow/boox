@@ -31,14 +31,14 @@ describe('getServers / getModels / getTools', () => {
     it('getServers returns response.data from GET /api/chat/servers', async () => {
         axios.get.mockResolvedValue({ data: ['ollama'] });
         const result = await getServers();
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/chat/servers');
+        expect(axios.get).toHaveBeenCalledWith('/api/chat/servers');
         expect(result).toEqual(['ollama']);
     });
 
     it('getModels passes server as a query param', async () => {
         axios.get.mockResolvedValue({ data: [{ name: 'phi4-mini' }] });
         const result = await getModels('ollama');
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/chat/models', {
+        expect(axios.get).toHaveBeenCalledWith('/api/chat/models', {
             params: { server: 'ollama' },
         });
         expect(result).toEqual([{ name: 'phi4-mini' }]);
@@ -47,7 +47,7 @@ describe('getServers / getModels / getTools', () => {
     it('getTools returns response.data from GET /api/chat/tools', async () => {
         axios.get.mockResolvedValue({ data: ['web_search'] });
         const result = await getTools();
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/chat/tools');
+        expect(axios.get).toHaveBeenCalledWith('/api/chat/tools');
         expect(result).toEqual(['web_search']);
     });
 });
@@ -71,7 +71,7 @@ describe('sendMessage request body', () => {
         const result = await sendMessage('hello', 'ollama', 'phi4-mini', 'sid', true);
 
         expect(axios.post).toHaveBeenCalledWith(
-            'http://localhost:8080/api/chat/send',
+            '/api/chat/send',
             {
                 message: 'hello',
                 server: 'ollama',
@@ -173,7 +173,7 @@ describe('streamMessage', () => {
         });
 
         expect(global.fetch).toHaveBeenCalledWith(
-            'http://localhost:8080/api/chat/stream',
+            '/api/chat/stream',
             expect.objectContaining({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -237,7 +237,7 @@ describe('resetContext', () => {
     it('posts server/sessionId and returns response.data', async () => {
         axios.post.mockResolvedValue({ data: { ok: true } });
         const result = await resetContext('ollama', 'sid');
-        expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/chat/reset-context', {
+        expect(axios.post).toHaveBeenCalledWith('/api/chat/reset-context', {
             server: 'ollama',
             sessionId: 'sid',
         });
@@ -254,7 +254,7 @@ describe('conversation persistence endpoints', () => {
     it('listConversations GETs /api/conversations', async () => {
         axios.get.mockResolvedValue({ data: [{ id: '1' }] });
         const result = await listConversations();
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/conversations');
+        expect(axios.get).toHaveBeenCalledWith('/api/conversations');
         expect(result).toEqual([{ id: '1' }]);
     });
 
@@ -262,14 +262,14 @@ describe('conversation persistence endpoints', () => {
         axios.get.mockResolvedValue({ data: [] });
         await getConversationMessages('id with space');
         expect(axios.get).toHaveBeenCalledWith(
-            'http://localhost:8080/api/conversations/id%20with%20space/messages'
+            '/api/conversations/id%20with%20space/messages'
         );
     });
 
     it('renameConversation PATCHes /api/conversations/:id with the new title', async () => {
         axios.patch.mockResolvedValue({ data: { id: '1', title: 'New' } });
         const result = await renameConversation('1', 'New');
-        expect(axios.patch).toHaveBeenCalledWith('http://localhost:8080/api/conversations/1', {
+        expect(axios.patch).toHaveBeenCalledWith('/api/conversations/1', {
             title: 'New',
         });
         expect(result).toEqual({ id: '1', title: 'New' });
@@ -278,6 +278,6 @@ describe('conversation persistence endpoints', () => {
     it('deleteConversation DELETEs /api/conversations/:id', async () => {
         axios.delete.mockResolvedValue({});
         await deleteConversation('1');
-        expect(axios.delete).toHaveBeenCalledWith('http://localhost:8080/api/conversations/1');
+        expect(axios.delete).toHaveBeenCalledWith('/api/conversations/1');
     });
 });
