@@ -22,7 +22,9 @@ class AgentRunServiceTest {
   @BeforeEach
   void setUp() {
     MockitoAnnotations.openMocks(this);
-    service = new AgentRunService(runs);
+    service =
+        new AgentRunService(
+            runs, org.mockito.Mockito.mock(com.example.chatapp.engine.ChatContextService.class));
     when(runs.save(any(AgentRun.class))).thenAnswer(invocation -> invocation.getArgument(0));
   }
 

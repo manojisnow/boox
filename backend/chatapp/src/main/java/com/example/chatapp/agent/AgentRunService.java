@@ -11,15 +11,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Owns the durable lifecycle and visible audit trail for agent tasks. */
 @Service
+@edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+    value = "EI_EXPOSE_REP2",
+    justification = "Spring-managed collaborators are retained for dependency injection.")
 public class AgentRunService {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final List<AgentRunStatus> ACTIVE =
       List.of(AgentRunStatus.QUEUED, AgentRunStatus.RUNNING, AgentRunStatus.CANCEL_REQUESTED);
   private final AgentRunRepository runs;
+  private final com.example.chatapp.engine.ChatContextService context;
 
-  public AgentRunService(final AgentRunRepository runs) {
+  public AgentRunService(
+      final AgentRunRepository runs, final com.example.chatapp.engine.ChatContextService context) {
     this.runs = runs;
+    this.context = context;
   }
 
   /** Carry evidence and access scope forward, while allowing explicit replacement or clearing. */
@@ -63,7 +69,7 @@ public class AgentRunService {
             || step.getStatus() != AgentStepStatus.COMPLETED
             || step.getDetail() == null
             || !step.getSummary().startsWith("Search result:")) continue;
-        final String excerpt = "\n" + step.getSummary() + "\n" + step.getDetail();
+        final String excerpt = "\nRetrieved source excerpt:\n" + step.getDetail();
         if (evidence.length() + excerpt.length() > 8_000) return evidence.toString();
         evidence.append(excerpt);
       }
@@ -156,6 +162,8 @@ public class AgentRunService {
               if (run.getStatus() == AgentRunStatus.CANCEL_REQUESTED) {
                 return markCancelled(runId).orElseThrow();
               }
+              // Joins this transaction: history and terminal state commit or roll back together.
+              context.addMessage(run.getConversationId(), "assistant", finalOutput);
               finishSteps(run, AgentStepStatus.COMPLETED);
               run.setFinalOutput(finalOutput);
               run.setStatus(AgentRunStatus.COMPLETED);

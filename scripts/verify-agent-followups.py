@@ -26,6 +26,8 @@ def task(goal, files=None, clear=False, web=None):
         run = request('/api/agent-runs/' + run['id'])
     print(json.dumps({'goal': goal, 'status': run['status'], 'scope': run.get('allowWebSearch'), 'files': run.get('attachedFileNames'), 'answer': run.get('finalOutput'), 'error': run.get('error')}), flush=True)
     assert run['status'] == 'COMPLETED', run
+    history = request('/api/conversations/' + conversation + '/messages')
+    assert history[-1]['role'] == 'assistant' and history[-1]['content'] == run['finalOutput'], 'Completed run has no committed answer in history'
     return run
 first = task('Calculate the sum of the amount column in totals.csv and show the rows used.', [{'name': 'totals.csv', 'content': 'item,amount\na,5\nb,7\nc,9'}])
 second = task('explain that calculation?')

@@ -78,26 +78,45 @@ public class AgentOrchestrator {
     runs.recoverInterrupted();
   }
 
-  private void execute(final String runId) {
-    final AgentRunView run = runs.markRunning(runId).orElse(null);
-    if (run == null) return;
-    if (run.getStatus() == AgentRunStatus.CANCEL_REQUESTED) {
-      runs.markCancelled(runId);
-      return;
+  private static java.util.Optional<AgentRunView> transition(
+      final java.util.function.Supplier<java.util.Optional<AgentRunView>> operation) {
+    for (int attempt = 0; ; attempt++) {
+      try {
+        return operation.get();
+      } catch (org.springframework.dao.OptimisticLockingFailureException conflict) {
+        if (attempt >= 2) throw conflict;
+      }
     }
-    if (run.getStatus() != AgentRunStatus.RUNNING) return;
+  }
+
+  private void execute(final String runId) {
     try {
+      final AgentRunView run = transition(() -> runs.markRunning(runId)).orElse(null);
+      if (run == null) return;
+      if (run.getStatus() == AgentRunStatus.CANCEL_REQUESTED) {
+        transition(() -> runs.markCancelled(runId));
+        return;
+      }
+      if (run.getStatus() != AgentRunStatus.RUNNING) return;
       final String answer = execution.execute(run);
-      // Complete observes cancellation transactionally; only store an answer actually returned.
-      final AgentRunView finished = runs.complete(runId, answer).orElseThrow();
-      if (finished.getStatus() == AgentRunStatus.COMPLETED)
-        context.addMessage(run.getConversationId(), "assistant", answer);
+      transition(() -> runs.complete(runId, answer));
     } catch (CancellationException exception) {
-      runs.markCancelled(runId);
+      recordFailure(runId, "Task cancelled");
     } catch (Exception exception) {
       LOGGER.error("Agent run {} failed", runId, exception);
-      if (runs.isCancellationRequested(runId)) runs.markCancelled(runId);
-      else runs.fail(runId, "The agent could not produce an answer: " + exception.getMessage());
+      recordFailure(runId, "The agent could not produce an answer: " + exception.getMessage());
+    }
+  }
+
+  private void recordFailure(final String runId, final String error) {
+    try {
+      transition(
+          () ->
+              runs.isCancellationRequested(runId)
+                  ? runs.markCancelled(runId)
+                  : runs.fail(runId, error));
+    } catch (Exception failure) {
+      LOGGER.error("Could not persist terminal status for agent run {}", runId, failure);
     }
   }
 }

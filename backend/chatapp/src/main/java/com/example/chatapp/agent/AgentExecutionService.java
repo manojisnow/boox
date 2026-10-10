@@ -77,7 +77,11 @@ public class AgentExecutionService {
       recent.addFirst(message(String.valueOf(row.get("role")), text));
     }
     messages.addAll(recent);
+    final java.util.Set<String> evidenceUrls = new java.util.HashSet<>();
+    for (final AgentAttachment file : request.getAttachments())
+      collectUrls(file.getContent(), evidenceUrls);
     final String priorEvidence = runs.priorEvidence(run.getConversationId(), run.getId());
+    collectUrls(priorEvidence, evidenceUrls);
     if (!priorEvidence.isBlank())
       messages.add(
           message(
@@ -132,7 +136,7 @@ public class AgentExecutionService {
         if (draft.isBlank())
           throw new IllegalStateException("The model returned an empty answer. Please retry.");
         messages.add(message("assistant", draft));
-        return review(run, messages, config);
+        return review(run, messages, config, evidenceUrls);
       }
       messages.add(MAPPER.convertValue(reply, new TypeReference<Map<String, Object>>() {}));
       for (final JsonNode call : requestedTools) {
@@ -160,6 +164,8 @@ public class AgentExecutionService {
             raw.length() <= MAX_EVIDENCE_CHARS
                 ? raw
                 : raw.substring(0, MAX_EVIDENCE_CHARS) + "\n[Search result truncated]";
+        if (!raw.startsWith("Error") && !raw.startsWith("No results"))
+          collectUrls(evidence, evidenceUrls);
         runs.progress(
             run.getId(),
             AgentStepType.TOOL,
@@ -177,7 +183,8 @@ public class AgentExecutionService {
   private String review(
       final AgentRunView run,
       final List<Map<String, Object>> messages,
-      final GenerationConfig config) {
+      final GenerationConfig config,
+      final java.util.Set<String> evidenceUrls) {
     checkCancelled(run.getId());
     runs.progress(
         run.getId(),
@@ -200,26 +207,21 @@ public class AgentExecutionService {
     if (answer.isBlank())
       throw new IllegalStateException(
           "The model could not produce a checked answer. Please retry.");
-    validateCitations(answer, messages);
+    validateCitations(answer, evidenceUrls);
     return answer;
   }
 
+  private static final java.util.regex.Pattern URLS =
+      java.util.regex.Pattern.compile("https?://[^\\s<>\\)\\]\"']+");
+
+  private static void collectUrls(final String content, final java.util.Set<String> evidenceUrls) {
+    final java.util.regex.Matcher matcher = URLS.matcher(content);
+    while (matcher.find()) evidenceUrls.add(matcher.group().replaceAll("[.,;:]+$", ""));
+  }
+
   private static void validateCitations(
-      final String answer, final List<Map<String, Object>> messages) {
-    final java.util.regex.Pattern urls =
-        java.util.regex.Pattern.compile("https?://[^\\s<>\\)\\]\"']+");
-    final java.util.Set<String> evidenceUrls = new java.util.HashSet<>();
-    for (final Map<String, Object> row : messages) {
-      final String content = String.valueOf(row.getOrDefault("content", ""));
-      if ("tool".equals(row.get("role"))
-          || ("user".equals(row.get("role"))
-              && (content.contains("<file-content>")
-                  || content.contains("<retrieved-evidence>")))) {
-        final java.util.regex.Matcher matcher = urls.matcher(content);
-        while (matcher.find()) evidenceUrls.add(matcher.group().replaceAll("[.,;:]+$", ""));
-      }
-    }
-    final java.util.regex.Matcher cited = urls.matcher(answer);
+      final String answer, final java.util.Set<String> evidenceUrls) {
+    final java.util.regex.Matcher cited = URLS.matcher(answer);
     while (cited.find()) {
       if (!evidenceUrls.contains(cited.group().replaceAll("[.,;:]+$", "")))
         throw new IllegalStateException(

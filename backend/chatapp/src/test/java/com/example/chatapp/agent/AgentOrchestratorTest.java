@@ -36,7 +36,7 @@ class AgentOrchestratorTest {
             });
     when(repository.findById(any()))
         .thenAnswer(invocation -> Optional.ofNullable(saved.get(invocation.getArgument(0))));
-    runs = new AgentRunService(repository);
+    runs = new AgentRunService(repository, context);
     orchestrator = new AgentOrchestrator(runs, execution, context, new SyncTaskExecutor());
   }
 
@@ -191,11 +191,62 @@ class AgentOrchestratorTest {
     runs.progress(
         first.getId(),
         AgentStepType.TOOL,
-        "Search result: facts",
+        "Search result: facts about https://question-only.example/topic",
         "Source https://example.com/facts",
         AgentStepStatus.COMPLETED);
     runs.complete(first.getId(), "answer");
     assertTrue(runs.priorEvidence("conv", "next").contains("https://example.com/facts"));
+    assertFalse(runs.priorEvidence("conv", "next").contains("https://question-only.example/topic"));
     assertEquals("", runs.priorEvidence("conv", first.getId()));
+  }
+
+  @Test
+  void claimConflictReconcilesCancellationWithoutExecutingModel() {
+    final AgentRunService lifecycle = mock(AgentRunService.class);
+    final AgentRunView queued = runs.create(request());
+    final AgentRunView cancelled = runs.cancel(queued.getId()).orElseThrow();
+    when(lifecycle.markRunning(queued.getId()))
+        .thenThrow(
+            new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                AgentRun.class, queued.getId()))
+        .thenReturn(Optional.of(cancelled));
+    final AgentOrchestrator worker =
+        new AgentOrchestrator(lifecycle, execution, context, new SyncTaskExecutor());
+    worker.schedule(queued.getId());
+    verify(lifecycle).markCancelled(queued.getId());
+    verifyNoInteractions(execution);
+  }
+
+  @Test
+  void claimConflictRetriesAndExhaustionRecordsFailure() {
+    final AgentRunService lifecycle = mock(AgentRunService.class);
+    final AgentRunView queued = runs.create(request());
+    when(lifecycle.markRunning(queued.getId()))
+        .thenThrow(
+            new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                AgentRun.class, queued.getId()));
+    new AgentOrchestrator(lifecycle, execution, context, new SyncTaskExecutor())
+        .schedule(queued.getId());
+    verify(lifecycle, times(3)).markRunning(queued.getId());
+    verify(lifecycle).fail(eq(queued.getId()), contains("could not produce"));
+    verifyNoInteractions(execution);
+  }
+
+  @Test
+  void completionConflictCanObserveCancellationWithoutWritingAnswer() throws Exception {
+    final AgentRunService lifecycle = mock(AgentRunService.class);
+    final AgentRunView queued = runs.create(request());
+    final AgentRunView running = runs.markRunning(queued.getId()).orElseThrow();
+    when(lifecycle.markRunning(queued.getId())).thenReturn(Optional.of(running));
+    when(execution.execute(running)).thenReturn("answer");
+    when(lifecycle.complete(queued.getId(), "answer"))
+        .thenThrow(
+            new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                AgentRun.class, queued.getId()))
+        .thenReturn(Optional.of(runs.cancel(queued.getId()).orElseThrow()));
+    new AgentOrchestrator(lifecycle, execution, context, new SyncTaskExecutor())
+        .schedule(queued.getId());
+    verify(lifecycle, times(2)).complete(queued.getId(), "answer");
+    verify(context, never()).addMessage(any(), eq("assistant"), any());
   }
 }
