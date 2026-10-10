@@ -23,6 +23,7 @@ public class SendMessageRequest {
   @NotBlank private String sessionId;
   @NotNull private Boolean stream;
   private String systemPrompt;
+  private boolean replaceGenerationConfig;
 
   @Size(max = MAX_IMAGES)
   private List<@Size(max = MAX_IMAGE_BASE64_LENGTH) String> images;
@@ -96,6 +97,14 @@ public class SendMessageRequest {
 
   public Double getTemperature() {
     return temperature;
+  }
+
+  public boolean isReplaceGenerationConfig() {
+    return replaceGenerationConfig;
+  }
+
+  public void setReplaceGenerationConfig(final boolean replaceGenerationConfig) {
+    this.replaceGenerationConfig = replaceGenerationConfig;
   }
 
   public void setTemperature(final Double temperature) {

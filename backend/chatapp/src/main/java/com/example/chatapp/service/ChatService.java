@@ -114,11 +114,12 @@ public class ChatService {
   }
 
   /**
-   * Persists per-conversation generation overrides when the request actually carries any, so an
-   * ordinary message that doesn't touch settings never wipes a previously-saved config.
+   * Replaces generation overrides when explicitly requested, including clearing every field. Legacy
+   * requests with overrides still apply them; messages without settings preserve the saved config.
    */
   private void applyGenerationConfig(final SendMessageRequest request, final String sessionId) {
-    if (request.getTemperature() != null
+    if (request.isReplaceGenerationConfig()
+        || request.getTemperature() != null
         || request.getNumCtx() != null
         || (request.getStopSequences() != null && !request.getStopSequences().isEmpty())) {
       chatContextService.setGenerationConfig(

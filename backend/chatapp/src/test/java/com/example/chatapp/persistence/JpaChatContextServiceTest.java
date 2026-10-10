@@ -123,6 +123,22 @@ class JpaChatContextServiceTest {
   }
 
   @Test
+  void generationConfig_resetClearsSavedOverridesAndKeepsOtherConversations() {
+    service.setGenerationConfig("reset", new GenerationConfig(0.3, 8192, List.of("STOP")));
+    service.setGenerationConfig("other", new GenerationConfig(0.9, 4096, List.of("END")));
+    service.setGenerationConfig("reset", GenerationConfig.empty());
+
+    final GenerationConfig cleared = service.getGenerationConfig("reset");
+    assertNull(cleared.getTemperature());
+    assertNull(cleared.getNumCtx());
+    assertTrue(cleared.getStopSequences().isEmpty());
+    final GenerationConfig other = service.getGenerationConfig("other");
+    assertEquals(0.9, other.getTemperature());
+    assertEquals(4096, other.getNumCtx());
+    assertEquals(List.of("END"), other.getStopSequences());
+  }
+
+  @Test
   void resetContext_clearsMessagesButKeepsConversation() {
     service.addMessage("s7", "user", "hi");
     service.setSystemPrompt("s7", "prompt");
