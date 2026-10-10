@@ -45,6 +45,7 @@ This directory contains the **React** single-page application (SPA) for the chat
 - Use the sidebar (☰ top-left) to start a new chat or resume a previous one — conversations persist across restarts.
 
 ## Customization
+- API requests use the frontend's origin by default. If the backend is hosted separately, set `VITE_API_URL` to its base URL in `frontend/.env.local` (for example, `VITE_API_URL=http://192.168.1.20:8080`), then restart Vite or rebuild the frontend. Configure the backend's `CORS_ALLOWED_ORIGINS` to allow the frontend's origin.
 - Edit or extend components in `src/components/` to change the UI.
 - Update `src/services/api.js` to modify how the frontend communicates with the backend.
 
