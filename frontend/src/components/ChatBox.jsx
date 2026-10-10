@@ -82,21 +82,11 @@ const ChatBox = ({
     useEffect(() => {
         if (!conversationId) return;
         let cancelled = false;
+        let retryTimer;
+        setChatLocked(true);
         const loadHistory = async () => {
             try {
-                const [history, runs] = await Promise.all([
-                    getConversationMessages(conversationId), listAgentRuns(conversationId),
-                ]);
-                if (!cancelled && runs.length > 0) {
-                    const latest = runs[0];
-                    const active = ['QUEUED', 'RUNNING', 'CANCEL_REQUESTED'].includes(latest.status);
-                    if (!active) completedAgentRuns.current.add(latest.id);
-                    setActiveAgentRun(latest);
-                    if (typeof latest.allowWebSearch === 'boolean') setAllowWebSearch(latest.allowWebSearch);
-                    setRetainedFiles(latest.attachedFileNames || []);
-                    setChatLocked(active);
-                    setInteractionMode('agent');
-                }
+                const history = await getConversationMessages(conversationId);
                 if (!cancelled && history.length > 0) {
                     setMessages(history.map(m => ({
                         text: m.content,
@@ -110,28 +100,58 @@ const ChatBox = ({
                 console.error('Failed to load conversation history:', err.message);
             }
         };
-        loadHistory();
-        return () => { cancelled = true; };
+        const historyLoaded = loadHistory();
+        const restoreRuns = async (attempt = 0) => {
+            try {
+                const runs = await listAgentRuns(conversationId);
+                // Apply the initial history before allowing terminal refresh to replace it.
+                await historyLoaded;
+                if (cancelled) return;
+                setAgentRefreshError('');
+                if (runs.length === 0) {
+                    setChatLocked(false);
+                    return;
+                }
+                const latest = runs[0];
+                setActiveAgentRun(latest);
+                if (typeof latest.allowWebSearch === 'boolean') setAllowWebSearch(latest.allowWebSearch);
+                setRetainedFiles(latest.attachedFileNames || []);
+                setInteractionMode('agent');
+            } catch (err) {
+                if (cancelled) return;
+                setAgentRefreshError('Could not restore task status. Retrying; sending is paused until status is known.');
+                retryTimer = setTimeout(() => restoreRuns(attempt + 1), Math.min(800 + attempt * 500, 5000));
+            }
+        };
+        restoreRuns();
+        return () => { cancelled = true; clearTimeout(retryTimer); };
     }, [conversationId]);
 
     useEffect(() => {
         if (!activeAgentRun) return undefined;
+        let cancelled = false;
+        let timer;
         const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeAgentRun.status);
         if (terminal) {
             if (!completedAgentRuns.current.has(activeAgentRun.id)) {
-                completedAgentRuns.current.add(activeAgentRun.id);
                 getConversationMessages(conversationId).then(history => {
+                    if (cancelled) return;
                     setMessages(history.map(m => ({ text: m.content, sender: m.role,
                         images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`) })));
-                }).catch(() => setAgentRefreshError('Could not refresh conversation history. Reload to retry.'));
-                if (onConversationChanged) onConversationChanged();
-            }
-            setChatLocked(false);
-            return undefined;
+                    completedAgentRuns.current.add(activeAgentRun.id);
+                    setAgentRefreshError('');
+                    setChatLocked(false);
+                    if (onConversationChanged) onConversationChanged();
+                }).catch(() => {
+                    if (cancelled) return;
+                    setAgentRefreshError('Could not refresh conversation history. Retrying before enabling follow-ups.');
+                    timer = setTimeout(() => setAgentPollAttempt(attempt => attempt + 1), Math.min(800 + agentPollAttempt * 500, 5000));
+                });
+            } else setChatLocked(false);
+            return () => { cancelled = true; clearTimeout(timer); };
         }
 
-        let cancelled = false;
-        const timer = setTimeout(async () => {
+        timer = setTimeout(async () => {
             try {
                 const run = await getAgentRun(activeAgentRun.id);
                 if (!cancelled) {

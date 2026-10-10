@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatBox from './ChatBox';
 import { sendMessage, streamMessage, getModels, getConversationMessages, listAgentRuns, createAgentRun, getAgentRun, cancelAgentRun } from '../services/api';
@@ -660,6 +660,44 @@ describe('ChatBox generation settings inputs', () => {
 });
 
 describe('Agent tasks', () => {
+    it('refreshes history after restoring completion even when the initial history snapshot is stale', async () => {
+        let resolveHistory;
+        getConversationMessages.mockImplementationOnce(() => new Promise(resolve => { resolveHistory = resolve; }))
+            .mockResolvedValue([{ role: 'user', content: 'Explain the total' }, { role: 'assistant', content: 'Committed answer' }]);
+        listAgentRuns.mockResolvedValue([{ id: 'restored-complete', status: 'COMPLETED', steps: [] }]);
+        render(<ChatBox {...baseProps} />);
+        await waitFor(() => expect(listAgentRuns).toHaveBeenCalledTimes(1));
+        await act(async () => resolveHistory([{ role: 'user', content: 'Explain the total' }]));
+        await screen.findByText('Committed answer');
+        expect(getConversationMessages).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves Ask history and retries initial task-status failures before enabling sending', async () => {
+        getConversationMessages.mockResolvedValue([{ role: 'assistant', content: 'Saved normal chat' }]);
+        listAgentRuns.mockRejectedValueOnce(new Error('temporary status failure')).mockResolvedValue([]);
+        render(<ChatBox {...baseProps} />);
+        await screen.findByText('Saved normal chat');
+        await screen.findByText(/Could not restore task status/);
+        expect(screen.getByRole('button', { name: 'Agent', exact: true })).toBeDisabled();
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Agent', exact: true })).toBeEnabled(), { timeout: 2000 });
+        expect(listAgentRuns).toHaveBeenCalledTimes(2);
+        expect(screen.queryByText(/Could not restore task status/)).not.toBeInTheDocument();
+        expect(screen.getByText('Saved normal chat')).toBeInTheDocument();
+    });
+
+    it('retries terminal history failures rather than marking an unseen answer refreshed', async () => {
+        getConversationMessages.mockResolvedValueOnce([{ role: 'user', content: 'Explain the total' }])
+            .mockRejectedValueOnce(new Error('temporary history failure'))
+            .mockResolvedValue([{ role: 'assistant', content: 'Recovered answer' }]);
+        listAgentRuns.mockResolvedValue([{ id: 'retry-history', status: 'COMPLETED', steps: [] }]);
+        render(<ChatBox {...baseProps} />);
+        await screen.findByText(/Could not refresh conversation history/);
+        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+        await screen.findByText('Recovered answer', {}, { timeout: 2000 });
+        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled();
+        expect(getConversationMessages).toHaveBeenCalledTimes(3);
+    });
+
     it('submits settings and selected text files and restores Ask after completion', async () => {
         const user = userEvent.setup();
         createAgentRun.mockResolvedValue({ id: 'run-1', status: 'RUNNING', steps: [] });
