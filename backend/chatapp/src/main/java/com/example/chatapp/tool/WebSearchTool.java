@@ -3,6 +3,7 @@ package com.example.chatapp.tool;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -11,6 +12,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -30,19 +33,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Web search tool using a three-provider fallback chain — all free, no API keys required.
- *
- * <ol>
- *   <li><b>DuckDuckGo Instant Answer API</b> — instant answers, math, units, well-known entities.
- *   <li><b>Wikipedia REST API</b> — factual knowledge, people, places, history, concepts.
- *   <li><b>Google News RSS</b> — current news and recent events.
- * </ol>
- *
- * <p>Each provider is tried in order. The first one that returns meaningful content wins. If all
- * three return nothing, a "no results" message is returned and the model falls back to its training
- * data.
- */
+/** Web search with optional search APIs and relevance-checked reference/news fallbacks. */
 @Component
 @ConditionalOnProperty(
     name = "tools.websearch.enabled",
@@ -72,7 +63,50 @@ public class WebSearchTool implements Tool {
   private static final Set<String> JSON_TYPE_KEYWORDS =
       Set.of("string", "number", "integer", "boolean", "array", "object", "null");
 
+  private static final Set<String> QUERY_MODIFIERS =
+      Set.of(
+          "the",
+          "a",
+          "an",
+          "of",
+          "and",
+          "or",
+          "for",
+          "in",
+          "on",
+          "to",
+          "is",
+          "what",
+          "which",
+          "latest",
+          "current",
+          "stable",
+          "release",
+          "releases",
+          "version",
+          "versions",
+          "supported",
+          "support",
+          "official",
+          "source",
+          "sources",
+          "notes",
+          "research",
+          "explain",
+          "cite",
+          "links",
+          "news");
+  private static final Pattern SITE = Pattern.compile("(?i)\\bsite:([a-z0-9.-]+)");
   private final RestTemplate restTemplate;
+
+  @Value("${tools.websearch.brave.api-key:}")
+  private String braveApiKey = "";
+
+  @Value("${tools.websearch.google.api-key:}")
+  private String googleApiKey = "";
+
+  @Value("${tools.websearch.google.search-engine-id:}")
+  private String googleSearchEngineId = "";
 
   @Value("${tools.websearch.max-results:5}")
   private int maxResults;
@@ -94,7 +128,7 @@ public class WebSearchTool implements Tool {
 
   @Override
   public String getDescription() {
-    return "Retrieve reference summaries and news headlines via DuckDuckGo, Wikipedia, and Google News."
+    return "Search web results using configured Brave or Google search APIs, with DuckDuckGo, Wikipedia, and news fallbacks."
         + " Results are limited excerpts, not full pages; cite returned URLs and do not infer details absent from the result.";
   }
 
@@ -161,28 +195,110 @@ public class WebSearchTool implements Tool {
     }
 
     LOGGER.info("Executing web search for: {}", query);
-    try {
-      // 1. DuckDuckGo Instant Answer
-      final Optional<String> ddgResult = searchDuckDuckGo(query);
-      if (ddgResult.isPresent()) {
-        return ddgResult.get();
+    final List<SearchProvider> providers =
+        List.of(
+            this::searchBrave,
+            this::searchGoogle,
+            this::searchDuckDuckGo,
+            this::searchWikipedia,
+            this::searchGoogleNewsRss);
+    for (final SearchProvider provider : providers) {
+      try {
+        final Optional<String> result = provider.search(query);
+        if (result.isPresent()) return result.get();
+      } catch (IOException | ParserConfigurationException | SAXException | RuntimeException e) {
+        // One unavailable provider must not prevent the remaining providers being tried.
+        LOGGER.warn("Search provider unavailable: {}", e.getClass().getSimpleName());
       }
-
-      // 2. Wikipedia
-      LOGGER.info("DuckDuckGo returned no results for '{}', trying Wikipedia", query);
-      final Optional<String> wikiResult = searchWikipedia(query);
-      if (wikiResult.isPresent()) {
-        return wikiResult.get();
-      }
-
-      // 3. Google News RSS
-      LOGGER.info("Wikipedia returned no results for '{}', trying Google News RSS", query);
-      return searchGoogleNewsRss(query).orElse("No results found for: " + query);
-
-    } catch (IOException | ParserConfigurationException | SAXException | RuntimeException e) {
-      LOGGER.error("Web search failed for query '{}': {}", query, e.getMessage(), e);
-      return "Search failed: " + e.getMessage();
     }
+    return "No results found for: "
+        + query
+        + ". No relevant evidence was retrieved. Do not guess current facts."
+        + (braveApiKey.isBlank() && (googleApiKey.isBlank() || googleSearchEngineId.isBlank())
+            ? " Full web search is not configured; reference summaries and news may not cover this request."
+            : "");
+  }
+
+  @FunctionalInterface
+  private interface SearchProvider {
+    Optional<String> search(String query)
+        throws IOException, ParserConfigurationException, SAXException;
+  }
+
+  @SuppressWarnings("unchecked")
+  Optional<String> searchBrave(final String query) throws IOException {
+    if (braveApiKey.isBlank()) return Optional.empty();
+    final String url =
+        "https://api.search.brave.com/res/v1/web/search?q="
+            + URLEncoder.encode(query, StandardCharsets.UTF_8)
+            + "&count="
+            + Math.max(1, Math.min(maxResults, 20));
+    final HttpHeaders headers = new HttpHeaders();
+    headers.set("X-Subscription-Token", braveApiKey);
+    headers.set(HttpHeaders.ACCEPT, "application/json");
+    final ResponseEntity<String> response =
+        restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<Void>(headers), String.class);
+    final String body = response.getBody();
+    if (body == null || body.isBlank()) return Optional.empty();
+    final Map<String, Object> json = MAPPER.readValue(body, Map.class);
+    if (!(json.get("web") instanceof Map<?, ?> web)
+        || !(web.get("results") instanceof List<?> items)) return Optional.empty();
+    final List<Map<String, Object>> normalized = new java.util.ArrayList<>();
+    for (final Object item : items) {
+      if (!(item instanceof Map<?, ?> row)) continue;
+      final Map<String, Object> result = new HashMap<>();
+      result.put("title", row.get("title"));
+      result.put("snippet", row.get("description"));
+      result.put("link", row.get("url"));
+      normalized.add(result);
+    }
+    return formatWebResults(query, normalized);
+  }
+
+  @SuppressWarnings("unchecked")
+  Optional<String> searchGoogle(final String query) throws IOException {
+    if (googleApiKey.isBlank() || googleSearchEngineId.isBlank()) return Optional.empty();
+    final String url =
+        "https://www.googleapis.com/customsearch/v1?key="
+            + URLEncoder.encode(googleApiKey, StandardCharsets.UTF_8)
+            + "&cx="
+            + URLEncoder.encode(googleSearchEngineId, StandardCharsets.UTF_8)
+            + "&q="
+            + URLEncoder.encode(query, StandardCharsets.UTF_8)
+            + "&num="
+            + Math.max(1, Math.min(maxResults, 10));
+    final ResponseEntity<String> response =
+        restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, String.class);
+    final String body = response.getBody();
+    if (body == null || body.isBlank()) return Optional.empty();
+    final Map<String, Object> json = MAPPER.readValue(body, Map.class);
+    return formatWebResults(query, json.get("items"));
+  }
+
+  private Optional<String> formatWebResults(final String query, final Object items) {
+    if (!(items instanceof List<?>)) return Optional.empty();
+    final StringBuilder results = new StringBuilder("Web search excerpts (not full pages):\n\n");
+    int count = 0;
+    for (final Object item : (List<?>) items) {
+      if (!(item instanceof Map<?, ?> row)) continue;
+      final String title = row.get("title") instanceof String value ? value : "";
+      final String snippet = row.get("snippet") instanceof String value ? stripHtml(value) : "";
+      final String link = row.get("link") instanceof String value ? value : "";
+      if (title.isBlank()
+          || snippet.isBlank()
+          || link.isBlank()
+          || !relevant(query, title + " " + snippet)
+          || !matchesSite(query, link)) continue;
+      results
+          .append(title)
+          .append('\n')
+          .append(snippet)
+          .append("\nSource: ")
+          .append(link)
+          .append("\n\n");
+      if (++count >= Math.max(1, maxResults)) break;
+    }
+    return count == 0 ? Optional.empty() : Optional.of(results.toString().trim());
   }
 
   // ---------------------------------------------------------------------------
@@ -215,7 +331,7 @@ public class WebSearchTool implements Tool {
     final String abstractText = (String) json.getOrDefault("AbstractText", "");
     final String abstractSource = (String) json.getOrDefault("AbstractSource", "");
     final String abstractUrl = (String) json.getOrDefault("AbstractURL", "");
-    if (abstractText != null && !abstractText.isEmpty()) {
+    if (abstractText != null && relevant(query, abstractText) && matchesSite(query, abstractUrl)) {
       results.append("Summary");
       if (abstractSource != null && !abstractSource.isEmpty()) {
         results.append(" (").append(abstractSource).append(')');
@@ -227,7 +343,7 @@ public class WebSearchTool implements Tool {
     }
 
     final String answer = (String) json.getOrDefault("Answer", "");
-    if (answer != null && !answer.isEmpty()) {
+    if (answer != null && !answer.isBlank() && !SITE.matcher(query).find()) {
       results.append("Answer: ").append(answer).append(PARAGRAPH_BREAK);
     }
 
@@ -241,7 +357,7 @@ public class WebSearchTool implements Tool {
         }
         final String text = (String) topic.get("Text");
         final String firstUrl = (String) topic.get("FirstURL");
-        if (text != null && !text.isEmpty()) {
+        if (text != null && relevant(query, text) && matchesSite(query, firstUrl)) {
           results.append("- ").append(text);
           if (firstUrl != null && !firstUrl.isEmpty()) {
             results.append(" (").append(firstUrl).append(')');
@@ -265,13 +381,14 @@ public class WebSearchTool implements Tool {
 
   @SuppressWarnings("unchecked")
   Optional<String> searchWikipedia(final String query) throws IOException {
-    // Step 1: find the most relevant article title
+    if (!matchesSite(query, "https://en.wikipedia.org/")) return Optional.empty();
+    // Step 1: find a relevant article title
     final String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);
     final String searchUrl =
         WIKIPEDIA_SEARCH_URL
             + "?action=query&list=search&srsearch="
             + encoded
-            + "&format=json&srlimit=1&srprop=snippet&utf8=1";
+            + "&format=json&srlimit=5&srprop=snippet&utf8=1";
 
     final HttpHeaders wikiHeaders = new HttpHeaders();
     wikiHeaders.set(
@@ -297,7 +414,19 @@ public class WebSearchTool implements Tool {
       return Optional.empty();
     }
 
-    final String articleTitle = (String) searchResults.get(0).get("title");
+    final String articleTitle =
+        searchResults.stream()
+            .filter(
+                row ->
+                    relevant(
+                        query,
+                        String.valueOf(row.get("title"))
+                            + " "
+                            + stripHtml(String.valueOf(row.get("snippet")))))
+            .map(row -> (String) row.get("title"))
+            .filter(title -> title != null && !title.isBlank())
+            .findFirst()
+            .orElse(null);
     if (articleTitle == null || articleTitle.isEmpty()) {
       return Optional.empty();
     }
@@ -323,9 +452,14 @@ public class WebSearchTool implements Tool {
 
     // Trim to first paragraph or 600 chars, whichever is shorter
     final String firstParagraph =
-        extract.contains("\n") ? extract.substring(0, extract.indexOf('\n')) : extract;
+        extract.strip().contains("\n")
+            ? extract.strip().substring(0, extract.strip().indexOf('\n'))
+            : extract.strip();
     final String summary =
         firstParagraph.length() > 600 ? firstParagraph.substring(0, 600) + "..." : firstParagraph;
+
+    if (summary.isBlank() || !relevant(query, articleTitle + " " + summary))
+      return Optional.empty();
 
     @SuppressWarnings("unchecked")
     final Map<String, Object> contentUrls =
@@ -384,14 +518,17 @@ public class WebSearchTool implements Tool {
     final StringBuilder results = new StringBuilder(64);
     results.append("News results for: ").append(query).append(PARAGRAPH_BREAK);
 
-    final int limit = Math.min(items.getLength(), maxResults);
+    int count = 0;
+    final int limit = items.getLength();
     for (int i = 0; i < limit; i++) {
       final Element item = (Element) items.item(i);
       final String title = getXmlText(item, "title");
       final String link = getXmlText(item, "link");
       final String pubDate = getXmlText(item, "pubDate");
 
-      if (!title.isEmpty()) {
+      if (!title.isEmpty()
+          && relevant(query, title)
+          && matchesSite(query, getXmlSource(item, link))) {
         results.append(i + 1).append(". ").append(title).append('\n');
         if (!pubDate.isEmpty()) {
           results.append("   ").append(pubDate).append('\n');
@@ -400,6 +537,7 @@ public class WebSearchTool implements Tool {
           results.append("   ").append(link).append('\n');
         }
         results.append('\n');
+        if (++count >= Math.max(1, maxResults)) break;
       }
     }
 
@@ -413,6 +551,44 @@ public class WebSearchTool implements Tool {
   // ---------------------------------------------------------------------------
   // Utilities
   // ---------------------------------------------------------------------------
+
+  private static String getXmlSource(final Element item, final String fallback) {
+    final NodeList sources = item.getElementsByTagName("source");
+    return sources.getLength() == 0 ? fallback : ((Element) sources.item(0)).getAttribute("url");
+  }
+
+  static boolean matchesSite(final String query, final String url) {
+    final Matcher site = SITE.matcher(query);
+    try {
+      final URI uri = URI.create(url == null ? "" : url);
+      final String host = uri.getHost();
+      if (host == null
+          || !("https".equalsIgnoreCase(uri.getScheme())
+              || "http".equalsIgnoreCase(uri.getScheme())))
+        return !site.find() && (url == null || url.isBlank());
+      if (!site.find()) return true;
+      final String requested = site.group(1).toLowerCase(Locale.ROOT);
+      return host.equalsIgnoreCase(requested)
+          || host.toLowerCase(Locale.ROOT).endsWith("." + requested);
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  static boolean relevant(final String query, final String text) {
+    if (text == null || text.isBlank()) return false;
+    final Set<String> terms = new java.util.HashSet<>();
+    for (final String term :
+        SITE.matcher(query.toLowerCase(Locale.ROOT)).replaceAll("").split("[^\\p{L}\\p{N}]+")) {
+      if (term.length() > 1 && !QUERY_MODIFIERS.contains(term) && !term.matches("[0-9]+"))
+        terms.add(term);
+    }
+    if (terms.isEmpty()) return true;
+    final Set<String> words =
+        Set.copyOf(List.of(text.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")));
+    final long matches = terms.stream().filter(words::contains).count();
+    return matches >= Math.max(1, (int) Math.ceil(terms.size() * 0.6));
+  }
 
   private static String getXmlText(final Element parent, final String tagName) {
     final NodeList nodes = parent.getElementsByTagName(tagName);

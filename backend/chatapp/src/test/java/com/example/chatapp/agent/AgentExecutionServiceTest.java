@@ -119,7 +119,9 @@ class AgentExecutionServiceTest {
         .thenReturn(
             json("{\"content\":\"draft\"}"),
             json("{\"content\":\"Source https://invented.example/facts\"}"));
-    assertThrows(IllegalStateException.class, () -> service.execute(run()));
+    final String blocked = service.execute(run());
+    assertTrue(blocked.contains("unsupported citations"));
+    assertFalse(blocked.contains("https://invented.example"));
     reset(client);
     when(runs.requestJson("run"))
         .thenReturn(
@@ -132,6 +134,41 @@ class AgentExecutionServiceTest {
   }
 
   @Test
+  void repairsUnsupportedCitationsOnceWithoutExecutingMoreSearches() throws Exception {
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"draft\"}"),
+            json("{\"content\":\"See https://invented.example/release\"}"),
+            json(
+                "{\"content\":\"I could not verify the latest release using the available sources.\"}"));
+    assertTrue(service.execute(run()).contains("could not verify"));
+    verify(client, times(3)).chat(any(), any(), any(), any());
+    verify(tools, never()).executeTool(any(), any());
+    verify(runs)
+        .progress(
+            eq("run"),
+            eq(AgentStepType.MODEL),
+            eq("Correcting unsupported citations"),
+            isNull(),
+            eq(AgentStepStatus.RUNNING));
+  }
+
+  @Test
+  void citationRepairFallsBackOnBlankAnswersAndChecksCancellation() throws Exception {
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"draft\"}"),
+            json("{\"content\":\"https://invented.example\"}"),
+            json("{\"content\":\"\"}"));
+    assertTrue(service.execute(run()).contains("unsupported citations"));
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"draft\"}"), json("{\"content\":\"https://invented.example\"}"));
+    when(runs.isCancellationRequested("run")).thenReturn(false, false, false, true);
+    assertThrows(CancellationException.class, () -> service.execute(run()));
+  }
+
+  @Test
   void cancellationStopsBeforeToolsOrFinalAnswer() throws Exception {
     when(runs.isCancellationRequested("run")).thenReturn(true);
     assertThrows(CancellationException.class, () -> service.execute(run()));
@@ -139,14 +176,43 @@ class AgentExecutionServiceTest {
   }
 
   @Test
-  void boundedSearchLimitStopsRepeatedCalls() throws Exception {
+  void boundedSearchLimitFinishesWithoutMoreTools() throws Exception {
     when(client.chat(any(), any(), any(), any()))
         .thenReturn(
             json(
                 "{\"tool_calls\":[{\"function\":{\"name\":\"web_search\",\"arguments\":\"{\\\"query\\\":\\\"facts\\\"}\"}}]}"));
     when(tools.executeTool(any(), any())).thenReturn("No results found.");
-    assertThrows(IllegalStateException.class, () -> service.execute(run()));
+    when(client.chat(any(), any(), any(), eq(List.of())))
+        .thenReturn(
+            json(
+                "{\"content\":\"I could not verify the requested facts from the available sources.\"}"));
+    assertTrue(service.execute(run()).contains("could not verify"));
     verify(tools, times(5)).executeTool(any(), any());
+    verify(client).chat(any(), any(), any(), eq(List.of()));
+  }
+
+  @Test
+  void batchOfToolCallsCannotExceedBudgetAndProviderFailuresAreMarkedFailed() throws Exception {
+    final String call =
+        "{\"function\":{\"name\":\"web_search\",\"arguments\":{\"query\":\"facts\"}}}";
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json(
+                "{\"tool_calls\":["
+                    + String.join(",", java.util.Collections.nCopies(7, call))
+                    + "]}"));
+    when(client.chat(any(), any(), any(), eq(List.of())))
+        .thenReturn(json("{\"content\":\"Search was unavailable; I cannot verify this.\"}"));
+    when(tools.executeTool(any(), any())).thenReturn("Search failed: unavailable");
+    assertTrue(service.execute(run()).contains("cannot verify"));
+    verify(tools, times(5)).executeTool(any(), any());
+    verify(runs, times(5))
+        .progress(
+            eq("run"),
+            eq(AgentStepType.TOOL),
+            startsWith("Search result"),
+            any(),
+            eq(AgentStepStatus.FAILED));
   }
 
   @Test
@@ -294,6 +360,8 @@ class AgentExecutionServiceTest {
             List.of());
     when(client.chat(any(), any(), any(), any()))
         .thenReturn(json("{\"content\":\"draft\"}"), json("{\"content\":\"Source " + url + "\"}"));
-    assertThrows(IllegalStateException.class, () -> service.execute(task));
+    final String blocked = service.execute(task);
+    assertTrue(blocked.contains("unsupported citations"));
+    assertFalse(blocked.contains(url));
   }
 }

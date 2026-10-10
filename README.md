@@ -205,7 +205,7 @@ boox/
 - **Files** accepts up to 4 text, Markdown, CSV, JSON, or code files, with a combined limit of 24,000 characters. File attachments are stored in the local conversation database; selecting a cloud Ollama model sends task input to that model's provider. PDF, Office documents, editing files, and executing code are not supported in this version.
 - Progress shows actual searches, expandable evidence, and the draft-review step. Reloading or changing conversations restores the latest task. A temporary connection failure retries status checks without starting another task.
 - **Cancel** stops at the next checkpoint after an in-flight request returns. Model calls have a 3-minute read timeout; search-provider calls have a 30-second read timeout. Tasks interrupted by a server restart are marked failed with a retry message.
-- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence are rejected, but you should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages.
+- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence trigger one correction attempt. If that attempt is empty or still includes unsupported URLs, the agent returns a limitation message instead of the rejected answer. You should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages.
 
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
@@ -213,7 +213,7 @@ boox/
 - **Auto-titled** — each conversation is titled from your first message
 
 ### Tool Calling
-- **Web search** — retrieves DuckDuckGo reference summaries, with Wikipedia and Google News fallback; source URLs are included when returned by the provider
+- **Web search** — uses Brave Search when `BRAVE_SEARCH_API_KEY` is configured. Without a search API key, it uses DuckDuckGo reference summaries, Wikipedia, and Google News; these fallbacks cannot reliably answer every current-information request. Results are filtered for topic relevance and `site:` restrictions. Source URLs are included when returned by the provider.
 - **Live tool call cards** — while the model is searching, a pulsing card appears in the chat; it expands with the result once done
 - **Extensible framework** — add new tools by implementing the `Tool` interface and registering as a Spring `@Component`; no other wiring needed
 
@@ -221,6 +221,8 @@ To enable web search, set in `backend/chatapp/src/main/resources/application.pro
 ```properties
 tools.websearch.enabled=true
 ```
+
+For full web search, set `BRAVE_SEARCH_API_KEY` in the backend environment (or the Compose `.env` file). See the [Brave Search API documentation](https://api-dashboard.search.brave.com/app/documentation/web-search). Existing Google Custom Search customers can instead set `GOOGLE_API_KEY` and `GOOGLE_SEARCH_ENGINE_ID`; [Google is retiring that API in January 2027](https://developers.google.com/custom-search/v1/overview). Search results are excerpts, not full pages. Provider failures fall through to the next provider. After five searches the agent finishes with available evidence and explains anything it could not verify, rather than asking the user to narrow a reasonable task.
 
 ### UI / UX
 - **Dark mode** — automatic via `prefers-color-scheme`, no toggle needed
