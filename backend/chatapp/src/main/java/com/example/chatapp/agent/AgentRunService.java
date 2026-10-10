@@ -64,11 +64,12 @@ public class AgentRunService {
     for (final AgentRun run : runs.findByConversationIdOrderByCreatedAtDesc(conversationId)) {
       if (java.util.Objects.equals(run.getId(), currentId)
           || run.getStatus() != AgentRunStatus.COMPLETED) continue;
-      for (final AgentStep step : run.getSteps()) {
+      for (final AgentStep step : run.getSteps().reversed()) {
         if (step.getType() != AgentStepType.TOOL
             || step.getStatus() != AgentStepStatus.COMPLETED
             || step.getDetail() == null
-            || !step.getSummary().startsWith("Search result:")) continue;
+            || !(step.getSummary().startsWith("Search result:")
+                || step.getSummary().startsWith("Page result:"))) continue;
         final String excerpt = "\nRetrieved source excerpt:\n" + step.getDetail();
         if (evidence.length() + excerpt.length() > 8_000) return evidence.toString();
         evidence.append(excerpt);

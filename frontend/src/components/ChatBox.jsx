@@ -645,7 +645,7 @@ const ChatBox = ({
                         <div className="agent-mode-help">
                             <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
                             <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={chatLocked} /> Include web sources</label>
-                            <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information.</p>
+                            <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information. Web queries and requested page URLs are sent to the configured search provider.</p>
                             {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={chatLocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
                             {filesLoading && <p role="status">Reading selected files…</p>}
                             {attachedFiles.length > 0 && <ul>{attachedFiles.map((file, index) => (

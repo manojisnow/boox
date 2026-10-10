@@ -35,6 +35,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Web search with optional search APIs and relevance-checked reference/news fallbacks. */
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression(
+    "'${tools.websearch.provider:legacy}' == 'legacy'")
 @ConditionalOnProperty(
     name = "tools.websearch.enabled",
     havingValue = "true",

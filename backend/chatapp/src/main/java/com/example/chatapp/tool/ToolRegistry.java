@@ -44,6 +44,15 @@ public class ToolRegistry {
 
   /** Execute a tool by name with the given arguments. */
   public String executeTool(final String name, final Map<String, Object> arguments) {
+    return executeTool(name, arguments, null, null);
+  }
+
+  /** Execute with trusted conversation metadata for providers that require session correlation. */
+  public String executeTool(
+      final String name,
+      final Map<String, Object> arguments,
+      final String conversationId,
+      final String model) {
     final Tool tool = tools.get(name);
     if (tool == null) {
       LOGGER.warn("Tool not found: {}", name);
@@ -51,7 +60,7 @@ public class ToolRegistry {
     }
     LOGGER.info("Executing tool: {} with args: {}", name, arguments);
     try {
-      return tool.execute(arguments);
+      return tool.execute(arguments, conversationId, model);
     } catch (Exception e) {
       LOGGER.error("Tool execution failed: {}", e.getMessage(), e);
       return "Error executing tool '" + name + "': " + e.getMessage();

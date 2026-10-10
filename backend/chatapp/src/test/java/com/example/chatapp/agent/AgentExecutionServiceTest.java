@@ -74,7 +74,7 @@ class AgentExecutionServiceTest {
                 "{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"function\":{\"name\":\"web_search\",\"arguments\":{\"query\":\"facts\"}}}]}"),
             json("{\"content\":\"draft\"}"),
             json("{\"content\":\"checked\"}"));
-    when(tools.executeTool(eq("web_search"), any()))
+    when(tools.executeTool(eq("web_search"), any(), any(), any()))
         .thenReturn("Actual source: https://example.com/facts");
     assertEquals("checked", service.execute(run()));
     final ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
@@ -93,7 +93,7 @@ class AgentExecutionServiceTest {
     when(client.chat(any(), any(), any(), any()))
         .thenReturn(json("{\"tool_calls\":[{\"function\":{\"name\":\"shell\"}}]}"));
     assertThrows(IllegalStateException.class, () -> service.execute(run()));
-    verify(tools, never()).executeTool(any(), any());
+    verify(tools, never()).executeTool(any(), any(), any(), any());
     when(client.chat(any(), any(), any(), any()))
         .thenReturn(
             json(
@@ -143,7 +143,7 @@ class AgentExecutionServiceTest {
                 "{\"content\":\"I could not verify the latest release using the available sources.\"}"));
     assertTrue(service.execute(run()).contains("could not verify"));
     verify(client, times(3)).chat(any(), any(), any(), any());
-    verify(tools, never()).executeTool(any(), any());
+    verify(tools, never()).executeTool(any(), any(), any(), any());
     verify(runs)
         .progress(
             eq("run"),
@@ -193,13 +193,13 @@ class AgentExecutionServiceTest {
         .thenReturn(
             json(
                 "{\"tool_calls\":[{\"function\":{\"name\":\"web_search\",\"arguments\":\"{\\\"query\\\":\\\"facts\\\"}\"}}]}"));
-    when(tools.executeTool(any(), any())).thenReturn("No results found.");
+    when(tools.executeTool(any(), any(), any(), any())).thenReturn("No results found.");
     when(client.chat(any(), any(), any(), eq(List.of())))
         .thenReturn(
             json(
                 "{\"content\":\"I could not verify the requested facts from the available sources.\"}"));
     assertTrue(service.execute(run()).contains("could not verify"));
-    verify(tools, times(5)).executeTool(any(), any());
+    verify(tools, times(5)).executeTool(any(), any(), any(), any());
     verify(client).chat(any(), any(), any(), eq(List.of()));
   }
 
@@ -215,9 +215,9 @@ class AgentExecutionServiceTest {
                     + "]}"));
     when(client.chat(any(), any(), any(), eq(List.of())))
         .thenReturn(json("{\"content\":\"Search was unavailable; I cannot verify this.\"}"));
-    when(tools.executeTool(any(), any())).thenReturn("Search failed: unavailable");
+    when(tools.executeTool(any(), any(), any(), any())).thenReturn("Search failed: unavailable");
     assertTrue(service.execute(run()).contains("cannot verify"));
-    verify(tools, times(5)).executeTool(any(), any());
+    verify(tools, times(5)).executeTool(any(), any(), any(), any());
     verify(runs, times(5))
         .progress(
             eq("run"),
@@ -263,7 +263,7 @@ class AgentExecutionServiceTest {
                 "{\"tool_calls\":[{\"function\":{\"name\":\"web_search\",\"arguments\":{\"query\":\"totals\"}}}]}"));
     assertThrows(IllegalStateException.class, () -> service.execute(run()));
     verify(client).chat(any(), any(), any(), eq(List.of()));
-    verify(tools, never()).executeTool(any(), any());
+    verify(tools, never()).executeTool(any(), any(), any(), any());
   }
 
   @Test
@@ -375,5 +375,68 @@ class AgentExecutionServiceTest {
     final String blocked = service.execute(task);
     assertTrue(blocked.contains("unsupported citations"));
     assertFalse(blocked.contains(url));
+  }
+
+  @Test
+  void fetchesPagesWithTrustedContextAndCarriesTheirEvidenceIntoReview() throws Exception {
+    when(tools.getToolDefinitions())
+        .thenReturn(
+            List.of(
+                Map.of("function", Map.of("name", "web_search")),
+                Map.of("function", Map.of("name", "web_fetch"))));
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json(
+                "{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"web_fetch\",\"arguments\":{\"urls\":[\"https://docs.example.org/current\"],\"objective\":\"Requirements\"}}}]}"),
+            json("{\"content\":\"draft\"}"),
+            json("{\"content\":\"See [requirements](https://docs.example.org/current)\"}"));
+    when(tools.executeTool(eq("web_fetch"), any(), eq("conv"), eq("model")))
+        .thenReturn("Source: https://docs.example.org/current\nJava 17 through 26.");
+    assertTrue(service.execute(run()).contains("https://docs.example.org/current"));
+    verify(runs)
+        .progress(
+            eq("run"),
+            eq(AgentStepType.TOOL),
+            startsWith("Page result:"),
+            contains("Java 17 through 26"),
+            eq(AgentStepStatus.COMPLETED));
+  }
+
+  @Test
+  void filesOnlyCannotInvokeFetchEvenWhenRegistered() throws Exception {
+    when(runs.requestJson("run")).thenReturn("{\"allowWebSearch\":false}");
+    when(tools.getToolDefinitions())
+        .thenReturn(List.of(Map.of("function", Map.of("name", "web_fetch"))));
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json(
+                "{\"tool_calls\":[{\"function\":{\"name\":\"web_fetch\",\"arguments\":{\"urls\":[\"https://example.org\"]}}}]}"));
+    assertThrows(IllegalStateException.class, () -> service.execute(run()));
+    verify(tools, never()).executeTool(any(), any(), any(), any());
+  }
+
+  @Test
+  void retriesEmptyReviewOnceWithoutReturningUncheckedDraftOrInvokingTools() throws Exception {
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"unchecked draft\"}"),
+            json("{\"content\":\"\"}"),
+            json("{\"content\":\"Checked concise answer\"}"));
+    assertEquals("Checked concise answer", service.execute(run()));
+    verify(client, times(3)).chat(any(), any(), any(), any());
+    verify(tools, never()).executeTool(any(), any(), any(), any());
+  }
+
+  @Test
+  void recognizesKnownUrlsInsideUnicodeBracketsAndMarkdownWithoutAcceptingInventedSources()
+      throws Exception {
+    when(runs.priorEvidence("conv", "run")).thenReturn("Source: https://docs.example.org/current");
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json("{\"content\":\"draft\"}"),
+            json(
+                "{\"content\":\"Evidence 【https://docs.example.org/current】 and **https://docs.example.org/current**\"}"));
+    assertTrue(service.execute(run()).contains("[Source](https://docs.example.org/current)"));
+    verify(client, times(2)).chat(any(), any(), any(), any());
   }
 }
