@@ -12,4 +12,9 @@ public interface Tool {
   Map<String, Object> getParameterSchema();
 
   String execute(Map<String, Object> arguments);
+
+  /** Trusted runtime context; models cannot choose the conversation or model identifier. */
+  default String execute(Map<String, Object> arguments, String conversationId, String model) {
+    return execute(arguments);
+  }
 }

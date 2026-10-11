@@ -134,4 +134,62 @@ class AgentRunServiceTest {
   private static AgentRun run() {
     return new AgentRun("run-1", "conversation-1", "Review", "ollama", "phi4-mini");
   }
+
+  @Test
+  void followupsReuseCompletedPageAndSearchEvidenceButNotFailuresOrCurrentRun() {
+    final AgentRun old = run();
+    old.setStatus(AgentRunStatus.COMPLETED);
+    final AgentStep page =
+        new AgentStep(
+            old,
+            1,
+            AgentStepType.TOOL,
+            "Page result: official",
+            "Source: https://docs.example.org/current\nVerified page facts");
+    page.setStatus(AgentStepStatus.COMPLETED);
+    old.getSteps().add(page);
+    final AgentStep failed =
+        new AgentStep(old, 2, AgentStepType.TOOL, "Page result: failed", "Secret failed response");
+    failed.setStatus(AgentStepStatus.FAILED);
+    old.getSteps().add(failed);
+    final AgentStep search =
+        new AgentStep(old, 3, AgentStepType.TOOL, "Search result: docs", "Search excerpt");
+    search.setStatus(AgentStepStatus.COMPLETED);
+    old.getSteps().add(search);
+    when(runs.findByConversationIdOrderByCreatedAtDesc("conversation-1")).thenReturn(List.of(old));
+    final String evidence = service.priorEvidence("conversation-1", "current");
+    assertTrue(evidence.contains("Verified page facts"));
+    assertTrue(evidence.contains("Search excerpt"));
+    assertFalse(evidence.contains("Secret"));
+    assertEquals("", service.priorEvidence("conversation-1", old.getId()));
+  }
+
+  @Test
+  void boundedFollowupEvidencePrioritizesMostRecentlyReadPages() {
+    final AgentRun old = run();
+    old.setStatus(AgentRunStatus.COMPLETED);
+    final AgentStep early =
+        new AgentStep(
+            old,
+            1,
+            AgentStepType.TOOL,
+            "Search result: broad",
+            "OLD ARCHIVED RESULTS " + "x".repeat(4_000));
+    early.setStatus(AgentStepStatus.COMPLETED);
+    old.getSteps().add(early);
+    final AgentStep latest =
+        new AgentStep(
+            old,
+            2,
+            AgentStepType.TOOL,
+            "Page result: requirements",
+            "CURRENT REQUIREMENTS " + "y".repeat(4_000));
+    latest.setStatus(AgentStepStatus.COMPLETED);
+    old.getSteps().add(latest);
+    when(runs.findByConversationIdOrderByCreatedAtDesc("conversation-1")).thenReturn(List.of(old));
+    final String evidence = service.priorEvidence("conversation-1", "current");
+    assertTrue(evidence.contains("CURRENT REQUIREMENTS"));
+    assertFalse(evidence.contains("OLD ARCHIVED RESULTS"));
+    assertTrue(evidence.length() <= 8_000);
+  }
 }

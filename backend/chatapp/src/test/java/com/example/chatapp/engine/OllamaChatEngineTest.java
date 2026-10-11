@@ -197,7 +197,8 @@ class OllamaChatEngineTest {
         .thenReturn(new ResponseEntity<>(finalResponse, HttpStatus.OK));
     when(toolRegistry.hasTools()).thenReturn(true);
     when(toolRegistry.getToolDefinitions()).thenReturn(List.of());
-    when(toolRegistry.executeTool(eq("web_search"), any())).thenReturn("Cat search results");
+    when(toolRegistry.executeTool(eq("web_search"), any(), any(), any()))
+        .thenReturn("Cat search results");
 
     // Act
     Map<String, String> reply = engine.sendMessage(message, model, sessionId, false);
@@ -205,7 +206,7 @@ class OllamaChatEngineTest {
     // Assert
     assertEquals("assistant", reply.get("role"));
     assertEquals("Here are cats", reply.get("content"));
-    verify(toolRegistry).executeTool(eq("web_search"), any());
+    verify(toolRegistry).executeTool(eq("web_search"), any(), any(), any());
     verify(chatContextService).addMessage(eq(sessionId), eq("tool"), eq("Cat search results"));
   }
 
@@ -663,7 +664,7 @@ class OllamaChatEngineTest {
         .thenReturn(new ResponseEntity<>(noToolResponse, HttpStatus.OK));
     when(toolRegistry.hasTools()).thenReturn(true);
     when(toolRegistry.getToolDefinitions()).thenReturn(List.of());
-    when(toolRegistry.executeTool(eq("web_search"), any())).thenReturn("Cat results");
+    when(toolRegistry.executeTool(eq("web_search"), any(), any(), any())).thenReturn("Cat results");
 
     String streamData =
         "{\"message\":{\"role\":\"assistant\",\"content\":\"Here\"}}\n{\"done\":true}\n";
@@ -684,7 +685,7 @@ class OllamaChatEngineTest {
     engine.streamMessage("hi", "m", sessionId, emitter);
 
     // Assert — tool_call and tool_result events were sent
-    verify(toolRegistry).executeTool(eq("web_search"), any());
+    verify(toolRegistry).executeTool(eq("web_search"), any(), any(), any());
     verify(chatContextService).addMessage(eq(sessionId), eq("tool"), eq("Cat results"));
     verify(emitter, atLeastOnce()).send(any(SseEmitter.SseEventBuilder.class));
     verify(emitter).complete();

@@ -40,6 +40,17 @@ public class Conversation implements Persistable<String> {
 
   private String model;
 
+  /** Random provider correlation ID; never exposes the client-supplied conversation identifier. */
+  private String webSessionId;
+
+  public String getWebSessionId() {
+    return webSessionId;
+  }
+
+  public void setWebSessionId(final String value) {
+    webSessionId = value;
+  }
+
   @Column(columnDefinition = "text")
   private String systemPrompt;
 

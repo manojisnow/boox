@@ -379,7 +379,7 @@ public class OllamaChatEngine implements ChatEngine {
         }
 
         LOGGER.info("Tool call: {} with args: {}", toolName, args);
-        final String result = toolRegistry.executeTool(toolName, args);
+        final String result = toolRegistry.executeTool(toolName, args, sessionId, model);
         chatContextService.addMessage(sessionId, "tool", result);
 
         if (emitter != null) {
