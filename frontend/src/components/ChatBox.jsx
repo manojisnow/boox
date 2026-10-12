@@ -182,7 +182,9 @@ const ChatBox = ({
                 setModels(result);
                 const preferred =
                     result.find(m => m.name === initialModel)
-                    || result.find(m => m.name === 'phi4-mini:latest');
+                    || result.find(m => m.name === 'granite4:3b')
+                    || result.find(m => m.name === 'phi4-mini:latest')
+                    || result[0];
                 if (preferred) {
                     setSelectedModel(preferred.name);
                 }

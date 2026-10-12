@@ -78,10 +78,12 @@ public class AgentExecutionService {
     }
     messages.addAll(recent);
     final java.util.Set<String> evidenceUrls = new java.util.HashSet<>();
+    final java.util.Set<String> webSourceUrls = new java.util.LinkedHashSet<>();
     for (final AgentAttachment file : request.getAttachments())
       collectUrls(file.getContent(), evidenceUrls);
     final String priorEvidence = runs.priorEvidence(run.getConversationId(), run.getId());
     collectUrls(priorEvidence, evidenceUrls);
+    if (request.permitsWebSearch()) collectUrls(priorEvidence, webSourceUrls);
     if (!priorEvidence.isBlank())
       messages.add(
           message(
@@ -137,7 +139,7 @@ public class AgentExecutionService {
             message(
                 "user",
                 "The search budget is exhausted. Finish using only retrieved evidence. Clearly explain anything you could not verify; do not guess current facts or invent citations."));
-        return review(run, messages, config, evidenceUrls);
+        return review(run, messages, config, evidenceUrls, webSourceUrls);
       }
       final JsonNode reply = client.chat(run.getModel(), messages, options, allowed);
       final JsonNode requestedTools = reply.path("tool_calls");
@@ -146,7 +148,7 @@ public class AgentExecutionService {
         if (draft.isBlank())
           throw new IllegalStateException("The model returned an empty answer. Please retry.");
         messages.add(message("assistant", draft));
-        return review(run, messages, config, evidenceUrls);
+        return review(run, messages, config, evidenceUrls, webSourceUrls);
       }
       messages.add(MAPPER.convertValue(reply, new TypeReference<Map<String, Object>>() {}));
       for (final JsonNode call : requestedTools) {
@@ -186,7 +188,14 @@ public class AgentExecutionService {
             raw.length() <= MAX_EVIDENCE_CHARS
                 ? raw
                 : raw.substring(0, MAX_EVIDENCE_CHARS) + "\n[Search result truncated]";
-        if (!failedSearch(raw)) collectUrls(evidence, evidenceUrls);
+        if (!failedSearch(raw)) {
+          collectUrls(evidence, evidenceUrls);
+          final java.util.Set<String> currentUrls = new java.util.LinkedHashSet<>();
+          collectUrls(evidence, currentUrls);
+          currentUrls.addAll(webSourceUrls);
+          webSourceUrls.clear();
+          webSourceUrls.addAll(currentUrls);
+        }
         runs.progress(
             run.getId(),
             AgentStepType.TOOL,
@@ -209,7 +218,8 @@ public class AgentExecutionService {
       final AgentRunView run,
       final List<Map<String, Object>> messages,
       final GenerationConfig config,
-      final java.util.Set<String> evidenceUrls) {
+      final java.util.Set<String> evidenceUrls,
+      final java.util.Set<String> webSourceUrls) {
     checkCancelled(run.getId());
     runs.progress(
         run.getId(),
@@ -264,6 +274,14 @@ public class AgentExecutionService {
       if (answer.isBlank() || hasUnsupportedCitations(answer, evidenceUrls))
         return "I couldn't produce an answer supported by the available evidence. The attempted answer contained unsupported citations, so I haven't included it. Please provide relevant source material or try again.";
     }
+    if (!webSourceUrls.isEmpty() && !URLS.matcher(answer).find()) {
+      answer +=
+          "\n\nAvailable web sources:\n"
+              + webSourceUrls.stream()
+                  .limit(5)
+                  .map(url -> "- [Source](" + url + ")")
+                  .collect(java.util.stream.Collectors.joining("\n"));
+    }
     return java.util.regex.Pattern.compile("【(https?://[^\\s】]+)】")
         .matcher(answer)
         .replaceAll("[Source]($1)");
@@ -311,7 +329,10 @@ public class AgentExecutionService {
   }
 
   private static String instructions(final String preference, final boolean allowWebSearch) {
-    return "You are Boox Agent, a research and file-analysis assistant. Today's date is "
+    return (allowWebSearch
+            ? "When the user asks to research using web sources, search the web, or cite a webpage, call web_search before answering. Do not answer from memory with a guessed URL. Never claim that you searched unless a tool call was executed.\n"
+            : "")
+        + "You are Boox Agent, a research and file-analysis assistant. Today's date is "
         + LocalDate.now()
         + (allowWebSearch
             ? ". Web access is permitted. Work within five total search/page-read calls. Use web_fetch to read specific public source pages when search excerpts are insufficient. Copy URLs exactly from search results or the user; never guess documentation paths. For latest releases or supported versions, prefer the publisher current overview and requirements over archived version pages. Prefer current official documentation; old version-specific pages do not establish the latest release. Use web_search when the task needs current or externally verifiable facts; tool names are not required in user requests. "

@@ -40,7 +40,7 @@ backend/
    ```
 2. **Ensure Ollama is running:**
    - Install Ollama from [ollama.ai/download](https://ollama.ai/download)
-   - Pull a model: `ollama pull phi4-mini`
+   - Pull a model: `ollama pull granite4:3b`
    - Start the server: `ollama serve`
    - The default configuration expects Ollama at `http://localhost:11434`
 
@@ -53,7 +53,7 @@ backend/
    ```properties
    # Ollama
    ollama.api.url=http://localhost:11434
-   ollama.model=phi4-mini
+   ollama.model=granite4:3b
    ollama.api.temperature=0.7
 
    # Context window management
