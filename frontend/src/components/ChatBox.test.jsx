@@ -217,8 +217,9 @@ describe('ChatBox conversation history', () => {
 });
 
 describe('ChatBox model selection', () => {
-    it('prefers a model matching initialModel over the phi4-mini default', async () => {
+    it('prefers the conversation model over installed defaults', async () => {
         getModels.mockResolvedValue([
+            { name: 'granite4:3b', capabilities: ['tools'] },
             { name: 'phi4-mini:latest', capabilities: [] },
             { name: 'qwen2.5:14b', capabilities: [] },
         ]);
@@ -233,6 +234,21 @@ describe('ChatBox model selection', () => {
         ]);
         render(<ChatBox {...baseProps} initialModel="not-installed" initialGenerationConfig={null} />);
         expect(await screen.findByText('Chat with phi4-mini')).toBeInTheDocument();
+    });
+
+    it('prefers the release default for a new conversation', async () => {
+        getModels.mockResolvedValue([
+            { name: 'phi4-mini:latest', capabilities: [] },
+            { name: 'granite4:3b', capabilities: ['tools'] },
+        ]);
+        render(<ChatBox {...baseProps} initialModel="" initialGenerationConfig={null} />);
+        expect(await screen.findByText('Chat with granite4')).toBeInTheDocument();
+    });
+
+    it('selects an installed model when neither default is available', async () => {
+        getModels.mockResolvedValue([{ name: 'llama3', capabilities: [] }]);
+        render(<ChatBox {...baseProps} initialModel="" initialGenerationConfig={null} />);
+        expect(await screen.findByText('Chat with llama3')).toBeInTheDocument();
     });
 
     it('shows an error toast when fetching models fails', async () => {

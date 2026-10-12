@@ -46,7 +46,7 @@ COPY --from=builder-backend --chown=boox:boox /app/backend/chatapp/target/chatap
 # The entire application will be available at http://localhost:8080/
 ENV PORT=8080 \
     OLLAMA_API_URL=http://host.docker.internal:11434 \
-    OLLAMA_MODEL=phi4-mini \
+    OLLAMA_MODEL=granite4:3b \
     OLLAMA_API_TEMPERATURE=0.7 \
     SPRING_PROFILES_ACTIVE=docker
 

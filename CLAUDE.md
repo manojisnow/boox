@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Boox is a full-stack web application providing an interactive chat UI powered by local AI models via [Ollama](https://ollama.com). No external AI API dependencies — runs entirely locally.
+Boox is a full-stack web application providing an interactive chat UI powered by local AI models via [Ollama](https://ollama.com). Local Ollama models can run entirely locally; cloud models and optional web providers send task data externally as described in README.md.
 
 **Architecture:** React SPA frontend + Spring Boot backend + Ollama AI engine (all containerizable)
 
@@ -14,7 +14,7 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 |---|---|
 | Frontend | React 19, Axios, Vite |
 | Backend | Spring Boot 4.1.1, Java 25, Maven |
-| AI Engine | Ollama (phi4-mini default) |
+| AI Engine | Ollama (granite4:3b default) |
 | HTTP Client | Spring RestTemplate |
 | Containerization | Docker, Docker Compose |
 
@@ -26,14 +26,14 @@ Boox is a full-stack web application providing an interactive chat UI powered by
 ```bash
 docker compose up -d
 # Pull a model into the ollama container:
-docker exec <ollama_container_id> ollama pull phi4-mini
+docker exec <ollama_container_id> ollama pull granite4:3b
 # App available at http://localhost:8080
 ```
 
 ### Local Development
 ```bash
 # Terminal 1 — Ollama
-ollama serve && ollama pull phi4-mini
+ollama serve && ollama pull granite4:3b
 
 # Terminal 2 — Backend (port 8080)
 cd backend/chatapp && mvn spring-boot:run
@@ -120,7 +120,7 @@ Key properties (`backend/chatapp/src/main/resources/application.properties`):
 ```properties
 server.port=8080
 ollama.api.url=http://localhost:11434
-ollama.model=phi4-mini
+ollama.model=granite4:3b
 ollama.api.temperature=0.7
 chat.cors.allowed-origins=http://localhost:3000
 spring.datasource.url=jdbc:sqlite:./data/boox.db

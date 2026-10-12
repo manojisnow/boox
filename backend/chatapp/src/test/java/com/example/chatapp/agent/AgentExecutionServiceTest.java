@@ -76,7 +76,9 @@ class AgentExecutionServiceTest {
             json("{\"content\":\"checked\"}"));
     when(tools.executeTool(eq("web_search"), any(), any(), any()))
         .thenReturn("Actual source: https://example.com/facts");
-    assertEquals("checked", service.execute(run()));
+    final String answer = service.execute(run());
+    assertTrue(answer.startsWith("checked"));
+    assertTrue(answer.contains("[Source](https://example.com/facts)"));
     final ArgumentCaptor<List<Map<String, Object>>> messages = ArgumentCaptor.forClass(List.class);
     verify(client, times(3)).chat(any(), messages.capture(), any(), any());
     assertTrue(messages.getValue().stream().anyMatch(row -> row.containsKey("tool_calls")));
@@ -86,6 +88,46 @@ class AgentExecutionServiceTest {
                 row ->
                     "web_search".equals(row.get("tool_name"))
                         && row.get("content").toString().contains("Actual source")));
+  }
+
+  @Test
+  void boundsFallbackLinksAndUsesOnlyRetrievedEvidence() throws Exception {
+    when(runs.priorEvidence("conv", "run"))
+        .thenReturn(
+            "https://example.com/a https://example.com/b https://example.com/c https://example.com/d https://example.com/e https://example.com/f");
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(json("{\"content\":\"draft\"}"), json("{\"content\":\"checked\"}"));
+    final String answer = service.execute(run());
+    assertEquals(5, answer.split("\\[Source\\]", -1).length - 1);
+    assertFalse(answer.contains("https://example.com/f"));
+  }
+
+  @Test
+  void fallbackLinksPreferCurrentSearchOverEarlierEvidence() throws Exception {
+    when(runs.priorEvidence("conv", "run"))
+        .thenReturn(
+            "https://example.com/a https://example.com/b https://example.com/c https://example.com/d https://example.com/e");
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(
+            json(
+                "{\"tool_calls\":[{\"function\":{\"name\":\"web_search\",\"arguments\":{\"query\":\"current\"}}}]}"),
+            json("{\"content\":\"draft\"}"),
+            json("{\"content\":\"checked\"}"));
+    when(tools.executeTool(eq("web_search"), any(), any(), any()))
+        .thenReturn("Source: https://example.com/z");
+    final String answer = service.execute(run());
+    assertTrue(answer.contains("[Source](https://example.com/z)"));
+    assertTrue(answer.indexOf("https://example.com/z") < answer.indexOf("https://example.com/a"));
+    assertFalse(answer.contains("https://example.com/e"));
+  }
+
+  @Test
+  void filesOnlyDoesNotAppendEarlierWebLinks() throws Exception {
+    when(runs.requestJson("run")).thenReturn("{\"allowWebSearch\":false}");
+    when(runs.priorEvidence("conv", "run")).thenReturn("https://example.com/old");
+    when(client.chat(any(), any(), any(), any()))
+        .thenReturn(json("{\"content\":\"draft\"}"), json("{\"content\":\"file answer\"}"));
+    assertEquals("file answer", service.execute(run()));
   }
 
   @Test

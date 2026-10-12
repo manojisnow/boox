@@ -8,7 +8,7 @@ Just Docker required — no repo clone, no build, no manual model setup.
 
 ```bash
 # 1. Download the compose file
-curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
+curl -fsSL https://github.com/manojisnow/boox/releases/latest/download/docker-compose.release.yml \
   -o docker-compose.boox.yml
 
 # 2. Run it
@@ -17,7 +17,7 @@ docker compose -f docker-compose.boox.yml up
 
 Open **http://localhost:8080** — done.
 
-> The default AI model (`phi4-mini`, ~2.5 GB) is pulled automatically on first run and cached in
+> The default AI model (`granite4:3b`, ~2.1 GB) is pulled automatically on first run and cached in
 > a Docker volume. Subsequent starts are instant. To use a different model, create a `.env` file
 > next to the compose file with `OLLAMA_MODEL=<model-name>`.
 
@@ -32,7 +32,7 @@ For local development:
 - Java 25 LTS
 - Node.js 24.15+ (Node 24 LTS; `frontend/.nvmrc`)
 - Maven
-- [Ollama](https://ollama.ai/) with your preferred model (default: phi4-mini)
+- [Ollama](https://ollama.ai/) with your preferred model (default: granite4:3b)
 
 ## Development Options
 
@@ -53,14 +53,14 @@ docker compose up -d
 docker compose logs -f
 ```
 
-After the containers are up and running, you'll need to download the phi4-mini model:
+After the containers are up and running, you'll need to download the granite4:3b model:
 
 ```bash
 # Get the Ollama container ID
 docker compose ps
 
-# Download the phi4-mini model
-docker exec <ollama_container_id> ollama pull phi4-mini
+# Download the granite4:3b model
+docker exec <ollama_container_id> ollama pull granite4:3b
 ```
 
 The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
@@ -80,10 +80,10 @@ docker exec <ollama_container_id> ollama pull <model_name>
 1. Start Ollama server and pull the model:
 ```bash
 ollama serve
-ollama pull phi4-mini
+ollama pull granite4:3b
 ```
 
-You can download a different model by replacing `phi4-mini` with your desired model name. Be considerate of your system resources, as some models can be quite large.
+You can download a different model by replacing `granite4:3b` with your desired model name. Be considerate of your system resources, as some models can be quite large.
 
 2. Start the backend:
 ```bash
@@ -105,7 +105,7 @@ If you prefer to run Ollama locally (useful if you use Ollama for other projects
 1. Start Ollama locally and pull the model:
 ```bash
 ollama serve
-ollama pull phi4-mini
+ollama pull granite4:3b
 ```
 
 2. Run the Boox container with host network access:
@@ -114,7 +114,7 @@ docker run -d --name boox_app \
   -p 8080:8080 \
   -v boox_data:/app/data \
   -e OLLAMA_API_URL=http://host.docker.internal:11434 \
-  -e OLLAMA_MODEL=phi4-mini \
+  -e OLLAMA_MODEL=granite4:3b \
   boox
 ```
 
@@ -158,14 +158,14 @@ docker run -d --name boox_app \
   -p 8080:8080 \
   -v boox_data:/app/data \
   -e OLLAMA_API_URL=http://ollama:11434 \
-  -e OLLAMA_MODEL=phi4-mini \
+  -e OLLAMA_MODEL=granite4:3b \
   -e OLLAMA_API_TEMPERATURE=0.7 \
   boox
 ```
 
 Available variables:
 - `OLLAMA_API_URL`: Ollama server URL
-- `OLLAMA_MODEL`: AI model to use (default: phi4-mini)
+- `OLLAMA_MODEL`: AI model to use (default: granite4:3b)
 - `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7) — server-wide default; any conversation can override it via the generation settings panel (see [Features](#chat))
 - `PORT`: Backend port (default: 8080)
 - `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
@@ -205,7 +205,7 @@ boox/
 - **Files** accepts up to 4 text, Markdown, CSV, JSON, or code files, with a combined limit of 24,000 characters. File attachments are stored in the local conversation database; selecting a cloud Ollama model sends task input to that model's provider. PDF, Office documents, editing files, and executing code are not supported in this version.
 - Progress shows actual searches, expandable evidence, and the draft-review step. Reloading or changing conversations restores the latest task. A temporary connection failure retries status checks without starting another task.
 - **Cancel** stops at the next checkpoint after an in-flight request returns. Model calls have a 3-minute read timeout; search-provider calls have a 30-second read timeout. Tasks interrupted by a server restart are marked failed with a retry message.
-- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence trigger one correction attempt. If that attempt is empty or still includes unsupported URLs, the agent returns a limitation message instead of the rejected answer. You should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages.
+- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence trigger one correction attempt. If that attempt is empty or still includes unsupported URLs, the agent returns a limitation message instead of the rejected answer. You should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages. If an answer omits links, Boox shows up to five available web-source links from its evidence.
 
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
@@ -257,3 +257,9 @@ To use Parallel search and public-page excerpts, set `WEB_SEARCH_PROVIDER=parall
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/manojisnow/boox/blob/main/LICENSE) file for details.
 
 Framework versions, migration details, and rollback guidance: [framework upgrade](docs/framework-upgrade.md).
+
+## v1.5.0 release
+
+See the [release notes](docs/releases/v1.5.0.md) for agent limits, external-data handling, installation, and backup/rollback instructions.
+
+Maintainer publication checklist: [releasing Boox](docs/releasing.md).

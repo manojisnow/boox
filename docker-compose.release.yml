@@ -5,12 +5,12 @@
 # the default AI model on first run.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/main/docker-compose.release.yml \
+#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/v1.5.0/docker-compose.release.yml \
 #     -o docker-compose.boox.yml
 #   docker compose -f docker-compose.boox.yml up
 #
 # Open http://localhost:8080 — no further configuration needed.
-# The AI model (~2.5 GB) is downloaded once and cached in a Docker volume.
+# The AI model (~2.1 GB) is downloaded once and cached in a Docker volume.
 
 services:
 
@@ -28,7 +28,7 @@ services:
         reservations:
           memory: 4G
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -45,14 +45,14 @@ services:
         condition: service_healthy
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-phi4-mini}"]
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-granite4:3b}"]
     volumes:
       - ollama_data:/root/.ollama
     restart: "no"
 
   # ── Boox application (frontend + backend in one image) ───────────────────────
   app:
-    image: dumanoj/boox:latest
+    image: dumanoj/boox:1.5.0
     ports:
       - "8080:8080"
     environment:
@@ -62,7 +62,7 @@ services:
       - BRAVE_SEARCH_API_KEY=${BRAVE_SEARCH_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID:-}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-phi4-mini}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-granite4:3b}
       - OLLAMA_API_TEMPERATURE=${OLLAMA_API_TEMPERATURE:-0.7}
       - PORT=8080
       - CORS_ALLOWED_ORIGINS=http://localhost:8080
