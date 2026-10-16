@@ -21,6 +21,18 @@ public class AgentRunStartRequest {
   // Reuses chat validation for settings, system prompt, and optional image attachments.
   @Valid private SendMessageRequest chatRequest;
 
+  @Size(max = 5)
+  private List<String> selectedMemoryIds;
+
+  public List<String> getSelectedMemoryIds() {
+    if (selectedMemoryIds != null) return List.copyOf(selectedMemoryIds);
+    return chatRequest == null ? List.of() : chatRequest.getSelectedMemoryIds();
+  }
+
+  public void setSelectedMemoryIds(List<String> ids) {
+    selectedMemoryIds = ids == null ? null : List.copyOf(ids);
+  }
+
   private boolean clearAttachments;
 
   public boolean isClearAttachments() {

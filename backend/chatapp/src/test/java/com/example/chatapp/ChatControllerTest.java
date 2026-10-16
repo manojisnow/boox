@@ -70,7 +70,7 @@ class ChatControllerTest {
     req.setModel("m");
     req.setSessionId("sid");
     req.setStream(true);
-    Map<String, String> result = Map.of("role", "assistant", "content", "reply");
+    Map<String, Object> result = Map.of("role", "assistant", "content", "reply");
     when(chatService.sendMessage(req)).thenReturn(result);
     ResponseEntity<?> response = chatController.sendMessage(req);
     assertEquals(result, response.getBody());

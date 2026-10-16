@@ -28,6 +28,16 @@ public class JpaChatContextService implements ChatContextService {
   private final ConversationRepository conversations;
   private final ChatMessageRepository messages;
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.example.chatapp.memory.CurrentUserResolver users;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  private void owned(String id, boolean allowMissing) {
+    if (users != null) users.assertConversationAccessible(id, allowMissing);
+  }
+
   public JpaChatContextService(
       final ConversationRepository conversations, final ChatMessageRepository messages) {
     this.conversations = conversations;
@@ -76,10 +86,11 @@ public class JpaChatContextService implements ChatContextService {
   @Transactional
   public void setSystemPrompt(final String sessionId, final String systemPrompt) {
     final Conversation conversation = getOrCreate(sessionId);
-    if (systemPrompt != null && !systemPrompt.isBlank()) {
-      conversation.setSystemPrompt(systemPrompt.trim());
-    } else {
-      conversation.setSystemPrompt(null);
+    final String normalized =
+        systemPrompt == null || systemPrompt.isBlank() ? null : systemPrompt.trim();
+    if (!java.util.Objects.equals(conversation.getSystemPrompt(), normalized)) {
+      conversation.setSystemPrompt(normalized);
+      conversation.setSettingsVersion(conversation.getSettingsVersion() + 1);
     }
     conversations.save(conversation);
   }
@@ -87,18 +98,31 @@ public class JpaChatContextService implements ChatContextService {
   @Override
   @Transactional(readOnly = true)
   public String getSystemPrompt(final String sessionId) {
+    owned(sessionId, true);
     return conversations.findById(sessionId).map(Conversation::getSystemPrompt).orElse(null);
   }
 
   @Override
   @Transactional
   public void resetContext(final String sessionId) {
+    owned(sessionId, true);
+    if (jdbc != null) {
+      jdbc.update("delete from project_memory_source where source_conversation_id=?", sessionId);
+      jdbc.update("delete from context_use where conversation_id=?", sessionId);
+      jdbc.update(
+          "delete from agent_step where agent_run_id in(select id from agent_run where conversation_id=?)",
+          sessionId);
+      jdbc.update("delete from agent_run where conversation_id=?", sessionId);
+    }
     messages.deleteByConversationId(sessionId);
     conversations
         .findById(sessionId)
         .ifPresent(
             conversation -> {
               conversation.setSystemPrompt(null);
+              conversation.setSummary(null);
+              conversation.setSummarizedCount(0);
+              conversation.setSettingsVersion(conversation.getSettingsVersion() + 1);
               conversation.setUpdatedAt(Instant.now());
               conversations.save(conversation);
             });
@@ -120,12 +144,14 @@ public class JpaChatContextService implements ChatContextService {
   @Override
   @Transactional(readOnly = true)
   public String getSummary(final String sessionId) {
+    owned(sessionId, true);
     return conversations.findById(sessionId).map(Conversation::getSummary).orElse(null);
   }
 
   @Override
   @Transactional(readOnly = true)
   public int getSummarizedCount(final String sessionId) {
+    owned(sessionId, true);
     return conversations.findById(sessionId).map(Conversation::getSummarizedCount).orElse(0);
   }
 
@@ -142,6 +168,7 @@ public class JpaChatContextService implements ChatContextService {
   @Override
   @Transactional(readOnly = true)
   public GenerationConfig getGenerationConfig(final String sessionId) {
+    owned(sessionId, true);
     return conversations
         .findById(sessionId)
         .map(
@@ -164,9 +191,15 @@ public class JpaChatContextService implements ChatContextService {
   }
 
   private Conversation getOrCreate(final String sessionId) {
+    owned(sessionId, true);
     return conversations
         .findById(sessionId)
-        .orElseGet(() -> conversations.save(new Conversation(sessionId)));
+        .orElseGet(
+            () -> {
+              Conversation created = new Conversation(sessionId);
+              if (users != null) created.setOwnerId(users.currentUserId());
+              return conversations.save(created);
+            });
   }
 
   private static String deriveTitle(final String firstUserMessage) {

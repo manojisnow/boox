@@ -5,6 +5,17 @@ import java.util.List;
 /** A single message for rendering a resumed conversation. */
 public final class MessageView {
 
+  private Long id;
+
+  public Long getId() {
+    return id;
+  }
+
+  public MessageView(Long id, String role, String content, List<String> images) {
+    this(role, content, images);
+    this.id = id;
+  }
+
   private final String role;
   private final String content;
   private final List<String> images;

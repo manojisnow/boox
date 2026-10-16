@@ -15,9 +15,20 @@ import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
-@DataJpaTest
+@DataJpaTest(
+    properties = {
+      "spring.jpa.hibernate.ddl-auto=validate",
+      "spring.datasource.url=jdbc:sqlite:target/boox-conversation-service-migration-test.db",
+      "spring.flyway.enabled=false"
+    })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ConversationService.class, JpaChatContextService.class})
+@Import({
+  ConversationService.class,
+  JpaChatContextService.class,
+  com.example.chatapp.config.SchemaMigrationConfiguration.class,
+  com.example.chatapp.memory.CurrentUserResolver.class,
+  com.example.chatapp.context.ExecutionCoordinator.class
+})
 @ActiveProfiles("test")
 class ConversationServiceTest {
 
@@ -30,6 +41,7 @@ class ConversationServiceTest {
   void list_returnsSummaries() {
     contextService.addMessage("c1", "user", "hello there");
     contextService.setMetadata("c1", "ollama", "m1");
+    entityManager.flush();
     List<ConversationSummary> summaries = conversationService.list();
     assertEquals(1, summaries.size());
     assertEquals("c1", summaries.get(0).getId());
@@ -41,6 +53,7 @@ class ConversationServiceTest {
   void list_includesGenerationConfig_whenSet() {
     contextService.addMessage("c7", "user", "hi");
     contextService.setGenerationConfig("c7", new GenerationConfig(0.5, 4096, List.of("STOP")));
+    entityManager.flush();
     ConversationSummary summary = conversationService.list().get(0);
     assertEquals(0.5, summary.getTemperature());
     assertEquals(4096, summary.getNumCtx());
@@ -53,6 +66,7 @@ class ConversationServiceTest {
     contextService.addMessage("c2", "assistant", ""); // tool-call step, no visible text
     contextService.addMessage("c2", "tool", "raw tool result");
     contextService.addMessage("c2", "assistant", "Here is the answer");
+    entityManager.flush();
     List<MessageView> views = conversationService.messages("c2");
     assertEquals(2, views.size());
     assertEquals("user", views.get(0).getRole());
@@ -64,6 +78,7 @@ class ConversationServiceTest {
   @Test
   void messages_includesImages_whenPresent() {
     contextService.addMessage("c5", "user", "what is this", List.of("imgA", "imgB"));
+    entityManager.flush();
     List<MessageView> views = conversationService.messages("c5");
     assertEquals(1, views.size());
     assertEquals(List.of("imgA", "imgB"), views.get(0).getImages());
@@ -72,6 +87,7 @@ class ConversationServiceTest {
   @Test
   void messages_emptyImages_whenNoneAttached() {
     contextService.addMessage("c6", "user", "plain text");
+    entityManager.flush();
     List<MessageView> views = conversationService.messages("c6");
     assertTrue(views.get(0).getImages().isEmpty());
   }
@@ -79,6 +95,7 @@ class ConversationServiceTest {
   @Test
   void rename_existing_updatesTitle() {
     contextService.addMessage("c3", "user", "original");
+    entityManager.flush();
     Optional<ConversationSummary> renamed = conversationService.rename("c3", "  New Name  ");
     assertTrue(renamed.isPresent());
     assertEquals("New Name", renamed.get().getTitle());
@@ -104,7 +121,10 @@ class ConversationServiceTest {
     entityManager.clear();
     conversationService.delete("active");
     assertTrue(agentRuns.findById("r").isEmpty());
-    assertTrue(conversationService.messages("active").isEmpty());
+    entityManager.flush();
+    assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> conversationService.messages("active"));
   }
 
   @Test
@@ -116,6 +136,9 @@ class ConversationServiceTest {
     entityManager.clear();
     conversationService.delete("c4");
     assertTrue(conversationService.list().isEmpty());
-    assertTrue(conversationService.messages("c4").isEmpty());
+    entityManager.flush();
+    assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> conversationService.messages("c4"));
   }
 }

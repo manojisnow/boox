@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** HTTP API for creating and inspecting agent tasks. */
+@edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+    value = "EI_EXPOSE_REP2",
+    justification =
+        "Controllers retain injected Spring singleton services, not caller-owned mutable data.")
 @RestController
 @RequestMapping("/api/agent-runs")
 public class AgentRunController {

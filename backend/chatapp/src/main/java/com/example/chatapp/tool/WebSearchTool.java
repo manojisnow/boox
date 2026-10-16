@@ -177,13 +177,10 @@ public class WebSearchTool implements Tool {
                   .findFirst()
                   .orElse(null);
       if (extracted != null) {
-        LOGGER.warn(
-            "Model passed query as schema object {}; using extracted value: {}",
-            queryObj,
-            extracted);
+        LOGGER.warn("Model passed query as a schema object; using an extracted text value");
         query = extracted;
       } else {
-        LOGGER.warn("Tool received unusable argument for 'query': {}", queryObj);
+        LOGGER.warn("Tool received an unusable argument for 'query'");
         return "Error: Could not extract a search query from the provided argument: " + queryObj;
       }
     } else {

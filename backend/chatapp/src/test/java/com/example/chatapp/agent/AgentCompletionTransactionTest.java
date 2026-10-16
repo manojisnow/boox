@@ -18,9 +18,20 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@DataJpaTest
+@DataJpaTest(
+    properties = {
+      "spring.jpa.hibernate.ddl-auto=validate",
+      "spring.datasource.url=jdbc:sqlite:target/boox-agent-completion-migration-test.db",
+      "spring.flyway.enabled=false"
+    })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({AgentRunService.class, JpaChatContextService.class})
+@Import({
+  AgentRunService.class,
+  JpaChatContextService.class,
+  com.example.chatapp.config.SchemaMigrationConfiguration.class,
+  com.example.chatapp.memory.CurrentUserResolver.class,
+  com.example.chatapp.context.ExecutionCoordinator.class
+})
 @ActiveProfiles("test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class AgentCompletionTransactionTest {

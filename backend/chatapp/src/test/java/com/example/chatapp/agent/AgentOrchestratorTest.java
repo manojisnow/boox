@@ -38,6 +38,28 @@ class AgentOrchestratorTest {
         .thenAnswer(invocation -> Optional.ofNullable(saved.get(invocation.getArgument(0))));
     runs = new AgentRunService(repository, context);
     orchestrator = new AgentOrchestrator(runs, execution, context, new SyncTaskExecutor());
+    configure(orchestrator);
+  }
+
+  private void configure(AgentOrchestrator target) {
+    com.example.chatapp.memory.CurrentUserResolver users =
+        mock(com.example.chatapp.memory.CurrentUserResolver.class);
+    when(users.currentUserId()).thenReturn("local");
+    com.example.chatapp.context.PersonalizationResolver personalization =
+        mock(com.example.chatapp.context.PersonalizationResolver.class);
+    when(personalization.resolve(any(), any(), any(), any(), any(), anyInt()))
+        .thenReturn(new com.example.chatapp.context.PersonalizationContext("", Map.of()));
+    org.springframework.transaction.PlatformTransactionManager transactions =
+        mock(org.springframework.transaction.PlatformTransactionManager.class);
+    when(transactions.getTransaction(any()))
+        .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        target, "coordinator", new com.example.chatapp.context.ExecutionCoordinator());
+    org.springframework.test.util.ReflectionTestUtils.setField(target, "users", users);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        target, "personalization", personalization);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        target, "transactionManager", transactions);
   }
 
   private AgentRunStartRequest request() {
@@ -100,6 +122,7 @@ class AgentOrchestratorTest {
           throw new TaskRejectedException("busy");
         };
     orchestrator = new AgentOrchestrator(runs, execution, context, rejected);
+    configure(orchestrator);
     assertEquals(AgentRunStatus.FAILED, orchestrator.start(request()).getStatus());
     final AgentRunStartRequest bad = request();
     bad.setServer("unknown");
@@ -244,8 +267,22 @@ class AgentOrchestratorTest {
             new org.springframework.orm.ObjectOptimisticLockingFailureException(
                 AgentRun.class, queued.getId()))
         .thenReturn(Optional.of(runs.cancel(queued.getId()).orElseThrow()));
-    new AgentOrchestrator(lifecycle, execution, context, new SyncTaskExecutor())
-        .schedule(queued.getId());
+    when(lifecycle.requestJson(queued.getId()))
+        .thenReturn(new tools.jackson.databind.ObjectMapper().writeValueAsString(request()));
+    AgentOrchestrator worker =
+        new AgentOrchestrator(lifecycle, execution, context, new SyncTaskExecutor());
+    configure(worker);
+    com.example.chatapp.context.ExecutionCoordinator coordinator =
+        (com.example.chatapp.context.ExecutionCoordinator)
+            org.springframework.test.util.ReflectionTestUtils.getField(worker, "coordinator");
+    String token = coordinator.reserve("local", queued.getConversationId());
+    ((Map<String, String>)
+            org.springframework.test.util.ReflectionTestUtils.getField(worker, "executionTokens"))
+        .put(queued.getId(), token);
+    ((Map<String, String>)
+            org.springframework.test.util.ReflectionTestUtils.getField(worker, "executionOwners"))
+        .put(queued.getId(), "local");
+    worker.schedule(queued.getId());
     verify(lifecycle, times(2)).complete(queued.getId(), "answer");
     verify(context, never()).addMessage(any(), eq("assistant"), any());
   }

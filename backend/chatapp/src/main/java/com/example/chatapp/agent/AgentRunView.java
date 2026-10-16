@@ -6,6 +6,7 @@ import java.util.List;
 /** Immutable API representation of an agent run and its visible activity. */
 public final class AgentRunView {
   private String requestJson;
+  private String contextUsedJson;
   private final String id;
   private final String conversationId;
   private final String goal;
@@ -58,7 +59,20 @@ public final class AgentRunView {
             run.getUpdatedAt(),
             run.getSteps().stream().map(AgentStepView::from).toList());
     view.requestJson = run.getRequestJson();
+    view.contextUsedJson = run.getContextUsedJson();
     return view;
+  }
+
+  public java.util.Map<String, Object> getContextUsed() {
+    if (contextUsedJson == null) return java.util.Map.of();
+    try {
+      return new tools.jackson.databind.ObjectMapper()
+          .readValue(
+              contextUsedJson,
+              new tools.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
+    } catch (tools.jackson.core.JacksonException exception) {
+      throw new IllegalStateException("Stored context metadata could not be read.", exception);
+    }
   }
 
   private AgentRunStartRequest request() {

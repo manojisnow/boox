@@ -9,6 +9,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
   /** Conversations ordered most-recently-updated first, for the sidebar. */
   List<Conversation> findAllByOrderByUpdatedAtDesc();
 
+  List<Conversation> findAllByOwnerIdOrderByUpdatedAtDesc(String ownerId);
+
   @org.springframework.data.jpa.repository.Modifying
   @org.springframework.data.jpa.repository.Query(
       "update Conversation c set c.webSessionId = :session where c.id = :id and c.webSessionId is null")

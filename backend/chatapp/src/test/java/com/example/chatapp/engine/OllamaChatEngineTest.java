@@ -211,6 +211,72 @@ class OllamaChatEngineTest {
   }
 
   @Test
+  void completeToolGroupsAndFrozenPersonalizationSurviveMultipleRounds() throws Exception {
+    when(restTemplate.getForEntity(anyString(), eq(Map.class)))
+        .thenReturn(ResponseEntity.ok(Map.of()));
+    when(chatContextService.getContext("sid"))
+        .thenReturn(List.of(Map.of("role", "user", "content", "find the decision")));
+    when(toolRegistry.hasTools()).thenReturn(true);
+    when(toolRegistry.getToolDefinitions()).thenReturn(List.of());
+    when(toolRegistry.executeTool(eq("web_search"), any(), any(), any())).thenReturn("one result");
+    when(toolRegistry.executeTool(eq("web_fetch"), any(), any(), any()))
+        .thenThrow(new IllegalStateException("failed"));
+    ObjectMapper mapper = new ObjectMapper();
+    String calls =
+        mapper.writeValueAsString(
+            Map.of(
+                "message",
+                Map.of(
+                    "role",
+                    "assistant",
+                    "content",
+                    "",
+                    "tool_calls",
+                    List.of(
+                        Map.of(
+                            "function",
+                            Map.of("name", "web_search", "arguments", Map.of("query", "decision"))),
+                        Map.of(
+                            "function",
+                            Map.of(
+                                "name",
+                                "web_fetch",
+                                "arguments",
+                                Map.of("urls", List.of("https://example.com"))))))));
+    when(restTemplate.exchange(
+            anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+        .thenReturn(ResponseEntity.ok(calls))
+        .thenReturn(
+            ResponseEntity.ok("{\"message\":{\"role\":\"assistant\",\"content\":\"done\"}}"));
+    com.example.chatapp.context.PersonalizationContext.install(
+        new com.example.chatapp.context.PersonalizationContext(
+            "Frozen preference: concise", Map.of()));
+    try {
+      assertEquals(
+          "done", engine.sendMessage("find the decision", "m", "sid", false).get("content"));
+    } finally {
+      com.example.chatapp.context.PersonalizationContext.clear();
+    }
+    ArgumentCaptor<HttpEntity> payloads = ArgumentCaptor.forClass(HttpEntity.class);
+    verify(restTemplate, times(2))
+        .exchange(anyString(), eq(HttpMethod.POST), payloads.capture(), eq(String.class));
+    List<Map<String, Object>> sent =
+        (List<Map<String, Object>>)
+            ((Map<?, ?>) payloads.getAllValues().getLast().getBody()).get("messages");
+    int toolCallIndex = -1;
+    for (int i = 0; i < sent.size(); i++)
+      if (sent.get(i).containsKey("tool_calls")) toolCallIndex = i;
+    assertTrue(toolCallIndex >= 0);
+    assertEquals("tool", sent.get(toolCallIndex + 1).get("role"));
+    assertEquals("tool", sent.get(toolCallIndex + 2).get("role"));
+    assertTrue(sent.get(toolCallIndex + 2).get("content").toString().startsWith("Tool failed"));
+    assertTrue(
+        sent.stream().anyMatch(row -> row.get("content").toString().contains("Frozen preference")));
+    verify(toolRegistry, times(1)).executeTool(eq("web_search"), any(), any(), any());
+    verify(toolRegistry, times(1)).executeTool(eq("web_fetch"), any(), any(), any());
+  }
+
+  @Test
   void sendMessage_returnsError_whenOllamaNotRunning() {
     // Arrange
     String sessionId = "sid";
@@ -424,16 +490,16 @@ class OllamaChatEngineTest {
   void sendMessage_summarizesDroppedMessages_whenBudgetExceeded() throws Exception {
     // Arrange
     setField(engine, "summaryEnabled", true);
-    setField(engine, "maxContextTokens", 25);
+    setField(engine, "maxContextTokens", 100);
     String sessionId = "sid";
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
     List<Map<String, Object>> ctx =
         List.of(
-            Map.of("role", "user", "content", "a".repeat(40)),
-            Map.of("role", "assistant", "content", "b".repeat(40)),
-            Map.of("role", "user", "content", "c".repeat(40)),
-            Map.of("role", "assistant", "content", "d".repeat(40)));
+            Map.of("role", "user", "content", "a".repeat(160)),
+            Map.of("role", "assistant", "content", "b".repeat(160)),
+            Map.of("role", "user", "content", "c".repeat(160)),
+            Map.of("role", "assistant", "content", "d".repeat(160)));
     when(chatContextService.getContext(sessionId)).thenReturn(ctx);
     when(chatContextService.getSummarizedCount(sessionId)).thenReturn(0);
     when(chatContextService.getSummary(sessionId)).thenReturn(null);
@@ -540,16 +606,16 @@ class OllamaChatEngineTest {
     // summary the engine is asking the model to write about it — the internal summarization
     // call must not pick up per-conversation overrides.
     setField(engine, "summaryEnabled", true);
-    setField(engine, "maxContextTokens", 25);
+    setField(engine, "maxContextTokens", 100);
     String sessionId = "sid";
     when(restTemplate.getForEntity(anyString(), eq(Map.class)))
         .thenReturn(new ResponseEntity<>(Map.of("models", List.of()), HttpStatus.OK));
     List<Map<String, Object>> ctx =
         List.of(
-            Map.of("role", "user", "content", "a".repeat(40)),
-            Map.of("role", "assistant", "content", "b".repeat(40)),
-            Map.of("role", "user", "content", "c".repeat(40)),
-            Map.of("role", "assistant", "content", "d".repeat(40)));
+            Map.of("role", "user", "content", "a".repeat(160)),
+            Map.of("role", "assistant", "content", "b".repeat(160)),
+            Map.of("role", "user", "content", "c".repeat(160)),
+            Map.of("role", "assistant", "content", "d".repeat(160)));
     when(chatContextService.getContext(sessionId)).thenReturn(ctx);
     when(chatContextService.getSummarizedCount(sessionId)).thenReturn(0);
     when(chatContextService.getSummary(sessionId)).thenReturn(null);

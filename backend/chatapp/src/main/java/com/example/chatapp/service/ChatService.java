@@ -27,6 +27,18 @@ public class ChatService {
   private final Map<String, ChatEngine> engines;
   private final ChatContextService chatContextService;
   private final AgentRunRepository agentRuns;
+  private final Map<String, String> executionOwners =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  @Autowired private com.example.chatapp.context.ExecutionCoordinator coordinator;
+  @Autowired private com.example.chatapp.context.PersonalizationResolver personalization;
+  @Autowired private com.example.chatapp.memory.CurrentUserResolver users;
+  @Autowired private com.example.chatapp.memory.MemoryService memory;
+
+  @org.springframework.beans.factory.annotation.Value("${ollama.context.max-tokens:3000}")
+  private int askInputCeiling = 3000;
+
+  @org.springframework.beans.factory.annotation.Value("${ollama.context.num-ctx:8192}")
+  private int askContextSize = 8192;
 
   @Autowired
   public ChatService(
@@ -53,18 +65,29 @@ public class ChatService {
     return Collections.emptyList();
   }
 
-  public Map<String, String> sendMessage(final SendMessageRequest request) {
-    assertConversationIdle(request.getSessionId());
+  public Map<String, Object> sendMessage(final SendMessageRequest request) {
+    String owner = users.currentUserId();
+    String token = reserve(request);
+    try {
+      startContext(request, owner, token);
+      Map<String, Object> result = new HashMap<>(sendReserved(request));
+      result.put(
+          "contextUsed",
+          com.example.chatapp.context.PersonalizationContext.current().contextUsed());
+      return result;
+    } finally {
+      com.example.chatapp.context.PersonalizationContext.clear();
+      coordinator.finish(owner, request.getSessionId(), token);
+      executionOwners.remove(token);
+    }
+  }
+
+  private Map<String, String> sendReserved(final SendMessageRequest request) {
     final String message = request.getMessage();
     final String server = request.getServer();
     final String model = request.getModel();
     final String sessionId = request.getSessionId();
     final boolean stream = request.isStream() != null && request.isStream();
-    if (request.getSystemPrompt() != null) {
-      chatContextService.setSystemPrompt(sessionId, request.getSystemPrompt());
-    }
-    chatContextService.setMetadata(sessionId, server, model);
-    applyGenerationConfig(request, sessionId);
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -78,25 +101,107 @@ public class ChatService {
   }
 
   public void resetContext(final ResetContextRequest request) {
-    assertConversationIdle(request.getSessionId());
-    final String server = request.getServer();
-    final String sessionId = request.getSessionId();
-    final ChatEngine engine = engines.get(server);
-    if (engine != null) {
-      LOGGER.info("Resetting context for server: {}, session: {}", server, sessionId);
-      engine.resetContext(sessionId);
-    } else {
-      LOGGER.warn("Attempted to reset context for unknown server: {}", server);
+    String owner = users.currentUserId();
+    coordinator.withOwner(
+        owner,
+        () -> {
+          assertConversationIdle(request.getSessionId());
+          ChatEngine engine = engines.get(request.getServer());
+          if (engine != null) engine.resetContext(request.getSessionId());
+          return null;
+        });
+  }
+
+  public String reserve(final SendMessageRequest request) {
+    String owner = users.currentUserId();
+    return coordinator.withOwner(
+        owner,
+        () -> {
+          assertConversationIdle(request.getSessionId());
+          chatContextService.setMetadata(
+              request.getSessionId(), request.getServer(), request.getModel());
+          if (request.getSystemPrompt() != null)
+            chatContextService.setSystemPrompt(request.getSessionId(), request.getSystemPrompt());
+          applyGenerationConfig(request, request.getSessionId());
+          String token = coordinator.reserve(owner, request.getSessionId());
+          executionOwners.put(token, owner);
+          return token;
+        });
+  }
+
+  public void release(final SendMessageRequest request, final String token) {
+    String owner = executionOwners.remove(token);
+    if (owner != null) coordinator.finish(owner, request.getSessionId(), token);
+  }
+
+  public Map<String, Object> executionStatus(String conversation) {
+    memory.conversationSettings(conversation);
+    return coordinator.status(users.currentUserId(), conversation);
+  }
+
+  private void startContext(SendMessageRequest request, String owner, String token) {
+    com.example.chatapp.context.PersonalizationContext.guard(
+        () -> coordinator.check(owner, request.getSessionId(), token));
+    GenerationConfig config = chatContextService.getGenerationConfig(request.getSessionId());
+    int capacity =
+        config != null && config.getNumCtx() != null
+            ? config.getNumCtx()
+            : askContextSize > 0 ? askContextSize : 8192;
+    int budget =
+        Math.max(0, Math.min(askInputCeiling, capacity - Math.min(1024, capacity / 4) - 128));
+    com.example.chatapp.context.PersonalizationContext.install(
+        personalization.resolve(
+            owner,
+            request.getSessionId(),
+            token,
+            request.getMessage(),
+            request.getSelectedMemoryIds(),
+            budget));
+    memory.recordContextUsed(
+        request.getSessionId(),
+        token,
+        com.example.chatapp.context.PersonalizationContext.current().contextUsed());
+  }
+
+  public void streamReserved(
+      final SendMessageRequest request, final SseEmitter emitter, final String token) {
+    String owner = executionOwners.get(token);
+    if (owner == null)
+      throw new java.util.concurrent.CancellationException("Execution was not accepted");
+    try {
+      startContext(request, owner, token);
+      try {
+        emitter.send(
+            SseEmitter.event()
+                .name("context_used")
+                .data(com.example.chatapp.context.PersonalizationContext.current().contextUsed()));
+      } catch (java.io.IOException | RuntimeException disconnected) {
+        LOGGER.debug("Context metadata transport closed");
+      }
+      streamCore(request, emitter);
+    } catch (RuntimeException error) {
+      try {
+        emitter.send(
+            SseEmitter.event().data("Unable to start this request: " + error.getMessage()));
+        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.complete();
+      } catch (java.io.IOException | RuntimeException disconnected) {
+        emitter.completeWithError(error);
+      }
+    } finally {
+      com.example.chatapp.context.PersonalizationContext.clear();
+      coordinator.finish(owner, request.getSessionId(), token);
+      executionOwners.remove(token);
     }
   }
 
   public void streamMessage(final SendMessageRequest request, final SseEmitter emitter) {
+    String token = reserve(request);
+    streamReserved(request, emitter, token);
+  }
+
+  private void streamCore(final SendMessageRequest request, final SseEmitter emitter) {
     final String server = request.getServer();
-    if (request.getSystemPrompt() != null) {
-      chatContextService.setSystemPrompt(request.getSessionId(), request.getSystemPrompt());
-    }
-    chatContextService.setMetadata(request.getSessionId(), server, request.getModel());
-    applyGenerationConfig(request, request.getSessionId());
     final ChatEngine engine = engines.get(server);
     if (engine != null) {
       LOGGER.info(
@@ -124,6 +229,7 @@ public class ChatService {
   }
 
   public void assertConversationIdle(final String sessionId) {
+    coordinator.assertIdle(users.currentUserId(), sessionId);
     if (agentRuns.existsByConversationIdAndStatusIn(
         sessionId,
         List.of(AgentRunStatus.QUEUED, AgentRunStatus.RUNNING, AgentRunStatus.CANCEL_REQUESTED))) {

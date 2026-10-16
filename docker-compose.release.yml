@@ -20,7 +20,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:11434:11434"
     deploy:
       resources:
         limits:
@@ -54,7 +54,7 @@ services:
   app:
     image: dumanoj/boox:1.5.0
     ports:
-      - "8080:8080"
+      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     environment:
       - OLLAMA_API_URL=http://ollama:11434
       - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-legacy}

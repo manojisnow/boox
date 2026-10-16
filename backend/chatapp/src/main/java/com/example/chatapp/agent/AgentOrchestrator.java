@@ -25,6 +25,23 @@ public class AgentOrchestrator {
   private final ChatContextService context;
   private final TaskExecutor executor;
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.example.chatapp.context.ExecutionCoordinator coordinator;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.example.chatapp.context.PersonalizationResolver personalization;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.example.chatapp.memory.CurrentUserResolver users;
+
+  @org.springframework.beans.factory.annotation.Autowired
+  private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+  private final java.util.Map<String, String> executionOwners =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.Map<String, String> executionTokens =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
   public AgentOrchestrator(
       final AgentRunService runs,
       final AgentExecutionService execution,
@@ -36,11 +53,40 @@ public class AgentOrchestrator {
     this.executor = executor;
   }
 
-  public synchronized AgentRunView start(final AgentRunStartRequest request) {
+  public AgentRunView start(final AgentRunStartRequest request) {
+    String owner = users.currentUserId();
+    AgentRunView accepted =
+        coordinator.withOwner(
+            owner,
+            () -> {
+              String token = coordinator.reserve(owner, request.getConversationId());
+              boolean committed = false;
+              try {
+                AgentRunView result =
+                    new org.springframework.transaction.support.TransactionTemplate(
+                            transactionManager)
+                        .execute(status -> accept(request));
+                executionTokens.put(result.getId(), token);
+                executionOwners.put(result.getId(), owner);
+                committed = true;
+                return result;
+              } finally {
+                if (!committed) coordinator.finish(owner, request.getConversationId(), token);
+              }
+            });
+    schedule(accepted.getId());
+    return runs.get(accepted.getId()).orElseThrow();
+  }
+
+  private AgentRunView accept(final AgentRunStartRequest request) {
     if (!"ollama".equals(request.getServer().trim())) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "Agent mode currently supports Ollama only.");
     }
+    context.setMetadata(request.getConversationId(), request.getServer(), request.getModel());
+    if (request.getChatRequest() != null && request.getChatRequest().getSystemPrompt() != null)
+      context.setSystemPrompt(
+          request.getConversationId(), request.getChatRequest().getSystemPrompt());
     runs.inheritEvidence(request);
     if (request.getAttachments().size() > 4)
       throw new ResponseStatusException(
@@ -52,24 +98,29 @@ public class AgentOrchestrator {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST,
           "Attached files exceed 24,000 characters in total. Select smaller files or relevant excerpts.");
-    final AgentRunView run = runs.create(request);
-    context.setMetadata(run.getConversationId(), run.getServer(), run.getModel());
+    final AgentRunView run;
     context.addMessage(
-        run.getConversationId(),
+        request.getConversationId(),
         "user",
-        run.getGoal()
+        request.getGoal()
             + request.getAttachments().stream()
                 .map(file -> "\n\nAttached file: " + file.getName())
                 .collect(java.util.stream.Collectors.joining()));
-    schedule(run.getId());
-    return runs.get(run.getId()).orElseThrow();
+    run = runs.create(request);
+    return run;
   }
 
   public void schedule(final String runId) {
     try {
       executor.execute(() -> execute(runId));
-    } catch (org.springframework.core.task.TaskRejectedException exception) {
-      runs.fail(runId, "The agent is busy. Please retry shortly.");
+    } catch (java.util.concurrent.RejectedExecutionException exception) {
+      try {
+        runs.fail(runId, "The agent is busy. Please retry shortly.");
+      } finally {
+        String token = executionTokens.remove(runId);
+        String owner = executionOwners.remove(runId);
+        if (token != null && owner != null) coordinator.finishExecution(owner, token);
+      }
     }
   }
 
@@ -90,6 +141,8 @@ public class AgentOrchestrator {
   }
 
   private void execute(final String runId) {
+    String owner = executionOwners.get(runId);
+    String token = executionTokens.get(runId);
     try {
       final AgentRunView run = transition(() -> runs.markRunning(runId)).orElse(null);
       if (run == null) return;
@@ -98,13 +151,42 @@ public class AgentOrchestrator {
         return;
       }
       if (run.getStatus() != AgentRunStatus.RUNNING) return;
+      AgentRunStartRequest request =
+          new tools.jackson.databind.ObjectMapper()
+              .readValue(runs.requestJson(runId), AgentRunStartRequest.class);
+      com.example.chatapp.engine.GenerationConfig savedConfig =
+          context.getGenerationConfig(run.getConversationId());
+      Integer contextOverride =
+          request.getChatRequest() != null && request.getChatRequest().isReplaceGenerationConfig()
+              ? request.getChatRequest().getNumCtx()
+              : savedConfig == null ? null : savedConfig.getNumCtx();
+      int capacity = contextOverride == null ? 16384 : contextOverride;
+      int budget = Math.max(0, capacity - Math.min(2048, capacity / 4) - 128);
+      com.example.chatapp.context.PersonalizationContext snapshot =
+          personalization.resolve(
+              owner,
+              run.getConversationId(),
+              token,
+              run.getGoal(),
+              request.getSelectedMemoryIds(),
+              budget);
+      com.example.chatapp.context.PersonalizationContext.install(snapshot);
+      com.example.chatapp.context.PersonalizationContext.guard(
+          () -> coordinator.check(owner, run.getConversationId(), token));
+      runs.setContextUsed(runId, snapshot.contextUsed());
       final String answer = execution.execute(run);
+      coordinator.check(owner, run.getConversationId(), token);
       transition(() -> runs.complete(runId, answer));
     } catch (CancellationException exception) {
       recordFailure(runId, "Task cancelled");
     } catch (Exception exception) {
-      LOGGER.error("Agent run {} failed", runId, exception);
+      LOGGER.error("Agent run {} failed: {}", runId, exception.getClass().getSimpleName());
       recordFailure(runId, "The agent could not produce an answer: " + exception.getMessage());
+    } finally {
+      com.example.chatapp.context.PersonalizationContext.clear();
+      executionTokens.remove(runId);
+      executionOwners.remove(runId);
+      if (owner != null && token != null) coordinator.finishExecution(owner, token);
     }
   }
 
@@ -116,7 +198,10 @@ public class AgentOrchestrator {
                   ? runs.markCancelled(runId)
                   : runs.fail(runId, error));
     } catch (Exception failure) {
-      LOGGER.error("Could not persist terminal status for agent run {}", runId, failure);
+      LOGGER.error(
+          "Could not persist terminal status for agent run {}: {}",
+          runId,
+          failure.getClass().getSimpleName());
     }
   }
 }

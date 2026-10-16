@@ -23,6 +23,7 @@ import org.springframework.data.domain.Persistable;
  * child references when the flush is deferred (e.g. inside one transaction).
  */
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "conversation")
 public class Conversation implements Persistable<String> {
 
@@ -32,6 +33,60 @@ public class Conversation implements Persistable<String> {
   @Id private String id;
 
   @Transient private boolean newEntity = true;
+
+  @Column(nullable = false)
+  private String ownerId;
+
+  private String projectId;
+
+  @Column(nullable = false)
+  private boolean usePreferences = true;
+
+  @Column(nullable = false)
+  private boolean useProjectContext = true;
+
+  @Column(nullable = false)
+  private long settingsVersion;
+
+  public String getOwnerId() {
+    return ownerId;
+  }
+
+  public void setOwnerId(String value) {
+    ownerId = value;
+  }
+
+  public String getProjectId() {
+    return projectId;
+  }
+
+  public void setProjectId(String value) {
+    projectId = value;
+  }
+
+  public boolean isUsePreferences() {
+    return usePreferences;
+  }
+
+  public void setUsePreferences(boolean value) {
+    usePreferences = value;
+  }
+
+  public boolean isUseProjectContext() {
+    return useProjectContext;
+  }
+
+  public void setUseProjectContext(boolean value) {
+    useProjectContext = value;
+  }
+
+  public long getSettingsVersion() {
+    return settingsVersion;
+  }
+
+  public void setSettingsVersion(long value) {
+    settingsVersion = value;
+  }
 
   @Column(nullable = false)
   private String title = DEFAULT_TITLE;

@@ -51,6 +51,47 @@ class AgentRunServiceTest {
   }
 
   @Test
+  void foreignConversationCannotExposeRunOrEvidenceOrAcceptCancellation() {
+    var users = org.mockito.Mockito.mock(com.example.chatapp.memory.CurrentUserResolver.class);
+    var conversations =
+        org.mockito.Mockito.mock(com.example.chatapp.persistence.ConversationRepository.class);
+    org.springframework.test.util.ReflectionTestUtils.setField(service, "users", users);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        service, "conversations", conversations);
+    when(users.currentUserId()).thenReturn("local-owner");
+    var foreign = new com.example.chatapp.persistence.Conversation("conversation-1");
+    foreign.setOwnerId("different-owner");
+    when(conversations.findById("conversation-1")).thenReturn(Optional.of(foreign));
+    AgentRun run = run();
+    when(runs.findById(run.getId())).thenReturn(Optional.of(run));
+
+    assertTrue(service.get(run.getId()).isEmpty());
+    assertTrue(service.cancel(run.getId()).isEmpty());
+    org.junit.jupiter.api.Assertions.assertNull(service.requestJson(run.getId()));
+    org.junit.jupiter.api.Assertions.assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> service.priorEvidence("conversation-1", run.getId()));
+    org.junit.jupiter.api.Assertions.assertThrows(
+        org.springframework.web.server.ResponseStatusException.class,
+        () -> service.listForConversation("conversation-1"));
+    org.mockito.Mockito.verify(runs, org.mockito.Mockito.never()).save(any(AgentRun.class));
+  }
+
+  @Test
+  void contextMetadataIsExposedWithoutRawPreferences() {
+    AgentRun run = run();
+    when(runs.findById(run.getId())).thenReturn(Optional.of(run));
+    service.setContextUsed(
+        run.getId(),
+        java.util.Map.of(
+            "included",
+            List.of(java.util.Map.of("type", "preference", "id", "local-owner", "version", 2))));
+    var metadata = service.get(run.getId()).orElseThrow().getContextUsed();
+    assertTrue(metadata.containsKey("included"));
+    assertFalse(run.getContextUsedJson().contains("background"));
+  }
+
+  @Test
   void listForConversation_returnsMappedRuns() {
     final AgentRun run = run();
     when(runs.findByConversationIdOrderByCreatedAtDesc("conversation-1")).thenReturn(List.of(run));

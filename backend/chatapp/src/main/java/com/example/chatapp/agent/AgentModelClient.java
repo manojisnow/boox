@@ -31,11 +31,10 @@ public class AgentModelClient {
       final List<Map<String, Object>> tools) {
     final int contextSize = ((Number) options.getOrDefault("num_ctx", 16_384)).intValue();
     final int outputSize = ((Number) options.getOrDefault("num_predict", 2_048)).intValue();
-    final int inputChars =
-        messages.stream()
-            .mapToInt(row -> String.valueOf(row.getOrDefault("content", "")).length())
-            .sum();
-    if (inputChars / 3 + outputSize > contextSize)
+    final int inputTokens =
+        messages.stream().mapToInt(com.example.chatapp.context.PromptBudget::cost).sum()
+            + com.example.chatapp.context.PromptBudget.estimate(tools.toString());
+    if (inputTokens + outputSize + 128 > contextSize)
       throw new IllegalStateException(
           "The task evidence exceeds the selected context size. Increase context size or use smaller files and a narrower request.");
     final Map<String, Object> payload = new java.util.HashMap<>();
@@ -54,6 +53,9 @@ public class AgentModelClient {
     } catch (org.springframework.web.client.ResourceAccessException exception) {
       throw new IllegalStateException(
           "The model is unavailable or timed out. Check Ollama and retry.", exception);
+    } catch (org.springframework.web.client.RestClientException exception) {
+      throw new IllegalStateException(
+          "The model request failed. Check model availability and input size.", exception);
     }
     try {
       final JsonNode response = mapper.readTree(body == null ? "{}" : body);

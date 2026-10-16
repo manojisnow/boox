@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatBox from './ChatBox';
-import { sendMessage, streamMessage, getModels, getConversationMessages, listAgentRuns, createAgentRun, getAgentRun, cancelAgentRun } from '../services/api';
+import { sendMessage, streamMessage, getModels, getConversationMessages, listAgentRuns, createAgentRun, getAgentRun, cancelAgentRun, getConversationSettings, saveConversationSettings, getConversationExecution } from '../services/api';
 
 vi.mock('../services/api', () => ({
+    getConversationSettings: vi.fn(), saveConversationSettings: vi.fn(), getConversationExecution: vi.fn(),
+    apiError: error => error.message,
     sendMessage: vi.fn(),
     streamMessage: vi.fn(),
     getModels: vi.fn(),
@@ -24,6 +26,9 @@ const baseProps = {
 beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
+    getConversationSettings.mockResolvedValue({ version: 0, usePreferences: true, useProjectContext: true, systemPrompt: '' });
+    saveConversationSettings.mockImplementation(async (id, settings) => ({ ...settings, version: settings.version + 1 }));
+    getConversationExecution.mockResolvedValue({ state: 'idle' });
     getConversationMessages.mockResolvedValue([]);
     listAgentRuns.mockResolvedValue([]);
     getModels.mockResolvedValue([
@@ -98,7 +103,7 @@ describe('ChatBox send with generation config', () => {
         await user.clear(screen.getByLabelText(/temperature/i));
         await user.clear(screen.getByLabelText(/context size/i));
         await user.clear(screen.getByLabelText(/stop sequences/i));
-        if (!streaming) await user.click(screen.getByRole('checkbox'));
+        if (!streaming) await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
         await user.type(screen.getByPlaceholderText('Message...'), 'Use the defaults');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
@@ -147,7 +152,7 @@ describe('ChatBox send with generation config', () => {
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
         // Turn off streaming so the non-streaming sendMessage path is exercised.
-        await user.click(screen.getByRole('checkbox'));
+        await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
 
         const textbox = screen.getByPlaceholderText('Message...');
         await user.type(textbox, 'hello');
@@ -407,7 +412,7 @@ describe('ChatBox non-streaming send errors', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.click(screen.getByRole('checkbox'));
+        await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
         await user.type(screen.getByPlaceholderText('Message...'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
@@ -443,8 +448,9 @@ describe('ChatBox keyboard handling', () => {
 });
 
 describe('ChatBox system prompt', () => {
-    it('restores a previously saved system prompt from sessionStorage', async () => {
-        sessionStorage.setItem('boox-system-prompt', 'Be a pirate');
+    it('restores only this conversation’s persisted system prompt', async () => {
+        sessionStorage.setItem('boox-system-prompt', 'Ignore global prompt');
+        getConversationSettings.mockResolvedValue({ version: 2, systemPrompt: 'Be a pirate', usePreferences: true, useProjectContext: true });
         const user = userEvent.setup();
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
@@ -462,7 +468,7 @@ describe('ChatBox system prompt', () => {
         const textarea = screen.getByPlaceholderText(/Set system behavior/);
         await user.type(textarea, 'Be nice');
 
-        expect(sessionStorage.getItem('boox-system-prompt')).toBe('Be nice');
+        expect(sessionStorage.getItem('boox-system-prompt')).toBeNull();
     });
 });
 
@@ -724,10 +730,10 @@ describe('Agent tasks', () => {
         await user.upload(fileInput, new File(['name,value\na,5\nb,7'], 'data.csv', { type: 'text/csv' }));
         await screen.findByRole('button', { name: 'Remove file data.csv' });
         expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
-        expect(screen.getByRole('checkbox', { name: '⌁' })).toBeDisabled();
+        expect(screen.getByRole('checkbox', { name: 'Stream response' })).toBeDisabled();
         await user.type(screen.getByPlaceholderText('Message...'), 'Calculate total');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
-        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false, false));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false, false, []));
         getConversationMessages.mockResolvedValue([{ role: 'user', content: 'Calculate total' }, { role: 'assistant', content: 'The total is 12' }]);
         await screen.findByText('The total is 12');
         await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
@@ -747,7 +753,7 @@ describe('Agent tasks', () => {
         expect(screen.getByText(/Scope: Files \+ Web/)).toBeInTheDocument();
         await user.type(screen.getByPlaceholderText('Message...'), 'Compare these figures with published figures');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
-        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true, false));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true, false, []));
     });
 
     it('restores retained files and scope, submits a follow-up, and supports clearing evidence', async () => {
@@ -762,7 +768,7 @@ describe('Agent tasks', () => {
         await user.click(screen.getByRole('button', { name: 'Clear retained files' }));
         await user.type(screen.getByPlaceholderText('Message...'), 'Explain that calculation');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
-        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Explain that calculation', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), [], false, true));
+        await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Explain that calculation', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), [], false, true, []));
     });
 
     it('restores an active run after reload and cancels it', async () => {
@@ -810,4 +816,127 @@ describe('Agent tasks', () => {
         await user.upload(input, new File(['x'.repeat(24_001)], 'large.txt', { type: 'text/plain' }));
         await screen.findByText(/24,000 characters total/);
     });
+});
+
+
+describe('ChatBox local context lifecycle', () => {
+    it('persists per-chat preferences and project opt-out before a model request', async () => {
+        const user = userEvent.setup();
+        getConversationSettings.mockResolvedValue({ version: 7, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Existing instructions' });
+        streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
+        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
+        await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Use my preferences' })).toBeEnabled());
+        await user.click(screen.getByRole('checkbox', { name: 'Use my preferences' }));
+        await user.click(screen.getByRole('checkbox', { name: 'Use project context' }));
+        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await waitFor(() => expect(streamMessage).toHaveBeenCalled());
+        expect(saveConversationSettings).toHaveBeenCalledWith('conv-1', { version: 7, projectId: 'p1', usePreferences: false, useProjectContext: false, systemPrompt: 'Existing instructions' });
+    });
+    it('does not send a request when settings cannot load, preserving existing data', async () => {
+        const user = userEvent.setup(); getConversationSettings.mockRejectedValue(new Error('settings down'));
+        render(<ChatBox {...baseProps} />);
+        expect(await screen.findByRole('alert')).toHaveTextContent('settings down');
+        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+        expect(saveConversationSettings).not.toHaveBeenCalled(); expect(streamMessage).not.toHaveBeenCalled();
+    });
+    it('explicitly clears persisted conversation instructions', async () => {
+        const user = userEvent.setup();
+        getConversationSettings.mockResolvedValue({ version: 4, usePreferences: true, useProjectContext: true, systemPrompt: 'Old prompt' });
+        render(<ChatBox {...baseProps} />);
+        await user.click(screen.getByLabelText('Toggle system prompt'));
+        await waitFor(() => expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Old prompt'));
+        await user.click(screen.getByRole('button', { name: 'Clear conversation instructions' }));
+        await waitFor(() => expect(saveConversationSettings).toHaveBeenCalledWith('conv-1', { version: 4, systemPrompt: '' }));
+        expect(screen.getByLabelText('Conversation instructions')).toHaveValue('');
+    });
+    it('does not unlock a disconnected Ask response while the worker remains running', async () => {
+        const user = userEvent.setup();
+        getConversationExecution.mockResolvedValueOnce({ state: 'idle' }).mockResolvedValue({ state: 'running' });
+        streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.reject(new Error('connection lost')) }) } });
+        render(<ChatBox {...baseProps} />);
+        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeEnabled());
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        await waitFor(() => expect(getConversationExecution).toHaveBeenCalledTimes(2));
+        await user.type(screen.getByPlaceholderText('Message...'), 'follow up');
+        expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
+        expect(screen.getByText(/Reconnecting does not cancel its work/)).toBeInTheDocument();
+    });
+    it('renders SSE context metadata separately from answer tokens', async () => {
+        const user = userEvent.setup(); let read = false;
+        streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => {
+            if (read) return Promise.resolve({ done: true }); read = true;
+            return Promise.resolve({ done: false, value: new TextEncoder().encode('event: context_used\ndata: {"included":[{"type":"preferences","name":"Response length","version":3}]}\n\ndata: Hello\n\ndata: [DONE]\n\n') });
+        } }) } });
+        render(<ChatBox {...baseProps} />);
+        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+        expect(await screen.findByText('Response length (v3)')).toBeInTheDocument();
+        expect(screen.getByText('Hello')).toBeInTheDocument();
+        expect(screen.queryByText(/"included"/)).not.toBeInTheDocument();
+    });
+    it('offers Save for project only for stable persisted IDs', async () => {
+        getConversationSettings.mockResolvedValue({ version: 0, projectId: 'p1', usePreferences: true, useProjectContext: true });
+        getConversationMessages.mockResolvedValue([{ id: 55, role: 'assistant', content: 'Persisted answer' }, { role: 'assistant', content: 'No identifier' }]);
+        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
+        await screen.findByText('Persisted answer');
+        expect(screen.getAllByRole('button', { name: 'Save for project' })).toHaveLength(1);
+    });
+});
+
+it('inherits an unsaved project chat without creating it until settings are saved or sent', async () => {
+    const user = userEvent.setup();
+    getConversationSettings.mockRejectedValue({ response: { status: 404 } });
+    streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
+    render(<ChatBox {...baseProps} initialProjectId="p1" projects={[{ id: 'p1', name: 'Boox' }]} />);
+    await waitFor(() => expect(screen.getByLabelText('Chat project')).toBeEnabled());
+    expect(screen.getByLabelText('Chat project')).toHaveValue('p1');
+    expect(saveConversationSettings).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText('Message'), 'First project message');
+    await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+    await waitFor(() => expect(saveConversationSettings).toHaveBeenCalledWith('conv-1', expect.objectContaining({ version: 0, projectId: 'p1' })));
+    expect(streamMessage).toHaveBeenCalled();
+});
+
+it('blocks sends during project-deletion settings refresh and preserves unrelated prompt edits', async () => {
+    const user = userEvent.setup();
+    getConversationSettings.mockResolvedValue({ version: 2, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Saved' });
+    const { rerender } = render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} settingsRevision={0} />);
+    await user.click(screen.getByLabelText('Toggle system prompt'));
+    await waitFor(() => expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Saved'));
+    await user.type(screen.getByLabelText('Conversation instructions'), ' draft');
+    await user.type(screen.getByLabelText('Message'), 'Ready');
+    let finish;
+    getConversationSettings.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    rerender(<ChatBox {...baseProps} projects={[]} settingsRevision={1} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeDisabled());
+    await act(async () => finish({ version: 3, projectId: null, usePreferences: true, useProjectContext: true, systemPrompt: 'Saved' }));
+    expect(screen.getByLabelText('Chat project')).toHaveValue('');
+    expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Saved draft');
+    expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+});
+
+it('recovers the authoritative completed answer after an Ask disconnect', async () => {
+    const user = userEvent.setup();
+    getConversationExecution.mockResolvedValueOnce({ state: 'idle' }).mockResolvedValueOnce({ state: 'running' }).mockResolvedValue({ state: 'idle' });
+    streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.reject(new Error('connection interrupted')) }) } });
+    render(<ChatBox {...baseProps} />);
+    await user.type(screen.getByLabelText('Message'), 'hello');
+    await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+    await waitFor(() => expect(getConversationExecution).toHaveBeenCalledTimes(2));
+    getConversationMessages.mockResolvedValue([{ id: 89, role: 'assistant', content: 'Completed while disconnected' }]);
+    expect(await screen.findByText('Completed while disconnected', {}, { timeout: 2500 })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Message'), 'Follow up');
+    expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+});
+
+it('keeps explicit generation edits when first settings save creates an empty conversation summary', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
+    await openGenerationSettings(user);
+    await user.type(screen.getByLabelText('Temperature'), '0.7');
+    rerender(<ChatBox {...baseProps} initialGenerationConfig={{ temperature: null, numCtx: null, stopSequences: [] }} />);
+    expect(screen.getByLabelText('Temperature')).toHaveValue(0.7);
 });

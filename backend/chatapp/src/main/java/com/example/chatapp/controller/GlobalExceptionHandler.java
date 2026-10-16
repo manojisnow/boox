@@ -45,6 +45,12 @@ public class GlobalExceptionHandler {
         .body(Map.of("error", defaultString(exception.getReason())));
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<Map<String, String>> handleInvalidInput(
+      final IllegalArgumentException exception) {
+    return ResponseEntity.badRequest().body(Map.of("error", defaultString(exception.getMessage())));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<Map<String, String>> handleGenericException(final Exception exception) {
     final Map<String, String> error = new ConcurrentHashMap<>();

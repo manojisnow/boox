@@ -40,6 +40,6 @@ class StreamControllerTest {
     SseEmitter emitter = streamController.streamMessage(req);
 
     assertNotNull(emitter);
-    verify(chatService, timeout(1000)).streamMessage(eq(req), any(SseEmitter.class));
+    verify(chatService, timeout(1000)).streamReserved(eq(req), any(SseEmitter.class), isNull());
   }
 }

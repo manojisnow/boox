@@ -31,6 +31,22 @@ class ChatServiceTest {
   void setUp() {
     MockitoAnnotations.openMocks(this);
     chatService = new ChatService(Map.of("server1", engine), chatContextService, agentRuns);
+    com.example.chatapp.context.ExecutionCoordinator coordinator =
+        new com.example.chatapp.context.ExecutionCoordinator();
+    com.example.chatapp.memory.CurrentUserResolver users =
+        mock(com.example.chatapp.memory.CurrentUserResolver.class);
+    when(users.currentUserId()).thenReturn("local");
+    com.example.chatapp.context.PersonalizationResolver personalization =
+        mock(com.example.chatapp.context.PersonalizationResolver.class);
+    when(personalization.resolve(any(), any(), any(), any(), any(), anyInt()))
+        .thenReturn(new com.example.chatapp.context.PersonalizationContext("", Map.of()));
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        chatService, "coordinator", coordinator);
+    org.springframework.test.util.ReflectionTestUtils.setField(chatService, "users", users);
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        chatService, "memory", mock(com.example.chatapp.memory.MemoryService.class));
+    org.springframework.test.util.ReflectionTestUtils.setField(
+        chatService, "personalization", personalization);
   }
 
   @Test
@@ -60,7 +76,7 @@ class ChatServiceTest {
     req.setStream(false);
     Map<String, String> result = Map.of("role", "assistant", "content", "reply");
     when(engine.sendMessage(any(), any(), any(), any(), anyBoolean())).thenReturn(result);
-    assertEquals(result, chatService.sendMessage(req));
+    assertEquals(result.get("content"), chatService.sendMessage(req).get("content"));
   }
 
   @Test
@@ -97,7 +113,7 @@ class ChatServiceTest {
   void sendMessage_returnsUnknown_whenEngineMissing() {
     SendMessageRequest req = new SendMessageRequest();
     req.setServer("unknown");
-    Map<String, String> result = chatService.sendMessage(req);
+    Map<String, Object> result = chatService.sendMessage(req);
     assertEquals("assistant", result.get("role"));
     assertEquals("(unknown server)", result.get("content"));
   }
@@ -242,6 +258,53 @@ class ChatServiceTest {
       chatService.streamMessage(request, new SseEmitter());
     } else {
       chatService.sendMessage(request);
+    }
+  }
+
+  @Test
+  void disconnectedTransportKeepsReservationUntilWorkerStops() throws Exception {
+    SendMessageRequest request = new SendMessageRequest();
+    request.setSessionId("slow-chat");
+    request.setServer("server1");
+    request.setModel("m");
+    request.setMessage("hello");
+    request.setStream(true);
+    java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1),
+        finish = new java.util.concurrent.CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              entered.countDown();
+              assertTrue(finish.await(5, java.util.concurrent.TimeUnit.SECONDS));
+              return null;
+            })
+        .when(engine)
+        .streamMessage(any(), any(), any(), any(), any());
+    SseEmitter emitter = mock(SseEmitter.class);
+    doThrow(new java.io.IOException("client disconnected"))
+        .when(emitter)
+        .send(any(SseEmitter.SseEventBuilder.class));
+    String token = chatService.reserve(request);
+    java.util.concurrent.ExecutorService worker =
+        java.util.concurrent.Executors.newSingleThreadExecutor();
+    try {
+      java.util.concurrent.Future<?> task =
+          worker.submit(() -> chatService.streamReserved(request, emitter, token));
+      assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      assertThrows(
+          org.springframework.web.server.ResponseStatusException.class,
+          () -> chatService.sendMessage(request));
+      ResetContextRequest reset = new ResetContextRequest();
+      reset.setSessionId("slow-chat");
+      reset.setServer("server1");
+      assertThrows(
+          org.springframework.web.server.ResponseStatusException.class,
+          () -> chatService.resetContext(reset));
+      finish.countDown();
+      task.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      assertDoesNotThrow(() -> chatService.resetContext(reset));
+    } finally {
+      finish.countDown();
+      worker.shutdownNow();
     }
   }
 }

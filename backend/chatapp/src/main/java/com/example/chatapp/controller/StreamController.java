@@ -39,7 +39,7 @@ public class StreamController {
         request.getModel(),
         request.getSessionId());
 
-    chatService.assertConversationIdle(request.getSessionId());
+    final String token = chatService.reserve(request);
     final SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
     emitter.onCompletion(() -> LOGGER.debug("SSE connection completed"));
     emitter.onTimeout(
@@ -48,7 +48,13 @@ public class StreamController {
           emitter.complete();
         });
 
-    executor.execute(() -> chatService.streamMessage(request, emitter));
+    boolean dispatched = false;
+    try {
+      executor.execute(() -> chatService.streamReserved(request, emitter, token));
+      dispatched = true;
+    } finally {
+      if (!dispatched) chatService.release(request, token);
+    }
     return emitter;
   }
 }

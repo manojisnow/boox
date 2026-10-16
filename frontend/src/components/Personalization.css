@@ -1,0 +1,24 @@
+.personalization-panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(540px, 100vw); overflow-y: auto; z-index: 150; background: var(--color-surface); color: var(--color-text-primary); padding: 24px; box-sizing: border-box; border-left: 1px solid var(--color-border); box-shadow: var(--shadow-md); }
+.personalization-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.personalization-panel h2 { margin: 0; font-size: 1.3rem; }
+.personalization-panel p { font-size: .9rem; line-height: 1.5; }
+.personalization-panel fieldset { border: 0; padding: 0; min-width: 0; }
+.personalization-panel label { display: block; margin: 14px 0; font-size: .9rem; }
+.personalization-panel input:not([type=checkbox]), .personalization-panel textarea, .personalization-panel select { display: block; width: 100%; box-sizing: border-box; padding: 9px; margin-top: 5px; background: var(--color-bg); color: inherit; border: 1px solid var(--color-border); border-radius: 6px; font: inherit; }
+.personalization-panel button, .context-controls button, .project-navigation button, .save-project-message { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg); color: inherit; cursor: pointer; }
+.personalization-panel button:disabled { opacity: .5; cursor: default; }
+.panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
+.personalization-panel pre, .preserve-lines { white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory-note { border-top: 1px solid var(--color-border); padding: 12px 0; }
+.context-used { margin: 8px 16px; font-size: .8rem; color: var(--color-text-secondary); }
+.context-used summary { cursor: pointer; }
+.context-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; font-size: .8rem; }
+.context-controls label { display: flex; align-items: center; gap: 4px; }
+.context-controls select { max-width: 180px; background: var(--color-surface); color: inherit; border: 1px solid var(--color-border); padding: 5px; }
+.project-navigation { padding: 64px 12px 8px; display: flex; flex-direction: column; gap: 8px; }
+.project-navigation select { width: 100%; padding: 8px; background: var(--color-bg); color: inherit; border: 1px solid var(--color-border); }
+.project-navigation .panel-actions { margin: 0; }
+.save-project-message { display: block; margin: 0 24px 8px auto; font-size: .75rem; }
+.settings-launch { border-radius: 20px; width: auto; padding: 0 12px; font-size: .8rem; }
+.context-used { flex-shrink: 0; }
+.context-used[open] { max-height: 180px; overflow-y: auto; }
