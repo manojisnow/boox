@@ -25,7 +25,7 @@ const AgentRunPanel = ({ run, onCancel }) => {
             <div className="agent-run-header">
                 <span className={`agent-run-status ${active ? 'active' : ''}`}>
                     <span className="agent-run-status-dot" />
-                    Agent · {STATUS_LABELS[run.status] || run.status}
+                    Research · {STATUS_LABELS[run.status] || run.status}
                 </span>
                 <button type="button" className="agent-run-toggle" aria-expanded={expanded} aria-controls={activityId} onClick={() => setExpanded(value => !value)}>
                     {expanded ? 'Hide activity' : `Show activity (${stepCount} ${stepCount === 1 ? 'step' : 'steps'})`}

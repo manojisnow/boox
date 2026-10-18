@@ -6,12 +6,15 @@ export function EditorPanel({ title, onClose, children }) {
     const ref = useRef(null);
     useEffect(() => {
         const previous = document.activeElement;
-        ref.current?.focus();
-        return () => previous?.focus();
+        const panel = ref.current;
+        if (typeof panel?.showModal === 'function') panel.showModal();
+        else if (panel) panel.open = true;
+        panel?.focus();
+        return () => { if (typeof panel?.close === 'function') panel.close(); if (previous?.isConnected) previous.focus(); };
     }, []);
-    return <section ref={ref} tabIndex={-1} className="personalization-panel" aria-label={title} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
+    return <dialog ref={ref} tabIndex={-1} className="personalization-panel" aria-label={title} onCancel={e => { e.preventDefault(); onClose(); }} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); } }}>
         <header><h2>{title}</h2><button type="button" onClick={onClose} aria-label={`Close ${title}`}>Close</button></header>{children}
-    </section>;
+    </dialog>;
 }
 
 const profileFields = [['responseLength', 'Response length'], ['explanationStyle', 'Explanation style'], ['familiarity', 'Assumed familiarity'], ['background', 'Background (optional)', 'User-provided background'], ['goals', 'Goals', 'User goals'], ['instructions', 'How should Boox help you?', 'Working preferences']];
@@ -108,7 +111,8 @@ export function MemoryPanel({ projectId, conversationId, sourceMessage, selected
         catch (e) { setError((committed ? 'Change saved. Could not refresh notes: ' : '') + apiError(e)); }
         finally { setBusy(false); }
     };
-    return <EditorPanel title="Project memory" onClose={onClose}>
+    const filteredNotes = notes.filter(n => `${n.title} ${n.content}`.toLowerCase().includes(query.toLowerCase()));
+    return <EditorPanel title="Project notes" onClose={onClose}>
         <p>Save only what you want carried across chats in this project. Saved notes remain when their source chat is deleted or moved. Manage them here.</p>
         <p>Select up to five notes for the next message. Selection clears when Boox accepts the request. Pinned notes and relevant matches may also be included within the context budget.</p>
         {error && <p role="alert">{error}</p>}
@@ -125,7 +129,8 @@ export function MemoryPanel({ projectId, conversationId, sourceMessage, selected
         <label>Search saved notes<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         {!loaded && !error && <p role="status">Loading notes…</p>}
         {loaded && notes.length === 0 && <p>No saved notes yet.</p>}
-        {notes.filter(n => `${n.title} ${n.content}`.toLowerCase().includes(query.toLowerCase())).map(note => <article className="memory-note" key={note.id}>
+        {loaded && notes.length > 0 && filteredNotes.length === 0 && <p role="status">No matching notes. Try a different search.</p>}
+        {filteredNotes.map(note => <article className="memory-note" key={note.id}>
             <h3>{note.title}</h3><p className="preserve-lines">{note.content}</p><small>{note.kind} · v{note.version}{note.pinned ? ' · Pinned' : ''}{note.origin === 'message' ? (note.sourceMessageId ? ' · From a saved message' : ' · Source unavailable') : ' · Manual note'}</small>
             <div className="panel-actions"><label><input type="checkbox" checked={selectedIds.includes(note.id)} disabled={!selectionEnabled || busy || (!selectedIds.includes(note.id) && selectedIds.length >= 5)} onChange={e => onSelectionChange(e.target.checked ? [...selectedIds, note.id] : selectedIds.filter(id => id !== note.id))} /> Use for next message</label>
                 <button type="button" disabled={busy} onClick={() => setDraft(note)}>Edit</button>

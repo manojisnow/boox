@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChatBox from './components/ChatBox';
 import ConversationSidebar from './components/ConversationSidebar';
+import Icon from './components/Icon';
 import { PreferencesPanel, ProjectEditor } from './components/Personalization';
 import {
     getServers,
@@ -33,7 +34,10 @@ const App = () => {
     const conversationRequestId = useRef(0);
     const [servers, setServers] = useState([]);
     const [selectedServer, setSelectedServer] = useState('');
-    const [sidebarExpanded, setSidebarExpanded] = useState(false);
+    const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth >= 900);
+    const [compact, setCompact] = useState(() => window.innerWidth < 900);
+    const sidebarRef = useRef(null);
+    const navigationToggleRef = useRef(null);
     const [conversations, setConversations] = useState([]);
     const [activeConversationId, setActiveConversationId] = useState(
         () => localStorage.getItem(ACTIVE_KEY) || newConversationId()
@@ -41,7 +45,7 @@ const App = () => {
 
     useEffect(() => {
         let current = true;
-        getPreferences().then(p => { if (current && !preferencesInteracted.current && p.onboardingStatus === 'not_started') { setOnboarding(true); setShowPreferences(true); } }).catch(e => { if (current) setAppError(apiError(e)); });
+        getPreferences().then(p => { if (current && !preferencesInteracted.current && p.onboardingStatus === 'not_started') { setOnboarding(true); } }).catch(e => { if (current) setAppError(apiError(e)); });
         const requestId = ++projectRequestId.current;
         listProjects().then(p => { if (current && requestId === projectRequestId.current) setProjects(p); }).catch(e => { if (current && requestId === projectRequestId.current) setAppError(apiError(e)); });
         return () => { current = false; };
@@ -78,7 +82,9 @@ const App = () => {
     useEffect(() => {
         const fetchServers = async () => {
             try {
-                setServers(await getServers());
+                const available = await getServers();
+                setServers(available);
+                setSelectedServer(current => current || available[0] || '');
             } catch (err) {
                 console.error('Failed to fetch servers:', err.message);
             }
@@ -101,6 +107,29 @@ const App = () => {
         }
     }, [activeConversation]);
 
+    useEffect(() => {
+        const resize = () => { const next = window.innerWidth < 900; if (next !== compact) { setCompact(next); setSidebarExpanded(!next); } };
+        window.addEventListener('resize', resize);
+        return () => window.removeEventListener('resize', resize);
+    }, [compact]);
+
+    useEffect(() => {
+        if (!sidebarExpanded || !compact) return;
+        const panel = sidebarRef.current;
+        const previous = document.activeElement;
+        panel?.querySelector('button')?.focus();
+        const handleKey = event => {
+            if (event.key === 'Escape') { event.preventDefault(); setSidebarExpanded(false); }
+            if (event.key !== 'Tab') return;
+            const targets = [navigationToggleRef.current, ...panel.querySelectorAll('button, summary, input')].filter(el => el && !el.disabled && (!el.closest('details:not([open])') || el.tagName === 'SUMMARY'));
+            const first = targets[0], last = targets[targets.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        };
+        document.addEventListener('keydown', handleKey);
+        return () => { document.removeEventListener('keydown', handleKey); if (previous?.isConnected) previous.focus(); };
+    }, [sidebarExpanded, compact]);
+
     const handleNewChat = () => {
         setActiveConversationId(newConversationId());
         refreshConversations();
@@ -113,7 +142,18 @@ const App = () => {
             setSelectedServer(summary.server);
         }
         setActiveConversationId(id);
+        if (window.innerWidth < 900) setSidebarExpanded(false);
         refreshConversations();
+    };
+
+    const handleSelectProject = (id) => {
+        setSelectedProject(id);
+        const latest = conversations.find(chat => (chat.projectId || '') === id);
+        if (latest) handleSelectConversation(latest.id);
+        else {
+            setActiveConversationId(newConversationId());
+            if (compact) setSidebarExpanded(false);
+        }
     };
 
     const handleRename = async (id, title) => {
@@ -127,7 +167,7 @@ const App = () => {
 
     const handleDelete = async (id) => {
         // eslint-disable-next-line no-alert
-        if (!window.confirm('Delete this conversation? Saved project notes remain; manage them in Project memory.')) return;
+        if (!window.confirm('Delete this conversation? Saved project notes remain; manage them in Project notes.')) return;
         try {
             await deleteConversation(id);
             if (id === activeConversationId) {
@@ -144,61 +184,42 @@ const App = () => {
             {showPreferences && <PreferencesPanel onboarding={onboarding} onClose={() => { preferencesInteracted.current = true; setShowPreferences(false); setOnboarding(false); }} />}
             {draftProject !== undefined && <ProjectEditor project={draftProject} onClose={() => setDraftProject(undefined)} onSaved={refreshProjects} chatCount={conversations.filter(c => c.projectId === draftProject?.id).length} />}
             {appError && <div className="toast" role="alert">{appError}<button onClick={() => setAppError('')} aria-label="Dismiss application error">Dismiss</button></div>}
-            <div className="top-left-controls">
-                <button
-                    className="sidebar-toggle-btn"
-                    onClick={() => setSidebarExpanded(exp => !exp)}
-                    aria-label={sidebarExpanded ? 'Hide chat history' : 'Show chat history'}
-                >
-                    {sidebarExpanded ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="15 18 9 12 15 6" />
-                        </svg>
-                    ) : (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <line x1="3" y1="12" x2="21" y2="12" />
-                            <line x1="3" y1="18" x2="21" y2="18" />
-                        </svg>
-                    )}
-                </button>
-            </div>
-            <div className="bottom-left-controls">
-                <button
-                    className="sidebar-toggle-btn new-chat-inline-btn"
-                    onClick={handleNewChat}
-                    aria-label="New Chat"
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                </button>
-            </div>
-            <div className={`sidebar${sidebarExpanded ? ' expanded' : ' collapsed'}`}>
-                {sidebarExpanded && (
-                    <>
+            <button ref={navigationToggleRef} className="navigation-toggle icon-button" onClick={() => setSidebarExpanded(value => !value)} aria-label={sidebarExpanded ? 'Hide chat history' : 'Show chat history'} aria-expanded={sidebarExpanded} aria-controls="boox-sidebar"><Icon name="panel" /></button>
+            {sidebarExpanded && <button className="navigation-scrim" aria-label="Close navigation" onClick={() => setSidebarExpanded(false)} />}
+            <aside id="boox-sidebar" ref={sidebarRef} className={`sidebar${sidebarExpanded ? ' expanded' : ' collapsed'}`} aria-label="Chat navigation" role={compact && sidebarExpanded ? 'dialog' : undefined} aria-modal={compact && sidebarExpanded ? true : undefined} inert={!sidebarExpanded}>
+                {sidebarExpanded && <>
+                    <div className="sidebar-brand">boox<span>.</span></div>
+                    <button className="new-chat-row" aria-label="New Chat" onClick={() => { handleNewChat(); if (window.innerWidth < 900) setSidebarExpanded(false); }}><Icon name="plus" />New chat</button>
                     <nav className="project-navigation" aria-label="Projects">
-                        <button onClick={() => { preferencesInteracted.current = true; setOnboarding(false); setShowPreferences(true); }}>Preferences</button>
-                        <label htmlFor="project-filter">Project</label>
-                        <select id="project-filter" value={selectedProject} onChange={e => setSelectedProject(e.target.value)}><option value="">Standalone chats</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-                        <div className="panel-actions"><button onClick={() => setDraftProject(null)}>Create project</button><button onClick={() => refreshProjects().catch(e => setAppError(apiError(e)))}>Refresh projects</button>{selectedProject && <button onClick={() => setDraftProject(projects.find(p => p.id === selectedProject))}>Edit project</button>}</div>
+                        <button className={!selectedProject ? 'selected' : ''} aria-current={!selectedProject ? 'page' : undefined} onClick={() => handleSelectProject('')}><Icon name="chat" />Standalone chats</button>
+                        <div className="navigation-heading"><span>Projects</span><button className="icon-button" aria-label="Create project" onClick={() => setDraftProject(null)}><Icon name="plus" size={16} /></button></div>
+                        {projects.map(project => <button key={project.id} className={selectedProject === project.id ? 'selected' : ''} aria-current={selectedProject === project.id ? 'page' : undefined} onClick={() => handleSelectProject(project.id)}><Icon name="folder" /><span>{project.name}</span></button>)}
+                        {!projects.length && <p className="navigation-empty">A home for related chats and ideas.</p>}
+                        {selectedProject && <button className="edit-project" onClick={() => setDraftProject(projects.find(p => p.id === selectedProject))}>Edit project</button>}
                     </nav>
+                    <div className="navigation-heading recent-heading">Recent chats</div>
                     <ConversationSidebar
                         conversations={conversations.filter(c => (c.projectId || '') === selectedProject)}
                         activeId={activeConversationId}
                         onSelect={handleSelectConversation}
-                        onNewChat={handleNewChat}
                         onRename={handleRename}
                         onDelete={handleDelete}
                     />
-                    </>
-                )}
-            </div>
+                    <div className="sidebar-footer">
+                        <button onClick={() => { preferencesInteracted.current = true; setOnboarding(false); setShowPreferences(true); }}><Icon name="settings" />Preferences</button>
+                        <details><summary aria-label="Navigation options">•••</summary><button onClick={() => refreshProjects().catch(e => setAppError(apiError(e)))}>Refresh projects</button></details>
+                    </div>
+                </>}
+            </aside>
             <div className="main-chat-section">
                 <ChatBox
                     key={activeConversationId}
                     conversationId={activeConversationId}
+                    title={activeConversation?.title || 'New chat'}
+                    sidebarExpanded={sidebarExpanded}
+                    onNewChat={handleNewChat}
+                    onboarding={onboarding}
+                    onOpenPreferences={() => { preferencesInteracted.current = true; setOnboarding(false); setShowPreferences(true); }}
                     initialProjectId={activeConversation?.projectId ?? selectedProject}
                     projects={projects}
                     settingsRevision={projectsRevision}

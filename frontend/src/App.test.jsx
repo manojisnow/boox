@@ -17,6 +17,7 @@ vi.mock('./services/api', () => ({
 vi.mock('./components/ChatBox', () => ({
     default: (props) => (
         <div data-testid="chat-box">
+            {!props.sidebarExpanded && <button aria-label="New Chat" onClick={props.onNewChat}>New chat</button>}
             <span data-testid="conversation-id">{props.conversationId}</span>
             <span data-testid="selected-server">{props.selectedServer}</span>
             <span data-testid="initial-model">{props.initialModel}</span>
@@ -43,6 +44,7 @@ vi.mock('./components/ConversationSidebar', () => ({
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    window.innerWidth = 700;
     getPreferences.mockResolvedValue({ onboardingStatus: 'skipped' });
     listProjects.mockResolvedValue([]);
     getServers.mockResolvedValue(['ollama']);
@@ -211,6 +213,43 @@ describe('App', () => {
 
 
 describe('project navigation and local installation state', () => {
+    it('opens a new project destination with inherited context when it has no conversations', async () => {
+        const user = userEvent.setup();
+        listProjects.mockResolvedValue([{ id: 'empty', name: 'New idea' }]);
+        render(<App />);
+        await user.click(screen.getByLabelText('Show chat history'));
+        await user.click(await screen.findByRole('button', { name: 'New idea', exact: true }));
+        expect(screen.getByTestId('initial-project')).toHaveTextContent('empty');
+        expect(screen.queryByRole('dialog', { name: 'Chat navigation' })).not.toBeInTheDocument();
+    });
+
+    it('contains keyboard focus in compact navigation and restores its trigger on Escape', async () => {
+        const user = userEvent.setup();
+        render(<App />);
+        const trigger = screen.getByLabelText('Show chat history');
+        await user.click(trigger);
+        expect(screen.getByRole('dialog', { name: 'Chat navigation' })).toBeInTheDocument();
+        await user.click(screen.getByLabelText('Navigation options'));
+        screen.getByRole('button', { name: 'Refresh projects' }).focus();
+        await user.tab();
+        expect(screen.getByLabelText('Hide chat history')).toHaveFocus();
+        await user.tab({ shift: true });
+        expect(screen.getByRole('button', { name: 'Refresh projects' })).toHaveFocus();
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog', { name: 'Chat navigation' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Show chat history')).toHaveFocus();
+    });
+
+    it('opens navigation by default on desktop and selects the available connection', async () => {
+        window.innerWidth = 1280;
+        render(<App />);
+        expect(screen.getByTestId('conversation-sidebar')).toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'New Chat', exact: true })).toHaveLength(1);
+        await waitFor(() => expect(screen.getByTestId('selected-server')).toHaveTextContent('ollama'));
+        act(() => { window.innerWidth = 500; window.dispatchEvent(new Event('resize')); });
+        expect(screen.queryByTestId('conversation-sidebar')).not.toBeInTheDocument();
+    });
+
     it('replaces a deleted stored chat ID without creating a conversation', async () => {
         localStorage.setItem('boox-active-conversation', 'deleted-chat');
         render(<App />);
@@ -223,11 +262,12 @@ describe('project navigation and local installation state', () => {
         listConversations.mockResolvedValue([{ id: '1', title: 'First', server: 'ollama', projectId: 'p1' }, { id: '2', title: 'Standalone', server: 'ollama' }]);
         render(<App />);
         await user.click(screen.getByLabelText('Show chat history'));
-        await waitFor(() => expect(screen.getByLabelText('Project')).toHaveValue('p1'));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Boox', exact: true })).toHaveAttribute('aria-current', 'page'));
         expect(screen.getByText('select-1')).toBeInTheDocument(); expect(screen.queryByText('select-2')).not.toBeInTheDocument();
         await user.click(screen.getByLabelText('New Chat'));
         expect(screen.getByTestId('initial-project')).toHaveTextContent('p1');
-        await user.selectOptions(screen.getByLabelText('Project'), '');
+        await user.click(screen.getByLabelText('Show chat history'));
+        await user.click(screen.getByRole('button', { name: 'Standalone chats', exact: true }));
         await user.click(screen.getByLabelText('New Chat'));
         expect(screen.getByTestId('initial-project')).toBeEmptyDOMElement();
     });
@@ -239,10 +279,11 @@ it('ignores an older initial project response after a newer refresh completes', 
     listProjects.mockImplementationOnce(() => new Promise(resolve => { initial = resolve; })).mockResolvedValue([{ id: 'fresh', name: 'Fresh project' }]);
     render(<App />);
     await user.click(screen.getByLabelText('Show chat history'));
+    await user.click(screen.getByLabelText('Navigation options'));
     await user.click(screen.getByRole('button', { name: 'Refresh projects' }));
-    expect(await screen.findByRole('option', { name: 'Fresh project' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Fresh project' })).toBeInTheDocument();
     await act(async () => initial([]));
-    expect(screen.getByRole('option', { name: 'Fresh project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fresh project' })).toBeInTheDocument();
 });
 
 it('does not reopen onboarding from an old bootstrap response after the user visits preferences', async () => {

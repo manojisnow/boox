@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Message from './Message';
 import AgentRunPanel from './AgentRunPanel';
-import { MemoryPanel, ContextUsed } from './Personalization';
+import Icon from './Icon';
+import { EditorPanel, MemoryPanel, ContextUsed } from './Personalization';
 import {
     sendMessage,
     streamMessage,
@@ -17,6 +18,11 @@ import './ChatBox.css';
 
 const ChatBox = ({
     conversationId,
+    title = 'New chat',
+    sidebarExpanded = true,
+    onNewChat,
+    onboarding = false,
+    onOpenPreferences,
     initialModel,
     initialProjectId = '',
     projects = [],
@@ -30,7 +36,10 @@ const ChatBox = ({
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [models, setModels] = useState([]);
+    const [modelsLoading, setModelsLoading] = useState(false);
+    const [modelRevision, setModelRevision] = useState(0);
     const [selectedModel, setSelectedModel] = useState('');
+    const chosenModels = useRef(new Map());
     const [chatLocked, setChatLocked] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamEnabled, setStreamEnabled] = useState(true);
@@ -41,6 +50,9 @@ const ChatBox = ({
     const [projectId, setProjectId] = useState(initialProjectId || '');
     const [usePreferences, setUsePreferences] = useState(true);
     const [useProjectContext, setUseProjectContext] = useState(true);
+    const [showContext, setShowContext] = useState(false);
+    const [settingsSaved, setSettingsSaved] = useState(false);
+    const [showAttachments, setShowAttachments] = useState(false);
     const [showMemory, setShowMemory] = useState(false);
     const [sourceMessage, setSourceMessage] = useState(null);
     const [selectedMemoryIds, setSelectedMemoryIds] = useState([]);
@@ -100,10 +112,10 @@ const ChatBox = ({
     }, [conversationId, settingsRevision]);
     const persistSettings = async () => {
         if (!settings) throw new Error('Conversation settings have not loaded. Reopen this chat and retry.');
-        setSettingsBusy(true); setSettingsError('');
+        setSettingsBusy(true); setSettingsError(''); setSettingsSaved(false);
         try {
             const saved = await saveConversationSettings(conversationId, { version: settings.version, projectId: projectId || null, usePreferences, useProjectContext, systemPrompt });
-            if (mounted.current) setSettings(saved);
+            if (mounted.current) { setSettings(saved); setSettingsSaved(true); }
             onConversationChanged?.();
             return saved;
         } catch (e) { if (mounted.current) setSettingsError(apiError(e)); throw e; }
@@ -171,7 +183,7 @@ const ChatBox = ({
                     setMessages(toMessages(history));
                 }
             } catch (err) {
-                console.error('Failed to load conversation history:', err.message);
+                if (err.response?.status !== 404) console.error('Failed to load conversation history:', err.message);
             }
         };
         const historyLoaded = loadHistory();
@@ -248,7 +260,8 @@ const ChatBox = ({
     useEffect(() => {
         setModels([]);
         setSelectedModel('');
-        if (!selectedServer) return;
+        if (!selectedServer) { setModelsLoading(false); return; }
+        setModelsLoading(true);
         let current = true;
         const fetchModels = async () => {
             try {
@@ -256,7 +269,8 @@ const ChatBox = ({
                 if (!current) return;
                 setModels(result);
                 const preferred =
-                    result.find(m => m.name === initialModel)
+                    result.find(m => m.name === chosenModels.current.get(selectedServer))
+                    || result.find(m => m.name === initialModel)
                     || result.find(m => m.name === 'granite4:3b')
                     || result.find(m => m.name === 'phi4-mini:latest')
                     || result[0];
@@ -267,11 +281,13 @@ const ChatBox = ({
                 if (!current) return;
                 console.error('Failed to fetch models:', err.message);
                 setError('Failed to fetch models. Please try again.');
+            } finally {
+                if (current) setModelsLoading(false);
             }
         };
         fetchModels();
         return () => { current = false; };
-    }, [selectedServer, initialModel]);
+    }, [selectedServer, initialModel, modelRevision]);
 
     // Auto-scroll to latest message
     useEffect(() => {
@@ -626,83 +642,49 @@ const ChatBox = ({
     };
 
     const showPlaceholder = messages.length === 0;
+    const connectionName = selectedServer === 'ollama' ? 'Ollama' : selectedServer;
+    const settingsDirty = settings && ((projectId || '') !== (settings.projectId || '') || usePreferences !== (settings.usePreferences ?? true) || useProjectContext !== (settings.useProjectContext ?? true) || systemPrompt !== (settings.systemPrompt || ''));
+
 
     return (
         <div className="chat-window chat-style-window">
             {showMemory && projectId && <MemoryPanel key={`${projectId}-${sourceMessage?.id || 'manual'}`} projectId={projectId} conversationId={conversationId} sourceMessage={sourceMessage} selectionEnabled={useProjectContext} selectedIds={selectedMemoryIds} onSelectionChange={setSelectedMemoryIds} onClose={() => { setShowMemory(false); setSourceMessage(null); }} />}
-            <div className="chat-controls">
-                <select
-                    aria-label="Server"
-                    value={selectedServer}
-                    onChange={e => setSelectedServer(e.target.value)}
-                    disabled={blocked}
-                    className="inline-select"
-                >
-                    <option value="" disabled>Select a server</option>
-                    {servers.map(server => (
-                        <option key={server} value={server}>{server}</option>
-                    ))}
-                </select>
-                {models.length > 0 && (
-                    <select
-                        aria-label="Model"
-                        value={selectedModel}
-                        onChange={e => setSelectedModel(e.target.value)}
-                        disabled={blocked}
-                        className="inline-select"
-                    >
-                        <option value="" disabled>Select a model</option>
-                        {models.map(model => (
-                            <option key={model.name} value={model.name}>{model.name}</option>
-                        ))}
-                    </select>
-                )}
-            </div>
-            <div className="context-controls">
-                <label>Chat project<select value={projectId} disabled={blocked || !settings} onChange={e => { setProjectId(e.target.value); setSelectedMemoryIds([]); }}><option value="">Standalone</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-                <label><input type="checkbox" checked={usePreferences} disabled={blocked || !settings} onChange={e => setUsePreferences(e.target.checked)} /> Use my preferences</label>
-                <label><input type="checkbox" checked={useProjectContext} disabled={blocked || !settings || !projectId} onChange={e => { setUseProjectContext(e.target.checked); if (!e.target.checked) setSelectedMemoryIds([]); }} /> Use project context</label>
-                <button type="button" disabled={blocked || !settings} onClick={() => persistSettings().catch(() => {})}>Save chat settings</button>
-                {projectId && <button type="button" disabled={blocked} onClick={() => { setSourceMessage(null); setShowMemory(true); }}>Project memory{selectedMemoryIds.length ? ` (${selectedMemoryIds.length} selected)` : ''}</button>}
-            </div>
-            {settingsError && <div role="alert">{settingsError} <button type="button" disabled={blocked} onClick={async () => {
-                try { const value = await getConversationSettings(conversationId); setSettings(value); setSystemPrompt(value.systemPrompt || ''); setProjectId(value.projectId || ''); setUsePreferences(value.usePreferences); setUseProjectContext(value.useProjectContext); setSelectedMemoryIds([]); setSettingsError(''); } catch (e) { setSettingsError(apiError(e)); }
-            }}>Reload chat settings</button></div>}
-            {executionError && <p role="status">{executionError}</p>}
-            {executionPending && <p role="status">Boox is checking or completing this conversation’s response. Reconnecting does not cancel its work.</p>}
-            <ContextUsed context={interactionMode === 'agent' ? activeAgentRun?.contextUsed : contextUsed} />
-            <div className="chat-messages">
-                {showPlaceholder ? (
-                    <div className="chat-greeting">
-                        <div className="greeting-title">Boox</div>
-                        <div className="greeting-subtitle">
-                            {selectedModel
-                                ? `Chat with ${selectedModel.split(':')[0]}`
-                                : 'Select a server and model to begin'}
-                        </div>
-                        <div className="greeting-hint">Press Enter to send, Shift+Enter for a new line</div>
-                    </div>
-                ) : (
-                    messages.map((msg, index) => (
-                        <React.Fragment key={msg.id || index}><Message text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
-                        {projectId && msg.id != null && !blocked && <button type="button" className="save-project-message" disabled={settings?.projectId !== projectId} title={settings?.projectId !== projectId ? 'Save chat settings before saving a message to this project' : 'Save this completed message as an editable project note'} onClick={() => { setSourceMessage(msg); setShowMemory(true); }}>Save for project</button>}</React.Fragment>
-                    ))
-                )}
-                {activeAgentRun && <AgentRunPanel run={activeAgentRun} onCancel={handleCancelAgentRun} />}
-                {agentRefreshError && <p role="status" className="agent-connection-message">{agentRefreshError}</p>}
-                {chatLocked && interactionMode === 'ask' && !isStreaming && (
-                    <div className="message-row bot">
-                        <div className="message-bubble bot typing-indicator">
-                            <span className="dot"></span>
-                            <span className="dot"></span>
-                            <span className="dot"></span>
-                        </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-            <form className="input-area" onSubmit={handleSendMessage}>
-                <div className="input-bubble">
+            <header className="chat-header">
+                <div className="chat-heading">
+                    <div className="chat-breadcrumb">{projects.find(p => p.id === projectId)?.name || 'Your space'}</div>
+                    <h1>{title}</h1>
+                </div>
+                <div className="chat-header-actions">
+                    {servers.length > 1 && <select aria-label="Server" value={selectedServer} onChange={e => setSelectedServer(e.target.value)} disabled={blocked} className="inline-select"><option value="" disabled>Connection</option>{servers.map(server => <option key={server} value={server}>{server}</option>)}</select>}
+                    {selectedServer && <div className="model-picker">
+                        <span className="model-source" id="model-source">Models from {connectionName}</span>
+                        {models.length > 0 && <select aria-label="Model" aria-describedby="model-source" value={selectedModel} onChange={e => { chosenModels.current.set(selectedServer, e.target.value); setSelectedModel(e.target.value); }} disabled={blocked} className="inline-select"><option value="" disabled>Select a model</option>{models.map(model => <option key={model.name} value={model.name}>{model.name}</option>)}</select>}
+                    </div>}
+                    {selectedServer && !selectedModel && !modelsLoading && <button type="button" className="connection-retry" onClick={() => setModelRevision(value => value + 1)} disabled={blocked}>Retry models</button>}
+                    <button type="button" className="context-trigger" aria-haspopup="dialog" onClick={() => setShowContext(true)}><Icon name="context" />Context</button>
+                    {!sidebarExpanded && onNewChat && <button type="button" className="icon-button" aria-label="New Chat" onClick={onNewChat}><Icon name="plus" /></button>}
+                </div>
+            </header>
+            {showContext && <EditorPanel title="Context" onClose={() => setShowContext(false)}>
+                <p className="panel-intro">Choose what carries into your next message.</p>
+                <div className="context-controls">
+                    <label>Chat project<select value={projectId} disabled={blocked || !settings} onChange={e => { setProjectId(e.target.value); setSelectedMemoryIds([]); }}><option value="">Standalone</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+                    <label><input type="checkbox" checked={usePreferences} disabled={blocked || !settings} onChange={e => setUsePreferences(e.target.checked)} /> Use my preferences</label>
+                    <label><input type="checkbox" checked={useProjectContext} disabled={blocked || !settings || !projectId} onChange={e => { setUseProjectContext(e.target.checked); if (!e.target.checked) setSelectedMemoryIds([]); }} /> Use project context</label>
+                    <button type="button" disabled={blocked || !settings} onClick={() => persistSettings().catch(() => {})}>{settingsBusy ? 'Saving…' : 'Save chat settings'}</button>
+                    {projectId && <button type="button" disabled={blocked} onClick={() => { setSourceMessage(null); setShowContext(false); setShowMemory(true); }}>Project notes{selectedMemoryIds.length ? ` (${selectedMemoryIds.length} selected)` : ''}</button>}
+                </div>
+
+                <p className="context-save-hint">Changes are saved when you send. Save now to keep them without sending a message.</p>
+                {settingsSaved && !settingsDirty && <p role="status">Chat settings saved.</p>}
+                {settingsError && <p role="alert">{settingsError}</p>}
+                <div className="context-section"><h3>Connection</h3>
+                    {servers.length <= 1 && <label>Server<select aria-label="Server" value={selectedServer} onChange={e => setSelectedServer(e.target.value)} disabled={blocked}><option value="" disabled>Select a server</option>{servers.map(server => <option key={server} value={server}>{server}</option>)}</select></label>}
+                    {selectedServer && <p>{selectedServer === 'ollama' ? 'The model list comes from the Ollama service configured for this Boox installation. It can include models that run locally or in the cloud.' : `The model list comes from the ${connectionName} connection configured for this Boox installation.`}</p>}
+                    <p>Context is sent to the selected model. Remote models receive the information you include.</p>
+                </div>
+                <div className="context-section"><h3>Advanced</h3>
+                    <button type="button" className="advanced-toggle" aria-label="Toggle system prompt" aria-expanded={showSystemPrompt} onClick={() => setShowSystemPrompt(value => !value)}>Conversation instructions <span>{showSystemPrompt ? '−' : '+'}</span></button>
                     {showSystemPrompt && (
                         <div className="system-prompt-section">
                             <textarea
@@ -721,6 +703,8 @@ const ChatBox = ({
                             }}>Clear conversation instructions</button>
                         </div>
                     )}
+
+                    <button type="button" className="advanced-toggle" aria-label="Toggle generation settings" aria-expanded={showGenerationSettings} onClick={() => setShowGenerationSettings(value => !value)}>Generation settings <span>{showGenerationSettings ? '−' : '+'}</span></button>
                     {showGenerationSettings && (
                         <div className="generation-settings-section">
                             <label className="generation-settings-field">
@@ -760,11 +744,61 @@ const ChatBox = ({
                             </label>
                         </div>
                     )}
+                        <label className="stream-toggle-inline" title={interactionMode === 'agent' ? 'Agent responses appear after evidence review' : 'Stream response'}>
+                            <input
+                                type="checkbox"
+                                aria-label="Stream response"
+                                checked={streamEnabled}
+                                disabled={interactionMode === 'agent' || blocked}
+                                onChange={e => setStreamEnabled(e.target.checked)}
+                            />
+                            <span>Stream responses</span>
+                        </label>
+                    <p>Generation overrides apply when you send your next message.</p>
+                </div>
+            </EditorPanel>}
+            {settingsError && <div role="alert">{settingsError} <button type="button" disabled={blocked} onClick={async () => {
+                try { const value = await getConversationSettings(conversationId); setSettings(value); setSystemPrompt(value.systemPrompt || ''); setProjectId(value.projectId || ''); setUsePreferences(value.usePreferences); setUseProjectContext(value.useProjectContext); setSelectedMemoryIds([]); setSettingsError(''); } catch (e) { setSettingsError(apiError(e)); }
+            }}>Reload chat settings</button></div>}
+            {executionError && <p role="status">{executionError}</p>}
+            {executionPending && <p role="status">Boox is checking or completing this conversation’s response. Reconnecting does not cancel its work.</p>}
+            <div className="chat-messages">
+                {showPlaceholder ? (
+                    <div className="chat-greeting">
+                        <div className="greeting-wordmark">boox<span>.</span></div>
+                        <h2 className="greeting-title">A little space to think.</h2>
+                        <div className="greeting-subtitle">
+                            {selectedModel ? (projectId ? 'Pick up an idea, or start something new in this project.' : 'Ask a question. Explore an idea. Make a little progress.') : (modelsLoading ? 'Connecting to your model…' : selectedServer ? 'No models available. Check your connection and installed models, then retry.' : 'Open Context to choose a connection and get started.')}
+                        </div>
+                        {onboarding && onOpenPreferences && <button type="button" className="onboarding-link" onClick={onOpenPreferences}>Make Boox feel more like you →</button>}
+                    </div>
+                ) : (
+                    messages.map((msg, index) => (
+                        <React.Fragment key={msg.id != null ? `message-${msg.id}` : `draft-${index}`}><Message text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
+                        {projectId && msg.id != null && !blocked && <button type="button" className="save-project-message" disabled={settings?.projectId !== projectId} title={settings?.projectId !== projectId ? 'Save chat settings before saving a message to this project' : 'Save this completed message as an editable project note'} onClick={() => { setSourceMessage(msg); setShowMemory(true); }}><Icon name="bookmark" size={14} />Save to project notes</button>}</React.Fragment>
+                    ))
+                )}
+                {activeAgentRun && <AgentRunPanel run={activeAgentRun} onCancel={handleCancelAgentRun} />}
+                {agentRefreshError && <p role="status" className="agent-connection-message">{agentRefreshError}</p>}
+                {chatLocked && interactionMode === 'ask' && !isStreaming && (
+                    <div className="message-row bot">
+                        <div className="message-bubble bot typing-indicator">
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                            <span className="dot"></span>
+                        </div>
+                    </div>
+                )}
+                {!showPlaceholder && <ContextUsed context={interactionMode === 'agent' ? activeAgentRun?.contextUsed : contextUsed} />}
+                <div ref={messagesEndRef} />
+            </div>
+            <form className="input-area" onSubmit={handleSendMessage}>
+                <div className="input-bubble">
                     {interactionMode === 'agent' && (
                         <div className="agent-mode-help">
-                            <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
+                            <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Research uses the sources you allow.</p>
                             <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={blocked} /> Include web sources</label>
-                            <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information. Web queries and requested page URLs are sent to the configured search provider.</p>
+                            <details className="research-details"><summary>About research & attachments</summary><p>Attaching text files defaults to Files only. Enable web sources to compare files with external information. Web queries and requested page URLs are sent to the configured search provider.</p><p>Up to 4 text, Markdown, CSV, JSON, or code files; 24,000 characters combined. PDF and Office files are not supported.</p></details>
                             {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={blocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
                             {filesLoading && <p role="status">Reading selected files…</p>}
                             {attachedFiles.length > 0 && <ul>{attachedFiles.map((file, index) => (
@@ -789,6 +823,16 @@ const ChatBox = ({
                             ))}
                         </div>
                     )}
+                        <textarea
+                            ref={textareaRef}
+                            aria-label="Message"
+                            value={input}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder={interactionMode === 'agent' ? 'What would you like to investigate?' : 'Ask anything, or pick up an idea…'}
+                            rows={1}
+                            className="input-textarea"
+                        />
                     <div className="input-row">
                         <div className="interaction-mode-toggle" role="group" aria-label="Response mode">
                             <button
@@ -798,7 +842,7 @@ const ChatBox = ({
                                 aria-pressed={interactionMode === 'ask'}
                                 disabled={blocked || filesLoading || attachedFiles.length > 0}
                             >
-                                Ask
+                                Chat
                             </button>
                             <button
                                 type="button"
@@ -807,40 +851,11 @@ const ChatBox = ({
                                 aria-pressed={interactionMode === 'agent'}
                                 disabled={blocked}
                             >
-                                Agent
+                                Research
                             </button>
                         </div>
-                        <button
-                            type="button"
-                            className={`system-prompt-toggle${systemPrompt ? ' active' : ''}`}
-                            onClick={() => setShowSystemPrompt(v => !v)}
-                            title="System prompt"
-                            aria-label="Toggle system prompt"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                            </svg>
-                        </button>
-                        <button
-                            type="button"
-                            className={`system-prompt-toggle${(temperature !== '' || numCtx !== '' || stopSequencesText !== '') ? ' active' : ''}`}
-                            onClick={() => setShowGenerationSettings(v => !v)}
-                            title="Generation settings"
-                            aria-label="Toggle generation settings"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="4" y1="21" x2="4" y2="14" />
-                                <line x1="4" y1="10" x2="4" y2="3" />
-                                <line x1="12" y1="21" x2="12" y2="12" />
-                                <line x1="12" y1="8" x2="12" y2="3" />
-                                <line x1="20" y1="21" x2="20" y2="16" />
-                                <line x1="20" y1="12" x2="20" y2="3" />
-                                <line x1="1" y1="14" x2="7" y2="14" />
-                                <line x1="9" y1="8" x2="15" y2="8" />
-                                <line x1="17" y1="16" x2="23" y2="16" />
-                            </svg>
-                        </button>
+                        <button type="button" className="attachment-trigger" aria-expanded={showAttachments} onClick={() => setShowAttachments(value => !value)}><Icon name="plus" size={16} />Attach</button>
+                        <div className="attachment-options" hidden={!showAttachments}>
                         {interactionMode === 'agent' && <>
                             <input ref={textFileInputRef} type="file" multiple accept=".txt,.md,.csv,.tsv,.json,.log,.java,.py,.js,.jsx,.ts,.tsx,.html,.css,.xml,.yaml,.yml,.sql" onChange={handleTextFileSelect} style={{ display: 'none' }} />
                             <button type="button" className="attach-image-toggle" onClick={() => textFileInputRef.current?.click()} disabled={blocked || filesLoading || attachedFiles.length >= 4} aria-label="Attach text files" title="Attach text, CSV, JSON, or code files">Files</button>
@@ -871,39 +886,21 @@ const ChatBox = ({
                                 </button>
                             </>
                         )}
-                        <textarea
-                            ref={textareaRef}
-                            aria-label="Message"
-                            value={input}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Message..."
-                            rows={1}
-                            className="input-textarea"
-                        />
+                        {interactionMode !== 'agent' && <span className="attachment-hint">Choose Research to attach text files.</span>}
+                        {!supportsVision && <span className="attachment-hint">Images need a vision-capable model.</span>}
+                        </div>
                         <button
                             type="submit"
                             className="send-btn"
                             aria-label="Send"
                             disabled={blocked || !settings || filesLoading || !input.trim() || !selectedServer || !selectedModel}
                         >
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                                <circle cx="16" cy="16" r="16" fill="currentColor" style={{ color: 'var(--color-accent)' }}/>
-                                <path d="M16 10L16 22M16 10L11 15M16 10L21 15" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                            <Icon name="arrow" size={20} />
                         </button>
-                        <label className="stream-toggle-inline" title={interactionMode === 'agent' ? 'Agent responses appear after evidence review' : 'Stream response'}>
-                            <input
-                                type="checkbox"
-                                aria-label="Stream response"
-                                checked={streamEnabled}
-                                disabled={interactionMode === 'agent' || blocked}
-                                onChange={e => setStreamEnabled(e.target.checked)}
-                            />
-                            <span className="stream-icon">&#x2301;</span>
-                        </label>
+
                     </div>
                 </div>
+                <p className="composer-caption">{selectedModel || 'Choose a model in Context'}<span>Enter to send · Shift + Enter for a new line</span></p>
             </form>
             {error && (
                 <div className="toast" role="alert">

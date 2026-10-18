@@ -1,76 +1,12 @@
-/* Message.css — Styles for chat message bubbles */
-
-.message-row {
-  display: flex;
-  width: 100%;
-  margin-bottom: 2px;
-  animation: slideIn 0.25s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.message-row.user {
-  justify-content: flex-end;
-}
-
-.message-row.bot {
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  max-width: 70%;
-  padding: 14px var(--space-md);
-  border-radius: var(--radius-md);
-  font-size: 1.05rem;
-  line-height: 1.55;
-  box-shadow: var(--shadow-sm);
-  margin: var(--space-sm) 0;
-  word-break: break-word;
-}
-
-.message-bubble.user {
-  background: linear-gradient(135deg, var(--color-user-bubble-start), var(--color-user-bubble-end));
-  color: #fff;
-  border-bottom-right-radius: 6px;
-}
-
-.message-bubble.bot {
-  background: var(--color-bot-bubble);
-  color: var(--color-text-primary);
-  border-bottom-left-radius: 6px;
-}
-
-.message-sender {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 2px;
-  font-weight: 500;
-}
-
-.message-images {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
-}
-
-.message-image-thumb {
-  max-width: 220px;
-  max-height: 220px;
-  border-radius: var(--radius-sm, 6px);
-  object-fit: cover;
-  display: block;
-}
-
+.message-row { display: flex; flex-direction: column; min-width: 0; width: 100%; margin: 4px 0 12px; }
+.message-row.user { align-items: flex-end; }
+.message-row.bot { align-items: stretch; }
+.message-bubble { min-width: 0; max-width: 100%; font-size: 16px; line-height: 1.75; overflow-wrap: anywhere; }
+.message-bubble.user { max-width: 88%; padding: 12px 18px; border-radius: 14px; background: var(--color-surface-secondary); color: var(--color-text-primary); white-space: pre-wrap; }
+.message-bubble.bot { padding: 0; background: transparent; }
+.message-sender { font-size: 13px; color: var(--color-accent); margin-bottom: 12px; font-weight: 500; }
+.message-images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.message-image-thumb { max-width: min(220px,100%); max-height: 220px; border-radius: 8px; object-fit: cover; display: block; }
 /* Markdown content in bot bubbles */
 .message-bubble.bot p {
   margin: 0.4em 0;
@@ -214,9 +150,7 @@
 
 @media (max-width: 600px) {
   .message-bubble {
-    max-width: 90%;
-    font-size: 0.98rem;
-    padding: 10px 12px;
+    font-size: 15px;
   }
 }
 
