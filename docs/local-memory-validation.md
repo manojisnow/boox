@@ -69,9 +69,11 @@ installation.
 
 ## Remaining acceptance and operating limits
 
-Interactive browser acceptance could not run: the computer-use tool reported a locked
-Mac and no available apps or browsers. Automated frontend verification passed, but visual
-layout and complete click-through flows still need a manual browser pass.
+The initial browser check was blocked by a locked Mac. On 18 October 2026, an isolated
+test instance was opened for a user-led walkthrough of onboarding/preferences, projects,
+saved notes, cross-chat recall and inclusion controls. The user reported that everything
+worked. This records user-reported acceptance of the flows exercised, rather than an
+independently observed exhaustive browser regression pass.
 
 The application remains a single-process local installation with no login protection.
 Internal ownership prepares the schema for future accounts; it does not authenticate

@@ -426,7 +426,7 @@ Saved project notes intentionally survive reset; the "no resurrection" requireme
 concerns cleared conversation history/summary/Agent evidence. Independently retained
 project notes remain available when enabled.
 
-Interactive browser acceptance is still pending because the Mac was locked. Broader
+The user reported successful manual browser testing on 18 October 2026. Broader
 preference usefulness and model obedience remain product-evaluation work; the local-model
 smoke checks do not establish these for every model. Perform the documented pre-upgrade
 backup and restore procedure before deploying against a real installation.

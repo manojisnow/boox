@@ -3,8 +3,8 @@
 Date: 16 October 2026. Based on the [feasibility study](local-memory-feasibility.md).
 Status: implemented on `codex/local-preferences-project-memory`, including the
 architecture-review remediations. Backend, frontend, real local-model and container
-checks passed. Interactive browser acceptance remains pending because the test Mac was
-locked. See the [implementation validation record](local-memory-validation.md) for
+checks passed. The user reported successful manual testing on 18 October 2026.
+See the [implementation validation record](local-memory-validation.md) for
 evidence and limits. The increments below retain the original delivery checklist.
 
 ## Delivery strategy
