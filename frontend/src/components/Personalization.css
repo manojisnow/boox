@@ -1,24 +1,30 @@
-.personalization-panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(540px, 100vw); overflow-y: auto; z-index: 150; background: var(--color-surface); color: var(--color-text-primary); padding: 24px; box-sizing: border-box; border-left: 1px solid var(--color-border); box-shadow: var(--shadow-md); }
-.personalization-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.personalization-panel h2 { margin: 0; font-size: 1.3rem; }
-.personalization-panel p { font-size: .9rem; line-height: 1.5; }
+.personalization-panel { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(430px,100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--color-surface); color: var(--color-text-primary); padding: 28px; border: 0; border-left: 1px solid var(--color-border); box-shadow: var(--shadow-lg); }
+.personalization-panel::backdrop { background: #17131f45; backdrop-filter: blur(2px); }
+.personalization-panel header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.personalization-panel h2 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.5px; }
+.personalization-panel h3 { font-size: 13px; font-weight: 500; margin: 0 0 10px; }
+.personalization-panel p { font-size: 12px; line-height: 1.7; color: var(--color-text-secondary); }
+.personalization-panel .panel-intro { font-size: 14px; margin-bottom: 24px; }
 .personalization-panel fieldset { border: 0; padding: 0; min-width: 0; }
-.personalization-panel label { display: block; margin: 14px 0; font-size: .9rem; }
-.personalization-panel input:not([type=checkbox]), .personalization-panel textarea, .personalization-panel select { display: block; width: 100%; box-sizing: border-box; padding: 9px; margin-top: 5px; background: var(--color-bg); color: inherit; border: 1px solid var(--color-border); border-radius: 6px; font: inherit; }
-.personalization-panel button, .context-controls button, .project-navigation button, .save-project-message { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg); color: inherit; cursor: pointer; }
-.personalization-panel button:disabled { opacity: .5; cursor: default; }
+.personalization-panel label { display: block; margin: 14px 0; font-size: 13px; }
+.personalization-panel input:not([type=checkbox]), .personalization-panel textarea, .personalization-panel select { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin-top: 6px; background: var(--color-bg); color: inherit; border: 1px solid var(--color-border); border-radius: 8px; font: inherit; }
+.personalization-panel textarea { resize: vertical; }
+.personalization-panel button { padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-bg); color: inherit; font-size: 12px; }
+.personalization-panel button:hover { background: var(--color-accent-soft); color: var(--color-accent); }
+.personalization-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.personalization-panel summary { font-size: 13px; }
 .panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; }
 .personalization-panel pre, .preserve-lines { white-space: pre-wrap; overflow-wrap: anywhere; }
-.memory-note { border-top: 1px solid var(--color-border); padding: 12px 0; }
-.context-used { margin: 8px 16px; font-size: .8rem; color: var(--color-text-secondary); }
-.context-used summary { cursor: pointer; }
-.context-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; font-size: .8rem; }
-.context-controls label { display: flex; align-items: center; gap: 4px; }
-.context-controls select { max-width: 180px; background: var(--color-surface); color: inherit; border: 1px solid var(--color-border); padding: 5px; }
-.project-navigation { padding: 64px 12px 8px; display: flex; flex-direction: column; gap: 8px; }
-.project-navigation select { width: 100%; padding: 8px; background: var(--color-bg); color: inherit; border: 1px solid var(--color-border); }
-.project-navigation .panel-actions { margin: 0; }
-.save-project-message { display: block; margin: 0 24px 8px auto; font-size: .75rem; }
-.settings-launch { border-radius: 20px; width: auto; padding: 0 12px; font-size: .8rem; }
-.context-used { flex-shrink: 0; }
-.context-used[open] { max-height: 180px; overflow-y: auto; }
+.memory-note { border-top: 1px solid var(--color-border); padding: 18px 0; }
+.context-used { font-size: 12px; color: var(--color-text-secondary); padding: 8px 0; flex-shrink: 0; }
+.context-used summary { cursor: pointer; width: fit-content; }
+.context-used[open] { padding: 12px 16px; background: var(--color-surface-secondary); border-radius: 8px; }
+.context-controls { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.context-controls label { margin: 7px 0; }
+.context-controls > button { align-self: flex-start; }
+.context-controls > button:last-child { margin-top: 8px; }
+.context-section { border-top: 1px solid var(--color-border); padding-top: 20px; margin-top: 24px; }
+.personalization-panel .advanced-toggle { display: flex; align-items: center; justify-content: space-between; background: transparent; border: 0; border-radius: 4px; width: 100%; text-align: left; padding: 12px 0; }
+.save-project-message { display: inline-flex; align-items: center; align-self: flex-start; gap: 6px; margin: -6px 0 12px; padding: 5px 0; border: 0; background: transparent; color: var(--color-text-secondary); font-size: 11px; }
+.save-project-message:hover { color: var(--color-accent); }
+@media(pointer: coarse) { .personalization-panel button { min-height: 44px; } .personalization-panel input:not([type=checkbox]), .personalization-panel textarea, .personalization-panel select { font-size: 16px; } }

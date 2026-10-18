@@ -36,11 +36,101 @@ beforeEach(() => {
     ]);
 });
 
-// Restores the generation settings panel's toggle button.
+const openContext = async user => {
+    if (!screen.queryByRole('dialog', { name: 'Context' })) await user.click(screen.getByRole('button', { name: 'Context', exact: true }));
+};
+
+// Advanced settings are available through Context.
 const openGenerationSettings = async (user) => {
+    await openContext(user);
     const toggle = await screen.findByRole('button', { name: /toggle generation settings/i });
     await user.click(toggle);
 };
+
+describe('quiet conversation controls', () => {
+    it('keeps saved messages and a draft reply distinct when a database ID matches the new message index', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const user = userEvent.setup();
+        let finishStream;
+        getConversationMessages.mockResolvedValue([
+            { id: 1, role: 'user', content: 'First question' },
+            { id: 2, role: 'assistant', content: 'First answer' },
+            { id: 3, role: 'user', content: 'Second question' },
+            { id: 4, role: 'assistant', content: 'Second answer' },
+        ]);
+        streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => new Promise(resolve => { finishStream = resolve; }) }) } });
+        try {
+            render(<ChatBox {...baseProps} />);
+            await screen.findByText('Second answer');
+            await user.type(screen.getByLabelText('Message'), 'Third question');
+            await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
+            await waitFor(() => expect(streamMessage).toHaveBeenCalled());
+            expect(screen.getAllByText('Second answer')).toHaveLength(1);
+            expect(screen.getAllByText('Third question')).toHaveLength(1);
+            expect(consoleError.mock.calls.some(args => args.join(' ').includes('same key'))).toBe(false);
+        } finally {
+            if (finishStream) await act(async () => finishStream({ done: true }));
+            consoleError.mockRestore();
+        }
+    });
+
+    it('treats missing history as normal for a new unsaved conversation', async () => {
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        getConversationMessages.mockRejectedValue({ response: { status: 404 } });
+        try {
+            render(<ChatBox {...baseProps} />);
+            await screen.findByLabelText('Model');
+            await waitFor(() => expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeEnabled());
+            expect(screen.getByText('A little space to think.')).toBeInTheDocument();
+            expect(consoleError).not.toHaveBeenCalled();
+        } finally { consoleError.mockRestore(); }
+    });
+
+    it('identifies the model source with a single connection and explains local versus cloud in Context', async () => {
+        const user = userEvent.setup();
+        render(<ChatBox {...baseProps} />);
+        const model = await screen.findByLabelText('Model');
+        expect(model).toHaveAccessibleDescription('Models from Ollama');
+        await openContext(user);
+        expect(screen.getByText(/The model list comes from the Ollama service/)).toHaveTextContent('It can include models that run locally or in the cloud.');
+    });
+
+    it('updates the model source when the selected connection changes', async () => {
+        const { rerender } = render(<ChatBox {...baseProps} servers={['ollama', 'other']} />);
+        await screen.findByLabelText('Model');
+        rerender(<ChatBox {...baseProps} selectedServer="other" servers={['ollama', 'other']} />);
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveAccessibleDescription('Models from other'));
+        expect(getModels).toHaveBeenLastCalledWith('other');
+    });
+
+    it('keeps context out of the transcript and preserves draft instructions after closing it', async () => {
+        const user = userEvent.setup();
+        render(<ChatBox {...baseProps} />);
+        await screen.findByLabelText('Model');
+        expect(screen.queryByLabelText('Chat project')).not.toBeInTheDocument();
+        await openContext(user);
+        await user.click(screen.getByLabelText('Toggle system prompt'));
+        await user.type(screen.getByLabelText('Conversation instructions'), 'Keep examples practical');
+        await user.keyboard('{Escape}');
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Context', exact: true })).toHaveFocus();
+        expect(saveConversationSettings).not.toHaveBeenCalled();
+        await openContext(user);
+        expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Keep examples practical');
+    });
+
+    it('recovers model discovery without discarding the message draft', async () => {
+        const user = userEvent.setup();
+        getModels.mockRejectedValueOnce(new Error('offline'));
+        render(<ChatBox {...baseProps} />);
+        await screen.findByRole('alert');
+        await user.type(screen.getByLabelText('Message'), 'Keep this draft');
+        await user.click(screen.getByRole('button', { name: 'Retry models' }));
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('qwen2.5:14b'));
+        expect(screen.getByLabelText('Message')).toHaveValue('Keep this draft');
+        expect(getModels).toHaveBeenCalledTimes(2);
+    });
+});
 
 describe('ChatBox generation config restore', () => {
     it('restores fields once initialGenerationConfig arrives asynchronously, without clobbering later user edits', async () => {
@@ -103,8 +193,8 @@ describe('ChatBox send with generation config', () => {
         await user.clear(screen.getByLabelText(/temperature/i));
         await user.clear(screen.getByLabelText(/context size/i));
         await user.clear(screen.getByLabelText(/stop sequences/i));
-        if (!streaming) await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
-        await user.type(screen.getByPlaceholderText('Message...'), 'Use the defaults');
+        if (!streaming) { await openContext(user); await user.click(screen.getByRole('checkbox', { name: 'Stream response' })); }
+        await user.type(screen.getByLabelText('Message'), 'Use the defaults');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         const send = streaming ? streamMessage : sendMessage;
@@ -131,7 +221,7 @@ describe('ChatBox send with generation config', () => {
 
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        const textbox = screen.getByPlaceholderText('Message...');
+        const textbox = screen.getByLabelText('Message');
         await user.type(textbox, 'Count from 1 to 10.');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
@@ -152,9 +242,9 @@ describe('ChatBox send with generation config', () => {
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
         // Turn off streaming so the non-streaming sendMessage path is exercised.
-        await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
+        { await openContext(user); await user.click(screen.getByRole('checkbox', { name: 'Stream response' })); }
 
-        const textbox = screen.getByPlaceholderText('Message...');
+        const textbox = screen.getByLabelText('Message');
         await user.type(textbox, 'hello');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
@@ -217,11 +307,22 @@ describe('ChatBox conversation history', () => {
                 'history down'
             )
         );
-        expect(screen.getByText('Boox')).toBeInTheDocument();
+        expect(screen.getByText('A little space to think.')).toBeInTheDocument();
     });
 });
 
 describe('ChatBox model selection', () => {
+    it('keeps an explicit model choice when saving settings creates a summary with the server default model', async () => {
+        const user = userEvent.setup();
+        getModels.mockResolvedValue([{ name: 'server-default' }, { name: 'chosen-model' }]);
+        const { rerender } = render(<ChatBox {...baseProps} initialModel="" />);
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('server-default'));
+        await user.selectOptions(screen.getByLabelText('Model'), 'chosen-model');
+        rerender(<ChatBox {...baseProps} initialModel="server-default" />);
+        await waitFor(() => expect(getModels).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('chosen-model'));
+    });
+
     it('prefers the conversation model over installed defaults', async () => {
         getModels.mockResolvedValue([
             { name: 'granite4:3b', capabilities: ['tools'] },
@@ -229,7 +330,7 @@ describe('ChatBox model selection', () => {
             { name: 'qwen2.5:14b', capabilities: [] },
         ]);
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
-        expect(await screen.findByText('Chat with qwen2.5')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('qwen2.5:14b'));
     });
 
     it('falls back to phi4-mini:latest when initialModel is not in the list', async () => {
@@ -238,7 +339,7 @@ describe('ChatBox model selection', () => {
             { name: 'llama3', capabilities: [] },
         ]);
         render(<ChatBox {...baseProps} initialModel="not-installed" initialGenerationConfig={null} />);
-        expect(await screen.findByText('Chat with phi4-mini')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('phi4-mini:latest'));
     });
 
     it('prefers the release default for a new conversation', async () => {
@@ -247,13 +348,13 @@ describe('ChatBox model selection', () => {
             { name: 'granite4:3b', capabilities: ['tools'] },
         ]);
         render(<ChatBox {...baseProps} initialModel="" initialGenerationConfig={null} />);
-        expect(await screen.findByText('Chat with granite4')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('granite4:3b'));
     });
 
     it('selects an installed model when neither default is available', async () => {
         getModels.mockResolvedValue([{ name: 'llama3', capabilities: [] }]);
         render(<ChatBox {...baseProps} initialModel="" initialGenerationConfig={null} />);
-        expect(await screen.findByText('Chat with llama3')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('llama3'));
     });
 
     it('shows an error toast when fetching models fails', async () => {
@@ -349,7 +450,7 @@ describe('ChatBox SSE streaming', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        await user.type(screen.getByLabelText('Message'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         await waitFor(() => expect(screen.getByText('Hello world')).toBeInTheDocument());
@@ -369,7 +470,7 @@ describe('ChatBox SSE streaming', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'search cats');
+        await user.type(screen.getByLabelText('Message'), 'search cats');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         expect(await screen.findByText('Web Search complete')).toBeInTheDocument();
@@ -384,7 +485,7 @@ describe('ChatBox SSE streaming', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        await user.type(screen.getByLabelText('Message'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         await waitFor(() => expect(consoleWarn).toHaveBeenCalled());
@@ -396,7 +497,7 @@ describe('ChatBox SSE streaming', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        await user.type(screen.getByLabelText('Message'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -412,8 +513,8 @@ describe('ChatBox non-streaming send errors', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.click(screen.getByRole('checkbox', { name: 'Stream response' }));
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        { await openContext(user); await user.click(screen.getByRole('checkbox', { name: 'Stream response' })); }
+        await user.type(screen.getByLabelText('Message'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -429,7 +530,7 @@ describe('ChatBox keyboard handling', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        const textbox = screen.getByPlaceholderText('Message...');
+        const textbox = screen.getByLabelText('Message');
         await user.type(textbox, 'hi{Enter}');
 
         await waitFor(() => expect(streamMessage).toHaveBeenCalledTimes(1));
@@ -440,7 +541,7 @@ describe('ChatBox keyboard handling', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        const textbox = screen.getByPlaceholderText('Message...');
+        const textbox = screen.getByLabelText('Message');
         await user.type(textbox, 'hi{Shift>}{Enter}{/Shift}');
 
         expect(streamMessage).not.toHaveBeenCalled();
@@ -455,6 +556,7 @@ describe('ChatBox system prompt', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
+        await openContext(user);
         await user.click(screen.getByLabelText('Toggle system prompt'));
         expect(screen.getByPlaceholderText(/Set system behavior/)).toHaveValue('Be a pirate');
     });
@@ -464,6 +566,7 @@ describe('ChatBox system prompt', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
+        await openContext(user);
         await user.click(screen.getByLabelText('Toggle system prompt'));
         const textarea = screen.getByPlaceholderText(/Set system behavior/);
         await user.type(textarea, 'Be nice');
@@ -506,7 +609,7 @@ describe('ChatBox send button state', () => {
         const user = userEvent.setup();
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        await user.type(screen.getByLabelText('Message'), 'hi');
         expect(screen.getByRole('button', { name: /send/i })).toBeEnabled();
     });
 });
@@ -519,7 +622,7 @@ describe('ChatBox Enter-key guard clauses', () => {
         const user = userEvent.setup();
         render(<ChatBox {...baseProps} selectedServer="" initialGenerationConfig={null} />);
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi{Enter}');
+        await user.type(screen.getByLabelText('Message'), 'hi{Enter}');
 
         expect(await screen.findByRole('alert')).toHaveTextContent(
             'Please select a server before sending a message.'
@@ -533,7 +636,7 @@ describe('ChatBox Enter-key guard clauses', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi{Enter}');
+        await user.type(screen.getByLabelText('Message'), 'hi{Enter}');
 
         expect(await screen.findByRole('alert')).toHaveTextContent(
             'Please select a model before sending a message.'
@@ -555,7 +658,7 @@ describe('ChatBox sending with an attached image', () => {
         await user.upload(fileInput, file);
         await screen.findByAltText('Attachment 1');
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'look at this');
+        await user.type(screen.getByLabelText('Message'), 'look at this');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         await waitFor(() => expect(streamMessage).toHaveBeenCalledTimes(1));
@@ -601,7 +704,7 @@ describe('ChatBox malformed tool_result', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await waitFor(() => expect(getModels).toHaveBeenCalled());
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'hi');
+        await user.type(screen.getByLabelText('Message'), 'hi');
         await user.click(screen.getByRole('button', { name: /send/i }));
 
         await waitFor(() =>
@@ -620,7 +723,7 @@ describe('ChatBox input change clears a prior error', () => {
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
         await screen.findByRole('alert');
 
-        await user.type(screen.getByPlaceholderText('Message...'), 'h');
+        await user.type(screen.getByLabelText('Message'), 'h');
 
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
@@ -659,7 +762,7 @@ describe('ChatBox server and model dropdowns', () => {
         await user.upload(fileInput, file);
         await screen.findByAltText('Attachment 1');
 
-        const modelSelect = screen.getAllByRole('combobox')[1];
+        const modelSelect = screen.getByLabelText('Model');
         await user.selectOptions(modelSelect, 'text-model');
 
         await waitFor(() => expect(screen.queryByLabelText('Attach image')).not.toBeInTheDocument());
@@ -700,8 +803,8 @@ describe('Agent tasks', () => {
         render(<ChatBox {...baseProps} />);
         await screen.findByText('Saved normal chat');
         await screen.findByText(/Could not restore task status/);
-        expect(screen.getByRole('button', { name: 'Agent', exact: true })).toBeDisabled();
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Agent', exact: true })).toBeEnabled(), { timeout: 2000 });
+        expect(screen.getByRole('button', { name: 'Research', exact: true })).toBeDisabled();
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Research', exact: true })).toBeEnabled(), { timeout: 2000 });
         expect(listAgentRuns).toHaveBeenCalledTimes(2);
         expect(screen.queryByText(/Could not restore task status/)).not.toBeInTheDocument();
         expect(screen.getByText('Saved normal chat')).toBeInTheDocument();
@@ -714,9 +817,9 @@ describe('Agent tasks', () => {
         listAgentRuns.mockResolvedValue([{ id: 'retry-history', status: 'COMPLETED', steps: [] }]);
         render(<ChatBox {...baseProps} />);
         await screen.findByText(/Could not refresh conversation history/);
-        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeDisabled();
         await screen.findByText('Recovered answer', {}, { timeout: 2000 });
-        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeEnabled();
         expect(getConversationMessages).toHaveBeenCalledTimes(3);
     });
 
@@ -725,33 +828,35 @@ describe('Agent tasks', () => {
         createAgentRun.mockResolvedValue({ id: 'run-1', status: 'RUNNING', steps: [] });
         getAgentRun.mockResolvedValue({ id: 'run-1', status: 'COMPLETED', finalOutput: 'The total is 12', steps: [] });
         render(<ChatBox {...baseProps} />);
-        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await user.click(screen.getByRole('button', { name: 'Research', exact: true }));
         const fileInput = document.querySelector('input[accept*=".txt"]');
         await user.upload(fileInput, new File(['name,value\na,5\nb,7'], 'data.csv', { type: 'text/csv' }));
         await screen.findByRole('button', { name: 'Remove file data.csv' });
-        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeDisabled();
+        await openContext(user);
         expect(screen.getByRole('checkbox', { name: 'Stream response' })).toBeDisabled();
-        await user.type(screen.getByPlaceholderText('Message...'), 'Calculate total');
+        await user.click(screen.getByRole('button', { name: 'Close Context' }));
+        await user.type(screen.getByLabelText('Message'), 'Calculate total');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Calculate total', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], { temperature: null, numCtx: null, stopSequences: [] }, [{ name: 'data.csv', content: 'name,value\na,5\nb,7' }], false, false, []));
         getConversationMessages.mockResolvedValue([{ role: 'user', content: 'Calculate total' }, { role: 'assistant', content: 'The total is 12' }]);
         await screen.findByText('The total is 12');
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
-        await user.click(screen.getByRole('button', { name: 'Ask', exact: true }));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeEnabled());
+        await user.click(screen.getByRole('button', { name: 'Chat', exact: true }));
     });
 
     it('offers visible web and mixed scopes without requiring tool names', async () => {
         const user = userEvent.setup();
         createAgentRun.mockResolvedValue({ id: 'mixed', status: 'RUNNING', steps: [] });
         render(<ChatBox {...baseProps} />);
-        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await user.click(screen.getByRole('button', { name: 'Research', exact: true }));
         expect(screen.getByRole('checkbox', { name: 'Include web sources' })).toBeChecked();
         await user.upload(document.querySelector('input[accept*=".txt"]'), new File(['amount\n7'], 'data.csv', { type: 'text/csv' }));
         await screen.findByRole('button', { name: 'Remove file data.csv' });
         expect(screen.getByRole('checkbox', { name: 'Include web sources' })).not.toBeChecked();
         await user.click(screen.getByRole('checkbox', { name: 'Include web sources' }));
         expect(screen.getByText(/Scope: Files \+ Web/)).toBeInTheDocument();
-        await user.type(screen.getByPlaceholderText('Message...'), 'Compare these figures with published figures');
+        await user.type(screen.getByLabelText('Message'), 'Compare these figures with published figures');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith(expect.any(String), 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), expect.any(Array), true, false, []));
     });
@@ -761,12 +866,12 @@ describe('Agent tasks', () => {
         listAgentRuns.mockResolvedValue([{ id: 'previous', status: 'COMPLETED', steps: [], attachedFileNames: ['totals.csv'], allowWebSearch: false }]);
         createAgentRun.mockResolvedValue({ id: 'follow-up', status: 'RUNNING', steps: [], attachedFileNames: [], allowWebSearch: false });
         render(<ChatBox {...baseProps} />);
-        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await user.click(screen.getByRole('button', { name: 'Research', exact: true }));
         await screen.findByText(/Available for follow-ups: totals.csv/);
-        expect(screen.getByRole('button', { name: 'Agent', exact: true })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Research', exact: true })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('checkbox', { name: 'Include web sources' })).not.toBeChecked();
         await user.click(screen.getByRole('button', { name: 'Clear retained files' }));
-        await user.type(screen.getByPlaceholderText('Message...'), 'Explain that calculation');
+        await user.type(screen.getByLabelText('Message'), 'Explain that calculation');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await waitFor(() => expect(createAgentRun).toHaveBeenCalledWith('Explain that calculation', 'conv-1', 'ollama', 'qwen2.5:14b', '', [], expect.any(Object), [], false, true, []));
     });
@@ -780,19 +885,19 @@ describe('Agent tasks', () => {
         await user.click(await screen.findByRole('button', { name: 'Cancel', exact: true }));
         expect(cancelAgentRun).toHaveBeenCalledWith('resumed');
         await screen.findByText(/Cancellation takes effect/);
-        await screen.findByText('Agent · Cancelled');
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
+        await screen.findByText('Research · Cancelled');
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeEnabled());
     });
 
     it('restores input when task creation fails', async () => {
         const user = userEvent.setup();
         createAgentRun.mockRejectedValue({ response: { data: { error: 'Conversation already busy' } } });
         render(<ChatBox {...baseProps} />);
-        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
-        await user.type(screen.getByPlaceholderText('Message...'), 'Review my goal');
+        await user.click(screen.getByRole('button', { name: 'Research', exact: true }));
+        await user.type(screen.getByLabelText('Message'), 'Review my goal');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await screen.findByText('Conversation already busy');
-        expect(screen.getByPlaceholderText('Message...')).toHaveValue('Review my goal');
+        expect(screen.getByLabelText('Message')).toHaveValue('Review my goal');
     });
 
     it('retries polling failures without unlocking an unfinished task', async () => {
@@ -800,15 +905,15 @@ describe('Agent tasks', () => {
         getAgentRun.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ id: 'run-offline', status: 'COMPLETED', steps: [] });
         render(<ChatBox {...baseProps} />);
         await screen.findByText(/Connection interrupted/, {}, { timeout: 2000 });
-        expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeDisabled();
-        await screen.findByText('Agent · Response ready', {}, { timeout: 3000 });
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Ask', exact: true })).toBeEnabled());
+        expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeDisabled();
+        await screen.findByText('Research · Response ready', {}, { timeout: 3000 });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Chat', exact: true })).toBeEnabled());
     });
 
     it('removes files and rejects oversized attachments', async () => {
         const user = userEvent.setup();
         render(<ChatBox {...baseProps} />);
-        await user.click(screen.getByRole('button', { name: 'Agent', exact: true }));
+        await user.click(screen.getByRole('button', { name: 'Research', exact: true }));
         const input = document.querySelector('input[accept*=".txt"]');
         await user.upload(input, new File(['some text'], 'notes.md', { type: 'text/markdown' }));
         await user.click(await screen.findByRole('button', { name: 'Remove file notes.md' }));
@@ -825,10 +930,11 @@ describe('ChatBox local context lifecycle', () => {
         getConversationSettings.mockResolvedValue({ version: 7, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Existing instructions' });
         streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
         render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
+        await openContext(user);
         await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Use my preferences' })).toBeEnabled());
         await user.click(screen.getByRole('checkbox', { name: 'Use my preferences' }));
         await user.click(screen.getByRole('checkbox', { name: 'Use project context' }));
-        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.type(screen.getByLabelText('Message'), 'hello');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await waitFor(() => expect(streamMessage).toHaveBeenCalled());
         expect(saveConversationSettings).toHaveBeenCalledWith('conv-1', { version: 7, projectId: 'p1', usePreferences: false, useProjectContext: false, systemPrompt: 'Existing instructions' });
@@ -837,7 +943,7 @@ describe('ChatBox local context lifecycle', () => {
         const user = userEvent.setup(); getConversationSettings.mockRejectedValue(new Error('settings down'));
         render(<ChatBox {...baseProps} />);
         expect(await screen.findByRole('alert')).toHaveTextContent('settings down');
-        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.type(screen.getByLabelText('Message'), 'hello');
         expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
         expect(saveConversationSettings).not.toHaveBeenCalled(); expect(streamMessage).not.toHaveBeenCalled();
     });
@@ -845,6 +951,7 @@ describe('ChatBox local context lifecycle', () => {
         const user = userEvent.setup();
         getConversationSettings.mockResolvedValue({ version: 4, usePreferences: true, useProjectContext: true, systemPrompt: 'Old prompt' });
         render(<ChatBox {...baseProps} />);
+        await openContext(user);
         await user.click(screen.getByLabelText('Toggle system prompt'));
         await waitFor(() => expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Old prompt'));
         await user.click(screen.getByRole('button', { name: 'Clear conversation instructions' }));
@@ -856,11 +963,11 @@ describe('ChatBox local context lifecycle', () => {
         getConversationExecution.mockResolvedValueOnce({ state: 'idle' }).mockResolvedValue({ state: 'running' });
         streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.reject(new Error('connection lost')) }) } });
         render(<ChatBox {...baseProps} />);
-        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.type(screen.getByLabelText('Message'), 'hello');
         await waitFor(() => expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeEnabled());
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         await waitFor(() => expect(getConversationExecution).toHaveBeenCalledTimes(2));
-        await user.type(screen.getByPlaceholderText('Message...'), 'follow up');
+        await user.type(screen.getByLabelText('Message'), 'follow up');
         expect(screen.getByRole('button', { name: 'Send', exact: true })).toBeDisabled();
         expect(screen.getByText(/Reconnecting does not cancel its work/)).toBeInTheDocument();
     });
@@ -871,7 +978,7 @@ describe('ChatBox local context lifecycle', () => {
             return Promise.resolve({ done: false, value: new TextEncoder().encode('event: context_used\ndata: {"included":[{"type":"preferences","name":"Response length","version":3}]}\n\ndata: Hello\n\ndata: [DONE]\n\n') });
         } }) } });
         render(<ChatBox {...baseProps} />);
-        await user.type(screen.getByPlaceholderText('Message...'), 'hello');
+        await user.type(screen.getByLabelText('Message'), 'hello');
         await user.click(screen.getByRole('button', { name: 'Send', exact: true }));
         expect(await screen.findByText('Response length (v3)')).toBeInTheDocument();
         expect(screen.getByText('Hello')).toBeInTheDocument();
@@ -882,7 +989,7 @@ describe('ChatBox local context lifecycle', () => {
         getConversationMessages.mockResolvedValue([{ id: 55, role: 'assistant', content: 'Persisted answer' }, { role: 'assistant', content: 'No identifier' }]);
         render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
         await screen.findByText('Persisted answer');
-        expect(screen.getAllByRole('button', { name: 'Save for project' })).toHaveLength(1);
+        expect(screen.getAllByRole('button', { name: 'Save to project notes' })).toHaveLength(1);
     });
 });
 
@@ -891,6 +998,7 @@ it('inherits an unsaved project chat without creating it until settings are save
     getConversationSettings.mockRejectedValue({ response: { status: 404 } });
     streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
     render(<ChatBox {...baseProps} initialProjectId="p1" projects={[{ id: 'p1', name: 'Boox' }]} />);
+    await openContext(user);
     await waitFor(() => expect(screen.getByLabelText('Chat project')).toBeEnabled());
     expect(screen.getByLabelText('Chat project')).toHaveValue('p1');
     expect(saveConversationSettings).not.toHaveBeenCalled();
@@ -904,6 +1012,7 @@ it('blocks sends during project-deletion settings refresh and preserves unrelate
     const user = userEvent.setup();
     getConversationSettings.mockResolvedValue({ version: 2, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Saved' });
     const { rerender } = render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} settingsRevision={0} />);
+    await openContext(user);
     await user.click(screen.getByLabelText('Toggle system prompt'));
     await waitFor(() => expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Saved'));
     await user.type(screen.getByLabelText('Conversation instructions'), ' draft');

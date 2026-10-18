@@ -12,7 +12,7 @@ describe('Message', () => {
 
     it('labels assistant messages "AI" and renders markdown', () => {
         const { container } = render(<Message text="**bold text**" sender="assistant" />);
-        expect(screen.getByText('AI')).toBeInTheDocument();
+        expect(screen.getByText('boox')).toBeInTheDocument();
         expect(container.querySelector('strong')).not.toBeNull();
         expect(container.querySelector('.message-row.bot')).not.toBeNull();
     });

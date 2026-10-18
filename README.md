@@ -199,16 +199,16 @@ See [preferences, project memory and upgrade behavior](docs/local-memory.md) for
 ### Chat
 - **Real-time streaming** — responses appear token by token via SSE (Server-Sent Events), with a toggle to switch to non-streaming mode
 - **Markdown rendering** — bot replies render as rich markdown with syntax-highlighted code blocks (via `react-markdown` + `react-syntax-highlighter`)
-- **System prompt** — collapsible gear icon in the input bar lets you set a custom system instruction (e.g. "You are a pirate"); persisted across page reloads via `sessionStorage`
+- **Conversation instructions** — open Context → Advanced to set custom instructions for the current conversation; saved with that conversation
 - **Context reset** — clear the current conversation's messages without restarting the server
 - **Multi-model support** — switch between any models pulled into Ollama at any point; switching mid-conversation continues the same conversation rather than starting a new one
 - **Context window management** — long conversations stay fast and coherent: once a conversation exceeds a token budget, older turns are automatically folded into a running summary instead of being sent to the model in full every turn. The full conversation is always still stored and shown — only what's *sent to the model* is trimmed. Configurable via `OLLAMA_CONTEXT_*` (see [Manual Configuration](#manual-configuration))
 - **Image input** — attach up to 4 images to a message for vision-capable models (e.g. `gemma3`/`gemma4`); the attach button only appears when the selected model reports `vision` support. Images persist with the conversation and are shown again on resume
-- **Per-conversation generation settings** — collapsible sliders-icon panel next to the system prompt lets you override temperature, context size (`num_ctx`), and stop sequences for that conversation only; each field falls back to the server default when left blank. Settings are saved with the conversation and restored on resume, isolated from every other conversation. To reset saved overrides, clear the fields and send your next message.
+- **Per-conversation generation settings** — Context → Advanced lets you override temperature, context size (`num_ctx`), and stop sequences for that conversation only; each field falls back to the server default when left blank. Settings are saved with the conversation and restored on resume, isolated from every other conversation. To reset saved overrides, clear the fields and send your next message.
 
 ### Agent mode
 - Ask naturally; no tool names are needed. The model chooses tools within the permitted scope. The visible **Include web sources** control selects Web or Files + Web. Attaching text files defaults to **Files only**, enforced by the backend; enable web sources for mixed research. API callers can set `allowWebSearch`; when omitted it defaults to false with text attachments and true otherwise.
-- Switch from **Ask** to **Agent** for a bounded research or file-analysis task. The agent can use the configured web-search provider and, with Parallel enabled, read public source pages and then reviews its draft against the available evidence before returning a response.
+- Switch from **Chat** to **Research** for a bounded research or file-analysis task. The agent can use the configured web-search provider and, with Parallel enabled, read public source pages and then reviews its draft against the available evidence before returning a response.
 - Run `python3 scripts/verify-agent-followups.py` against the local app with `qwen2.5:14b` installed for the five-turn regression: total, explanation, hypothetical adjustment, original-file lookup, and explicit clearing.
 - **Follow-ups** reuse retained text files, the saved web-access scope, and up to 8,000 characters of prior retrieved source excerpts within the same conversation. New uploads replace retained files with the same name. **Clear retained files** removes them from the next task; a new conversation starts without prior evidence. History and evidence remain bounded; this is not unlimited conversation memory.
 - **Files** accepts up to 4 text, Markdown, CSV, JSON, or code files, with a combined limit of 24,000 characters. File attachments are stored in the local conversation database; selecting a cloud Ollama model sends task input to that model's provider. PDF, Office documents, editing files, and executing code are not supported in this version.
@@ -237,7 +237,10 @@ To use Parallel search and public-page excerpts, set `WEB_SEARCH_PROVIDER=parall
 
 ### UI / UX
 - **Dark mode** — automatic via `prefers-color-scheme`, no toggle needed
-- **25 CSS design tokens** — consistent spacing, colours, radii, and transitions throughout
+- **Quiet conversation layout** — restrained surfaces, a readable transcript, and a spacious composer with separate writing and control rows
+- **Context drawer** — project assignment, preferences, saved notes, and advanced settings stay accessible without crowding the conversation; changes save explicitly or before sending
+- **Project navigation** — open an existing project conversation or start a new chat with inherited project context; compact screens use a navigation drawer
+- **Shared design tokens** — consistent spacing, colours, radii, and transitions throughout
 - **Auto-resize textarea** — input grows as you type, capped at 120px
 - **Enter to send, Shift+Enter for newline**
 - **Typing indicator** — animated dots while waiting for the first token

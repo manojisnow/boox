@@ -25,9 +25,9 @@ const ConversationSidebar = ({ conversations, activeId, onSelect, onNewChat, onR
 
     return (
         <div className="conversation-sidebar">
-            <button className="new-chat-row" onClick={onNewChat}>
+            {onNewChat && <button className="new-chat-row" onClick={onNewChat}>
                 <span className="plus">+</span> New chat
-            </button>
+            </button>}
             <div className="conversation-list">
                 {conversations.length === 0 && (
                     <div className="conv-empty">No conversations yet</div>
@@ -40,6 +40,7 @@ const ConversationSidebar = ({ conversations, activeId, onSelect, onNewChat, onR
                         {editingId === conversation.id ? (
                             <input
                                 className="conv-rename-input"
+                                aria-label="Conversation title"
                                 value={draft}
                                 autoFocus
                                 onChange={e => setDraft(e.target.value)}
@@ -52,6 +53,7 @@ const ConversationSidebar = ({ conversations, activeId, onSelect, onNewChat, onR
                         ) : (
                             <button
                                 className="conv-title"
+                                aria-current={conversation.id === activeId ? 'page' : undefined}
                                 onClick={() => onSelect(conversation.id)}
                                 title={conversation.title}
                             >

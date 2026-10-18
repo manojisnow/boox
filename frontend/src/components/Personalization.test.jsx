@@ -106,6 +106,20 @@ it('shows execution metadata without presenting current settings as historical s
     expect(screen.getByText('Response length (v2)')).toBeInTheDocument(); expect(screen.getByText('Saved note: context budget')).toBeInTheDocument();
 });
 
+it('explains an empty saved-note search and restores results when the query is cleared', async () => {
+    const user = userEvent.setup();
+    listMemories.mockResolvedValue([{ id: 'n1', title: 'Project decision', content: 'Keep SQLite', kind: 'decision' }]);
+    render(<MemoryPanel projectId="p1" onClose={() => {}} onSelectionChange={() => {}} />);
+    expect(await screen.findByRole('heading', { name: 'Project decision' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Project notes' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search saved notes'), 'unmatched');
+    expect(screen.getByRole('status')).toHaveTextContent('No matching notes. Try a different search.');
+    expect(screen.queryByRole('heading', { name: 'Project decision' })).not.toBeInTheDocument();
+    await user.clear(screen.getByLabelText('Search saved notes'));
+    expect(screen.getByRole('heading', { name: 'Project decision' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
 it('refreshes preserved saved notes after their source chat is reset', async () => {
     const user = userEvent.setup();
     const note = { id: 'n1', version: 1, title: 'Keep decision', content: 'SQLite', kind: 'decision', origin: 'message', sourceMessageId: 5, sourceConversationId: 'c1' };
