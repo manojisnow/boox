@@ -2,6 +2,8 @@
 
 A modern chat application built with React and Spring Boot that uses Ollama for local AI models.
 
+![Boox's conversation interface with project navigation, model selection, and a spacious composer](docs/images/quiet-conversation-ui.png)
+
 ## ⚡ Zero-Setup Quick Start
 
 Just Docker required — no repo clone, no build, no manual model setup.
