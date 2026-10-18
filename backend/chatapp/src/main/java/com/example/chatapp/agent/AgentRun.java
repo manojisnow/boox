@@ -29,6 +29,17 @@ public class AgentRun implements Persistable<String> {
   @Column(columnDefinition = "text")
   private String requestJson;
 
+  @Column(columnDefinition = "text")
+  private String contextUsedJson;
+
+  public String getContextUsedJson() {
+    return contextUsedJson;
+  }
+
+  public void setContextUsedJson(final String value) {
+    contextUsedJson = value;
+  }
+
   @Transient private boolean newEntity = true;
 
   @Column(nullable = false)

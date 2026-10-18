@@ -6,6 +6,34 @@ import java.util.List;
 /** Sidebar list item for a persisted conversation. */
 public final class ConversationSummary {
 
+  private String projectId;
+  private boolean usePreferences = true;
+  private boolean useProjectContext = true;
+  private long version;
+
+  public String getProjectId() {
+    return projectId;
+  }
+
+  public boolean isUsePreferences() {
+    return usePreferences;
+  }
+
+  public boolean isUseProjectContext() {
+    return useProjectContext;
+  }
+
+  public long getVersion() {
+    return version;
+  }
+
+  public void setContextSettings(String project, boolean preferences, boolean context, long value) {
+    projectId = project;
+    usePreferences = preferences;
+    useProjectContext = context;
+    version = value;
+  }
+
   private final String id;
   private final String title;
   private final String server;

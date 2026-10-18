@@ -57,11 +57,15 @@ public class AgentExecutionService {
     if (settings != null && settings.isReplaceGenerationConfig())
       context.setGenerationConfig(run.getConversationId(), config);
     final String preference =
-        settings == null
+        settings == null || settings.getSystemPrompt() == null
             ? context.getSystemPrompt(run.getConversationId())
             : settings.getSystemPrompt();
     final List<Map<String, Object>> messages = new ArrayList<>();
     messages.add(message("system", instructions(preference, request.permitsWebSearch())));
+    com.example.chatapp.context.PersonalizationContext personalization =
+        com.example.chatapp.context.PersonalizationContext.current();
+    if (personalization != null && !personalization.text().isBlank())
+      messages.add(message("system", personalization.text()));
     // Keep this run independent of other writers; previous tool rows aren't valid tool-call pairs.
     final List<Map<String, Object>> history = context.getContext(run.getConversationId());
     int historyChars = 0;
@@ -238,7 +242,7 @@ public class AgentExecutionService {
     final Map<String, Object> options = options(config);
     options.remove("stop");
     options.put("temperature", 0.1);
-    options.put("num_predict", Math.min(4_096, ((Number) options.get("num_ctx")).intValue() / 4));
+    options.put("num_predict", Math.min(2_048, ((Number) options.get("num_ctx")).intValue() / 4));
     String answer =
         client.chat(run.getModel(), messages, options, List.of()).path("content").asText();
     checkCancelled(run.getId());
@@ -309,6 +313,7 @@ public class AgentExecutionService {
   }
 
   private void checkCancelled(final String runId) {
+    com.example.chatapp.context.PersonalizationContext.checkpoint();
     if (runs.isCancellationRequested(runId)) throw new CancellationException("Task cancelled");
   }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Message from './Message';
 import AgentRunPanel from './AgentRunPanel';
+import { MemoryPanel, ContextUsed } from './Personalization';
 import {
     sendMessage,
     streamMessage,
@@ -10,12 +11,16 @@ import {
     getAgentRun,
     listAgentRuns,
     cancelAgentRun,
+    getConversationSettings, saveConversationSettings, getConversationExecution, apiError,
 } from '../services/api';
 import './ChatBox.css';
 
 const ChatBox = ({
     conversationId,
     initialModel,
+    initialProjectId = '',
+    projects = [],
+    settingsRevision = 0,
     initialGenerationConfig,
     onConversationChanged,
     selectedServer,
@@ -29,7 +34,22 @@ const ChatBox = ({
     const [chatLocked, setChatLocked] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamEnabled, setStreamEnabled] = useState(true);
-    const [systemPrompt, setSystemPrompt] = useState(() => sessionStorage.getItem('boox-system-prompt') || '');
+    const [systemPrompt, setSystemPrompt] = useState('');
+    const [settings, setSettings] = useState(null);
+    const [settingsError, setSettingsError] = useState('');
+    const [settingsBusy, setSettingsBusy] = useState(false);
+    const [projectId, setProjectId] = useState(initialProjectId || '');
+    const [usePreferences, setUsePreferences] = useState(true);
+    const [useProjectContext, setUseProjectContext] = useState(true);
+    const [showMemory, setShowMemory] = useState(false);
+    const [sourceMessage, setSourceMessage] = useState(null);
+    const [selectedMemoryIds, setSelectedMemoryIds] = useState([]);
+    const [contextUsed, setContextUsed] = useState(null);
+    const [executionPending, setExecutionPending] = useState(true);
+    const [executionError, setExecutionError] = useState('');
+    const [executionCheck, setExecutionCheck] = useState(0);
+    const mounted = useRef(true);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
     const [showSystemPrompt, setShowSystemPrompt] = useState(false);
     const [error, setError] = useState('');
     const [attachedImages, setAttachedImages] = useState([]);
@@ -55,6 +75,66 @@ const ChatBox = ({
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
     const completedAgentRuns = useRef(new Set());
+
+    const toMessages = history => history.filter(m => ['user', 'assistant'].includes(m.role)).map(m => ({ id: m.id, text: m.content, sender: m.role, images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`) }));
+    useEffect(() => {
+        let current = true;
+        const previous = settings;
+        setSettings(null);
+        getConversationSettings(conversationId).then(value => {
+            if (!current) return;
+            setSettings(value);
+            // A project deletion refreshes the server version and assignment. Keep
+            // unrelated edits the user has not saved yet.
+            if (!previous || projectId === (previous.projectId || '') || !projects.some(p => p.id === projectId)) setProjectId(value.projectId || '');
+            if (!previous || usePreferences === previous.usePreferences) setUsePreferences(value.usePreferences);
+            if (!previous || useProjectContext === previous.useProjectContext) setUseProjectContext(value.useProjectContext);
+            if (!previous || systemPrompt === (previous.systemPrompt || '')) setSystemPrompt(value.systemPrompt || '');
+            setSelectedMemoryIds([]); setSettingsError(''); setContextUsed(value.contextUsed || null);
+        }).catch(e => {
+            if (!current) return;
+            if (e.response?.status === 404) setSettings({ version: 0 });
+            else setSettingsError(apiError(e));
+        });
+        return () => { current = false; };
+    }, [conversationId, settingsRevision]);
+    const persistSettings = async () => {
+        if (!settings) throw new Error('Conversation settings have not loaded. Reopen this chat and retry.');
+        setSettingsBusy(true); setSettingsError('');
+        try {
+            const saved = await saveConversationSettings(conversationId, { version: settings.version, projectId: projectId || null, usePreferences, useProjectContext, systemPrompt });
+            if (mounted.current) setSettings(saved);
+            onConversationChanged?.();
+            return saved;
+        } catch (e) { if (mounted.current) setSettingsError(apiError(e)); throw e; }
+        finally { if (mounted.current) setSettingsBusy(false); }
+    };
+    useEffect(() => {
+        let current = true; let timer;
+        const check = async () => {
+            try {
+                const status = await getConversationExecution(conversationId);
+                if (!current) return;
+                const pending = ['queued', 'running', 'cancelling', 'cancellation_requested'].includes(status.state?.toLowerCase());
+                setExecutionPending(pending); setExecutionError('');
+                if (pending) timer = setTimeout(check, 1200);
+                else if (executionCheck > 0) {
+                    const history = await getConversationMessages(conversationId);
+                    if (current && history.length) setMessages(toMessages(history));
+                    const savedSettings = await getConversationSettings(conversationId);
+                    if (current && savedSettings.contextUsed) setContextUsed(savedSettings.contextUsed);
+                }
+            } catch (e) {
+                if (!current) return;
+                if (e.response?.status === 404) { setExecutionPending(false); return; }
+                setExecutionPending(true); setExecutionError('Checking response status. Sending stays paused until Boox confirms the worker has finished.');
+                timer = setTimeout(check, 2000);
+            }
+        };
+        check();
+        return () => { current = false; clearTimeout(timer); };
+    }, [conversationId, executionCheck]);
+    const blocked = chatLocked || executionPending || settingsBusy;
 
     const MAX_IMAGES = 4;
     const MAX_IMAGE_BYTES = 7_000_000; // matches the backend's ~7MB-raw cap
@@ -88,13 +168,7 @@ const ChatBox = ({
             try {
                 const history = await getConversationMessages(conversationId);
                 if (!cancelled && history.length > 0) {
-                    setMessages(history.map(m => ({
-                        text: m.content,
-                        sender: m.role,
-                        // Stored images have no known MIME type; browsers decode a
-                        // data: URL correctly regardless of the declared type here.
-                        images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`),
-                    })));
+                    setMessages(toMessages(history));
                 }
             } catch (err) {
                 console.error('Failed to load conversation history:', err.message);
@@ -136,8 +210,7 @@ const ChatBox = ({
             if (!completedAgentRuns.current.has(activeAgentRun.id)) {
                 getConversationMessages(conversationId).then(history => {
                     if (cancelled) return;
-                    setMessages(history.map(m => ({ text: m.content, sender: m.role,
-                        images: (m.images || []).map(b64 => `data:image/png;base64,${b64}`) })));
+                    setMessages(toMessages(history));
                     completedAgentRuns.current.add(activeAgentRun.id);
                     setAgentRefreshError('');
                     setChatLocked(false);
@@ -176,9 +249,11 @@ const ChatBox = ({
         setModels([]);
         setSelectedModel('');
         if (!selectedServer) return;
+        let current = true;
         const fetchModels = async () => {
             try {
                 const result = await getModels(selectedServer);
+                if (!current) return;
                 setModels(result);
                 const preferred =
                     result.find(m => m.name === initialModel)
@@ -189,11 +264,13 @@ const ChatBox = ({
                     setSelectedModel(preferred.name);
                 }
             } catch (err) {
+                if (!current) return;
                 console.error('Failed to fetch models:', err.message);
                 setError('Failed to fetch models. Please try again.');
             }
         };
         fetchModels();
+        return () => { current = false; };
     }, [selectedServer, initialModel]);
 
     // Auto-scroll to latest message
@@ -310,10 +387,13 @@ const ChatBox = ({
             return;
         }
         if (!input.trim()) return;
-        if (chatLocked || filesLoading) return;
+        if (blocked || filesLoading || !settings) return;
 
         setError('');
         setChatLocked(true);
+        generationConfigRestored.current = true;
+        setContextUsed(null);
+        try { await persistSettings(); } catch (e) { setError(apiError(e)); setChatLocked(false); return; }
         const imagesBase64 = attachedImages.map((img) => img.base64);
         const generationConfig = {
             temperature: temperature === '' ? null : Number(temperature),
@@ -350,8 +430,10 @@ const ChatBox = ({
                     generationConfig,
                     attachedFiles,
                     allowWebSearch,
-                    clearAttachments
+                    clearAttachments,
+                    selectedMemoryIds
                 );
+                setSelectedMemoryIds([]);
                 setAttachedFiles([]);
                 setClearAttachments(false);
                 setRetainedFiles(run.attachedFileNames || []);
@@ -379,8 +461,10 @@ const ChatBox = ({
                     conversationId.trim(),
                     systemPrompt,
                     imagesBase64,
-                    generationConfig
+                    generationConfig,
+                    selectedMemoryIds
                 );
+                setSelectedMemoryIds([]);
                 // The backend has now created/updated this conversation, so surface it
                 // in the sidebar immediately — before streaming finishes — in case the
                 // user navigates away mid-response.
@@ -413,7 +497,11 @@ const ChatBox = ({
                                 currentEventName = '';
                                 break;
                             }
-                            if (currentEventName === 'tool_call') {
+                            if (currentEventName === 'context_used') {
+                                try { setContextUsed(JSON.parse(rawData)); } catch { /* Keep the response usable if metadata is malformed. */ }
+                            } else if (currentEventName === 'error') {
+                                setError(rawData.trim() || 'The response stopped. Checking worker status.');
+                            } else if (currentEventName === 'tool_call') {
                                 try {
                                     const parsed = JSON.parse(rawData);
                                     setMessages((prev) => {
@@ -472,9 +560,11 @@ const ChatBox = ({
                 }
             } catch (err) {
                 console.error('Stream failed:', err.message);
-                setError('Failed to stream message. Please try again.');
+                setError(err.response?.data?.error || err.response?.data?.message || 'Failed to stream message. Please try again.');
             } finally {
                 setIsStreaming(false);
+                setExecutionPending(true);
+                setExecutionCheck(n => n + 1);
                 setChatLocked(false);
                 if (onConversationChanged) onConversationChanged();
             }
@@ -488,14 +578,18 @@ const ChatBox = ({
                     false,
                     systemPrompt,
                     imagesBase64,
-                    generationConfig
+                    generationConfig,
+                    selectedMemoryIds
                 );
-                const botMessage = { text: response.content, sender: response.role };
+                setSelectedMemoryIds([]);
+                setContextUsed(response.contextUsed || null);
+                const botMessage = { id: response.id, text: response.content, sender: response.role };
                 setMessages((prev) => [...prev, botMessage]);
             } catch (err) {
                 console.error('Send failed:', err.message);
-                setError('Failed to send message. Please try again.');
+                setError(err.response?.data?.error || err.response?.data?.message || 'Failed to send message. Please try again.');
             } finally {
+                setExecutionPending(true); setExecutionCheck(n => n + 1);
                 setChatLocked(false);
                 if (onConversationChanged) onConversationChanged();
             }
@@ -513,7 +607,7 @@ const ChatBox = ({
     const handleSystemPromptChange = (e) => {
         const val = e.target.value;
         setSystemPrompt(val);
-        sessionStorage.setItem('boox-system-prompt', val);
+
     };
 
     const handleInputChange = (e) => {
@@ -535,11 +629,13 @@ const ChatBox = ({
 
     return (
         <div className="chat-window chat-style-window">
+            {showMemory && projectId && <MemoryPanel key={`${projectId}-${sourceMessage?.id || 'manual'}`} projectId={projectId} conversationId={conversationId} sourceMessage={sourceMessage} selectionEnabled={useProjectContext} selectedIds={selectedMemoryIds} onSelectionChange={setSelectedMemoryIds} onClose={() => { setShowMemory(false); setSourceMessage(null); }} />}
             <div className="chat-controls">
                 <select
+                    aria-label="Server"
                     value={selectedServer}
                     onChange={e => setSelectedServer(e.target.value)}
-                    disabled={chatLocked}
+                    disabled={blocked}
                     className="inline-select"
                 >
                     <option value="" disabled>Select a server</option>
@@ -549,9 +645,10 @@ const ChatBox = ({
                 </select>
                 {models.length > 0 && (
                     <select
+                        aria-label="Model"
                         value={selectedModel}
                         onChange={e => setSelectedModel(e.target.value)}
-                        disabled={chatLocked}
+                        disabled={blocked}
                         className="inline-select"
                     >
                         <option value="" disabled>Select a model</option>
@@ -561,6 +658,19 @@ const ChatBox = ({
                     </select>
                 )}
             </div>
+            <div className="context-controls">
+                <label>Chat project<select value={projectId} disabled={blocked || !settings} onChange={e => { setProjectId(e.target.value); setSelectedMemoryIds([]); }}><option value="">Standalone</option>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+                <label><input type="checkbox" checked={usePreferences} disabled={blocked || !settings} onChange={e => setUsePreferences(e.target.checked)} /> Use my preferences</label>
+                <label><input type="checkbox" checked={useProjectContext} disabled={blocked || !settings || !projectId} onChange={e => { setUseProjectContext(e.target.checked); if (!e.target.checked) setSelectedMemoryIds([]); }} /> Use project context</label>
+                <button type="button" disabled={blocked || !settings} onClick={() => persistSettings().catch(() => {})}>Save chat settings</button>
+                {projectId && <button type="button" disabled={blocked} onClick={() => { setSourceMessage(null); setShowMemory(true); }}>Project memory{selectedMemoryIds.length ? ` (${selectedMemoryIds.length} selected)` : ''}</button>}
+            </div>
+            {settingsError && <div role="alert">{settingsError} <button type="button" disabled={blocked} onClick={async () => {
+                try { const value = await getConversationSettings(conversationId); setSettings(value); setSystemPrompt(value.systemPrompt || ''); setProjectId(value.projectId || ''); setUsePreferences(value.usePreferences); setUseProjectContext(value.useProjectContext); setSelectedMemoryIds([]); setSettingsError(''); } catch (e) { setSettingsError(apiError(e)); }
+            }}>Reload chat settings</button></div>}
+            {executionError && <p role="status">{executionError}</p>}
+            {executionPending && <p role="status">Boox is checking or completing this conversation’s response. Reconnecting does not cancel its work.</p>}
+            <ContextUsed context={interactionMode === 'agent' ? activeAgentRun?.contextUsed : contextUsed} />
             <div className="chat-messages">
                 {showPlaceholder ? (
                     <div className="chat-greeting">
@@ -574,7 +684,8 @@ const ChatBox = ({
                     </div>
                 ) : (
                     messages.map((msg, index) => (
-                        <Message key={index} text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
+                        <React.Fragment key={msg.id || index}><Message text={msg.text} sender={msg.sender} toolCalls={msg.toolCalls} images={msg.images} />
+                        {projectId && msg.id != null && !blocked && <button type="button" className="save-project-message" disabled={settings?.projectId !== projectId} title={settings?.projectId !== projectId ? 'Save chat settings before saving a message to this project' : 'Save this completed message as an editable project note'} onClick={() => { setSourceMessage(msg); setShowMemory(true); }}>Save for project</button>}</React.Fragment>
                     ))
                 )}
                 {activeAgentRun && <AgentRunPanel run={activeAgentRun} onCancel={handleCancelAgentRun} />}
@@ -595,13 +706,19 @@ const ChatBox = ({
                     {showSystemPrompt && (
                         <div className="system-prompt-section">
                             <textarea
+                                aria-label="Conversation instructions"
+                                maxLength={8000}
                                 value={systemPrompt}
                                 onChange={handleSystemPromptChange}
                                 placeholder="Set system behavior... (e.g. You are a helpful coding assistant)"
                                 rows={2}
                                 className="system-prompt-textarea"
-                                disabled={chatLocked}
+                                disabled={blocked}
                             />
+                            <button type="button" disabled={blocked || !settings} onClick={async () => {
+                                setSettingsBusy(true);
+                                try { const saved = await saveConversationSettings(conversationId, { version: settings.version, systemPrompt: '' }); setSettings(saved); setSystemPrompt(''); } catch (e) { setSettingsError(apiError(e)); } finally { setSettingsBusy(false); }
+                            }}>Clear conversation instructions</button>
                         </div>
                     )}
                     {showGenerationSettings && (
@@ -614,9 +731,9 @@ const ChatBox = ({
                                     max="2"
                                     step="0.1"
                                     value={temperature}
-                                    onChange={e => setTemperature(e.target.value)}
+                                    onChange={e => { generationConfigRestored.current = true; setTemperature(e.target.value); }}
                                     placeholder="server default"
-                                    disabled={chatLocked}
+                                    disabled={blocked}
                                 />
                             </label>
                             <label className="generation-settings-field">
@@ -626,9 +743,9 @@ const ChatBox = ({
                                     min="1"
                                     step="1"
                                     value={numCtx}
-                                    onChange={e => setNumCtx(e.target.value)}
+                                    onChange={e => { generationConfigRestored.current = true; setNumCtx(e.target.value); }}
                                     placeholder="server default"
-                                    disabled={chatLocked}
+                                    disabled={blocked}
                                 />
                             </label>
                             <label className="generation-settings-field generation-settings-field-wide">
@@ -636,9 +753,9 @@ const ChatBox = ({
                                 <input
                                     type="text"
                                     value={stopSequencesText}
-                                    onChange={e => setStopSequencesText(e.target.value)}
+                                    onChange={e => { generationConfigRestored.current = true; setStopSequencesText(e.target.value); }}
                                     placeholder="comma-separated, e.g. END, ###"
-                                    disabled={chatLocked}
+                                    disabled={blocked}
                                 />
                             </label>
                         </div>
@@ -646,12 +763,12 @@ const ChatBox = ({
                     {interactionMode === 'agent' && (
                         <div className="agent-mode-help">
                             <p>Scope: {allowWebSearch ? (attachedFiles.length || retainedFiles.length ? 'Files + Web' : 'Web') : 'Files only'}. Ask naturally; the agent chooses tools within this scope.</p>
-                            <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={chatLocked} /> Include web sources</label>
+                            <label><input type="checkbox" checked={allowWebSearch} onChange={event => setAllowWebSearch(event.target.checked)} disabled={blocked} /> Include web sources</label>
                             <p>Attaching text files defaults to Files only. Enable web sources to compare files with external information. Web queries and requested page URLs are sent to the configured search provider.</p>
-                            {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={chatLocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
+                            {retainedFiles.length > 0 && <p>Available for follow-ups: {retainedFiles.join(', ')}. <button type="button" disabled={blocked} onClick={() => { setRetainedFiles([]); setClearAttachments(true); }}>Clear retained files</button></p>}
                             {filesLoading && <p role="status">Reading selected files…</p>}
                             {attachedFiles.length > 0 && <ul>{attachedFiles.map((file, index) => (
-                                <li key={index}>{file.name} <button type="button" aria-label={`Remove file ${file.name}`} onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))} disabled={chatLocked}>Remove</button></li>
+                                <li key={index}>{file.name} <button type="button" aria-label={`Remove file ${file.name}`} onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== index))} disabled={blocked}>Remove</button></li>
                             ))}</ul>}
                         </div>
                     )}
@@ -679,7 +796,7 @@ const ChatBox = ({
                                 className={interactionMode === 'ask' ? 'active' : ''}
                                 onClick={() => setInteractionMode('ask')}
                                 aria-pressed={interactionMode === 'ask'}
-                                disabled={chatLocked || filesLoading || attachedFiles.length > 0}
+                                disabled={blocked || filesLoading || attachedFiles.length > 0}
                             >
                                 Ask
                             </button>
@@ -688,7 +805,7 @@ const ChatBox = ({
                                 className={interactionMode === 'agent' ? 'active' : ''}
                                 onClick={() => setInteractionMode('agent')}
                                 aria-pressed={interactionMode === 'agent'}
-                                disabled={chatLocked}
+                                disabled={blocked}
                             >
                                 Agent
                             </button>
@@ -726,7 +843,7 @@ const ChatBox = ({
                         </button>
                         {interactionMode === 'agent' && <>
                             <input ref={textFileInputRef} type="file" multiple accept=".txt,.md,.csv,.tsv,.json,.log,.java,.py,.js,.jsx,.ts,.tsx,.html,.css,.xml,.yaml,.yml,.sql" onChange={handleTextFileSelect} style={{ display: 'none' }} />
-                            <button type="button" className="attach-image-toggle" onClick={() => textFileInputRef.current?.click()} disabled={chatLocked || filesLoading || attachedFiles.length >= 4} aria-label="Attach text files" title="Attach text, CSV, JSON, or code files">Files</button>
+                            <button type="button" className="attach-image-toggle" onClick={() => textFileInputRef.current?.click()} disabled={blocked || filesLoading || attachedFiles.length >= 4} aria-label="Attach text files" title="Attach text, CSV, JSON, or code files">Files</button>
                         </>}
                         {supportsVision && (
                             <>
@@ -742,7 +859,7 @@ const ChatBox = ({
                                     type="button"
                                     className="attach-image-toggle"
                                     onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                                    disabled={chatLocked || attachedImages.length >= MAX_IMAGES}
+                                    disabled={blocked || attachedImages.length >= MAX_IMAGES}
                                     title="Attach image"
                                     aria-label="Attach image"
                                 >
@@ -756,6 +873,7 @@ const ChatBox = ({
                         )}
                         <textarea
                             ref={textareaRef}
+                            aria-label="Message"
                             value={input}
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
@@ -767,7 +885,7 @@ const ChatBox = ({
                             type="submit"
                             className="send-btn"
                             aria-label="Send"
-                            disabled={chatLocked || filesLoading || !input.trim() || !selectedServer || !selectedModel}
+                            disabled={blocked || !settings || filesLoading || !input.trim() || !selectedServer || !selectedModel}
                         >
                             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                                 <circle cx="16" cy="16" r="16" fill="currentColor" style={{ color: 'var(--color-accent)' }}/>
@@ -777,8 +895,9 @@ const ChatBox = ({
                         <label className="stream-toggle-inline" title={interactionMode === 'agent' ? 'Agent responses appear after evidence review' : 'Stream response'}>
                             <input
                                 type="checkbox"
+                                aria-label="Stream response"
                                 checked={streamEnabled}
-                                disabled={interactionMode === 'agent' || chatLocked}
+                                disabled={interactionMode === 'agent' || blocked}
                                 onChange={e => setStreamEnabled(e.target.checked)}
                             />
                             <span className="stream-icon">&#x2301;</span>

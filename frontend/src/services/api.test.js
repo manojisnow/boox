@@ -12,11 +12,14 @@ import {
     renameConversation,
     deleteConversation,
     createAgentRun, listAgentRuns, getAgentRun, cancelAgentRun,
+    getPreferences, savePreferences, clearPreferences, listProjects, saveProject, deleteProject,
+    listMemories, saveMemory, deleteMemory, getConversationSettings, saveConversationSettings, getConversationExecution,
 } from './api';
 
 vi.mock('axios', () => ({
     default: {
         defaults: {},
+        request: vi.fn(),
         get: vi.fn(),
         post: vi.fn(),
         patch: vi.fn(),
@@ -298,5 +301,40 @@ describe('agent run API', () => {
         expect(axios.get).toHaveBeenCalledWith('/api/agent-runs/a%2Fb');
         await cancelAgentRun('a/b');
         expect(axios.post).toHaveBeenCalledWith('/api/agent-runs/a%2Fb/cancel');
+    });
+});
+
+
+describe('local context APIs', () => {
+    it('preserves versions and explicit empty prompt values in settings PATCH', async () => {
+        axios.request.mockResolvedValue({ data: { version: 3, systemPrompt: '' } });
+        await saveConversationSettings('a/b', { version: 2, systemPrompt: '', projectId: null, usePreferences: false });
+        expect(axios.request).toHaveBeenCalledWith({ method: 'patch', url: '/api/conversations/a%2Fb/settings', data: { version: 2, systemPrompt: '', projectId: null, usePreferences: false }, params: undefined });
+    });
+    it('uses versioned preference and project resources', async () => {
+        axios.request.mockResolvedValue({ data: {} });
+        await getPreferences(); await savePreferences({ version: 1, instructions: '' }); await clearPreferences(2);
+        await listProjects(); await saveProject({ name: 'Boox' }); await saveProject({ id: 'p1', version: 3, name: 'Boox' }); await deleteProject('p1', 4);
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'put', url: '/api/preferences', data: { version: 1, instructions: '' } }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'delete', url: '/api/preferences', params: { version: 2 } }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'post', url: '/api/projects' }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'put', url: '/api/projects/p1' }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'delete', url: '/api/projects/p1', params: { version: 4 } }));
+    });
+    it('uses scoped note routes and worker execution status', async () => {
+        axios.request.mockResolvedValue({ data: {} });
+        await listMemories('p1'); await saveMemory('p1', { title: 'Decision', sourceMessageId: 71 });
+        await saveMemory('p1', { id: 'n1', version: 2 }); await deleteMemory('p1', 'n1', 2);
+        await getConversationSettings('c1'); await getConversationExecution('c1');
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'post', url: '/api/projects/p1/memories', data: { title: 'Decision', sourceMessageId: 71 } }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'put', url: '/api/projects/p1/memories/n1' }));
+        expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'get', url: '/api/chat/conversations/c1/execution' }));
+    });
+    it('sends selected note IDs in Ask and Agent requests', async () => {
+        axios.post.mockResolvedValue({ data: {} });
+        await sendMessage('hello', 'ollama', 'model', 'chat', false, '', [], null, ['n1']);
+        expect(axios.post).toHaveBeenCalledWith('/api/chat/send', expect.objectContaining({ selectedMemoryIds: ['n1'] }), expect.anything());
+        await createAgentRun('goal', 'chat', 'ollama', 'model', '', [], null, [], false, false, ['n1']);
+        expect(axios.post).toHaveBeenCalledWith('/api/agent-runs', expect.objectContaining({ chatRequest: expect.objectContaining({ selectedMemoryIds: ['n1'] }) }));
     });
 });

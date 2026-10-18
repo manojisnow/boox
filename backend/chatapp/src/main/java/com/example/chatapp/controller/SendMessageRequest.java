@@ -25,6 +25,17 @@ public class SendMessageRequest {
   private String systemPrompt;
   private boolean replaceGenerationConfig;
 
+  @Size(max = 5)
+  private List<String> selectedMemoryIds;
+
+  public List<String> getSelectedMemoryIds() {
+    return selectedMemoryIds == null ? List.of() : List.copyOf(selectedMemoryIds);
+  }
+
+  public void setSelectedMemoryIds(List<String> ids) {
+    selectedMemoryIds = ids == null ? null : new ArrayList<>(ids);
+  }
+
   @Size(max = MAX_IMAGES)
   private List<@Size(max = MAX_IMAGE_BASE64_LENGTH) String> images;
 

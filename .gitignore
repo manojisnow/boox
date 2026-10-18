@@ -40,3 +40,6 @@ backend/chatapp/data/
 *.db
 reports-laria/
 .kiro/
+
+# Private launch plans, recordings, exports and publication tracking
+.local/

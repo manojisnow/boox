@@ -12,9 +12,19 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
-@DataJpaTest
+@DataJpaTest(
+    properties = {
+      "spring.jpa.hibernate.ddl-auto=validate",
+      "spring.datasource.url=jdbc:sqlite:target/boox-jpa-context-migration-test.db",
+      "spring.flyway.enabled=false"
+    })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaChatContextService.class)
+@Import({
+  JpaChatContextService.class,
+  com.example.chatapp.config.SchemaMigrationConfiguration.class,
+  com.example.chatapp.memory.CurrentUserResolver.class,
+  com.example.chatapp.context.ExecutionCoordinator.class
+})
 @ActiveProfiles("test")
 class JpaChatContextServiceTest {
 

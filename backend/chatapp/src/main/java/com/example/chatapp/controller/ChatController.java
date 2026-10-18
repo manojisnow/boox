@@ -42,20 +42,17 @@ public class ChatController {
 
   @PostMapping("/send")
   public ResponseEntity<?> sendMessage(@Valid @RequestBody final SendMessageRequest request) {
-    LOGGER.info("Received sendMessage request with message: {}", request.getMessage());
-    LOGGER.info(
-        "Request details: message={}, server={}, model={}, sessionId={}, stream={}",
-        request.getMessage(),
-        request.getServer(),
-        request.getModel(),
-        request.getSessionId(),
-        request.isStream());
     try {
       return ResponseEntity.ok(chatService.sendMessage(request));
     } catch (Exception e) {
       LOGGER.error("Error processing sendMessage request: {}", e.getMessage(), e);
       throw e;
     }
+  }
+
+  @GetMapping("/conversations/{id}/execution")
+  public Map<String, Object> executionStatus(@PathVariable String id) {
+    return chatService.executionStatus(id);
   }
 
   @GetMapping("/tools")

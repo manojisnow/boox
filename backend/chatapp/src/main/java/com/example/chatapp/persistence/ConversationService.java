@@ -22,6 +22,22 @@ public class ConversationService {
   private final com.example.chatapp.agent.AgentRunRepository agentRuns;
   private final ChatMessageRepository messageRepository;
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.example.chatapp.memory.CurrentUserResolver users;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.example.chatapp.context.ExecutionCoordinator coordinator;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.transaction.PlatformTransactionManager manager;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+  private void owned(String id) {
+    if (users != null) users.requireOwnedConversation(id);
+  }
+
   public ConversationService(
       final ConversationRepository conversations,
       final ChatMessageRepository messageRepository,
@@ -34,9 +50,10 @@ public class ConversationService {
   /** All conversations, most-recently-updated first. */
   @Transactional(readOnly = true)
   public List<ConversationSummary> list() {
-    return conversations.findAllByOrderByUpdatedAtDesc().stream()
-        .map(ConversationService::toSummary)
-        .toList();
+    return (users == null
+            ? conversations.findAllByOrderByUpdatedAtDesc()
+            : conversations.findAllByOwnerIdOrderByUpdatedAtDesc(users.currentUserId()))
+        .stream().map(ConversationService::toSummary).toList();
   }
 
   /**
@@ -45,17 +62,30 @@ public class ConversationService {
    */
   @Transactional(readOnly = true)
   public List<MessageView> messages(final String conversationId) {
+    owned(conversationId);
     return messageRepository.findByConversationIdOrderBySeqAsc(conversationId).stream()
         .filter(ConversationService::isRenderable)
         .map(
             m ->
-                new MessageView(m.getRole(), m.getContent(), JsonListCodec.fromJson(m.getImages())))
+                new MessageView(
+                    m.getId(), m.getRole(), m.getContent(), JsonListCodec.fromJson(m.getImages())))
         .toList();
   }
 
   /** Renames a conversation; empty when the id does not exist. */
-  @Transactional
   public Optional<ConversationSummary> rename(final String conversationId, final String title) {
+    if (users == null || coordinator == null || manager == null)
+      return renameInternal(conversationId, title);
+    return coordinator.withOwner(
+        users.currentUserId(),
+        () ->
+            new org.springframework.transaction.support.TransactionTemplate(manager)
+                .execute(status -> renameInternal(conversationId, title)));
+  }
+
+  private Optional<ConversationSummary> renameInternal(
+      final String conversationId, final String title) {
+    if (users != null) users.assertConversationAccessible(conversationId, true);
     return conversations
         .findById(conversationId)
         .map(
@@ -67,8 +97,25 @@ public class ConversationService {
   }
 
   /** Deletes a conversation and its messages. Idempotent. */
-  @Transactional
   public void delete(final String conversationId) {
+    if (users == null || coordinator == null || manager == null) {
+      deleteInternal(conversationId);
+      return;
+    }
+    coordinator.withOwner(
+        users.currentUserId(),
+        () ->
+            new org.springframework.transaction.support.TransactionTemplate(manager)
+                .execute(
+                    status -> {
+                      owned(conversationId);
+                      coordinator.assertIdle(users.currentUserId(), conversationId);
+                      deleteInternal(conversationId);
+                      return null;
+                    }));
+  }
+
+  private void deleteInternal(final String conversationId) {
     if (agentRuns.existsByConversationIdAndStatusIn(
         conversationId,
         List.of(
@@ -78,6 +125,11 @@ public class ConversationService {
       throw new org.springframework.web.server.ResponseStatusException(
           org.springframework.http.HttpStatus.CONFLICT,
           "Cancel the active agent task before deleting this conversation.");
+    }
+    if (jdbc != null) {
+      jdbc.update(
+          "delete from project_memory_source where source_conversation_id=?", conversationId);
+      jdbc.update("delete from context_use where conversation_id=?", conversationId);
     }
     agentRuns.deleteAll(agentRuns.findByConversationIdOrderByCreatedAtDesc(conversationId));
     conversations.deleteById(conversationId);
@@ -92,14 +144,18 @@ public class ConversationService {
   }
 
   private static ConversationSummary toSummary(final Conversation c) {
-    return new ConversationSummary(
-        c.getId(),
-        c.getTitle(),
-        c.getServer(),
-        c.getModel(),
-        c.getUpdatedAt(),
-        c.getTemperature(),
-        c.getNumCtx(),
-        JsonListCodec.fromJson(c.getStopSequences()));
+    ConversationSummary result =
+        new ConversationSummary(
+            c.getId(),
+            c.getTitle(),
+            c.getServer(),
+            c.getModel(),
+            c.getUpdatedAt(),
+            c.getTemperature(),
+            c.getNumCtx(),
+            JsonListCodec.fromJson(c.getStopSequences()));
+    result.setContextSettings(
+        c.getProjectId(), c.isUsePreferences(), c.isUseProjectContext(), c.getSettingsVersion());
+    return result;
   }
 }

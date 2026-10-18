@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
-import { getServers, listConversations, renameConversation, deleteConversation } from './services/api';
+import { getServers, listConversations, renameConversation, deleteConversation, getPreferences, listProjects } from './services/api';
 
 vi.mock('./services/api', () => ({
+    getPreferences: vi.fn().mockResolvedValue({ onboardingStatus: 'skipped' }),
+    listProjects: vi.fn().mockResolvedValue([]),
+    apiError: error => error.message,
     getServers: vi.fn(),
     listConversations: vi.fn(),
     renameConversation: vi.fn(),
@@ -17,6 +20,7 @@ vi.mock('./components/ChatBox', () => ({
             <span data-testid="conversation-id">{props.conversationId}</span>
             <span data-testid="selected-server">{props.selectedServer}</span>
             <span data-testid="initial-model">{props.initialModel}</span>
+            <span data-testid="initial-project">{props.initialProjectId}</span>
         </div>
     ),
 }));
@@ -39,6 +43,8 @@ vi.mock('./components/ConversationSidebar', () => ({
 beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    getPreferences.mockResolvedValue({ onboardingStatus: 'skipped' });
+    listProjects.mockResolvedValue([]);
     getServers.mockResolvedValue(['ollama']);
     listConversations.mockResolvedValue([
         { id: '1', title: 'First', server: 'ollama', model: 'phi4-mini' },
@@ -201,4 +207,52 @@ describe('App', () => {
         );
         expect(consoleError).toHaveBeenCalledWith('Failed to load conversations:', 'list down');
     });
+});
+
+
+describe('project navigation and local installation state', () => {
+    it('replaces a deleted stored chat ID without creating a conversation', async () => {
+        localStorage.setItem('boox-active-conversation', 'deleted-chat');
+        render(<App />);
+        await waitFor(() => expect(screen.getByTestId('conversation-id').textContent).not.toBe('deleted-chat'));
+        expect(localStorage.getItem('boox-active-conversation')).toBe(screen.getByTestId('conversation-id').textContent);
+    });
+    it('restores project navigation and inherits its project for a new chat', async () => {
+        const user = userEvent.setup(); localStorage.setItem('boox-active-conversation', '1');
+        listProjects.mockResolvedValue([{ id: 'p1', name: 'Boox' }]);
+        listConversations.mockResolvedValue([{ id: '1', title: 'First', server: 'ollama', projectId: 'p1' }, { id: '2', title: 'Standalone', server: 'ollama' }]);
+        render(<App />);
+        await user.click(screen.getByLabelText('Show chat history'));
+        await waitFor(() => expect(screen.getByLabelText('Project')).toHaveValue('p1'));
+        expect(screen.getByText('select-1')).toBeInTheDocument(); expect(screen.queryByText('select-2')).not.toBeInTheDocument();
+        await user.click(screen.getByLabelText('New Chat'));
+        expect(screen.getByTestId('initial-project')).toHaveTextContent('p1');
+        await user.selectOptions(screen.getByLabelText('Project'), '');
+        await user.click(screen.getByLabelText('New Chat'));
+        expect(screen.getByTestId('initial-project')).toBeEmptyDOMElement();
+    });
+});
+
+
+it('ignores an older initial project response after a newer refresh completes', async () => {
+    const user = userEvent.setup(); let initial;
+    listProjects.mockImplementationOnce(() => new Promise(resolve => { initial = resolve; })).mockResolvedValue([{ id: 'fresh', name: 'Fresh project' }]);
+    render(<App />);
+    await user.click(screen.getByLabelText('Show chat history'));
+    await user.click(screen.getByRole('button', { name: 'Refresh projects' }));
+    expect(await screen.findByRole('option', { name: 'Fresh project' })).toBeInTheDocument();
+    await act(async () => initial([]));
+    expect(screen.getByRole('option', { name: 'Fresh project' })).toBeInTheDocument();
+});
+
+it('does not reopen onboarding from an old bootstrap response after the user visits preferences', async () => {
+    const user = userEvent.setup(); let bootstrap;
+    getPreferences.mockImplementationOnce(() => new Promise(resolve => { bootstrap = resolve; })).mockResolvedValue({ version: 0, onboardingStatus: 'completed' });
+    render(<App />);
+    await user.click(screen.getByLabelText('Show chat history'));
+    await user.click(screen.getByRole('button', { name: 'Preferences' }));
+    expect(await screen.findByRole('heading', { name: 'Preferences' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close Preferences' }));
+    await act(async () => bootstrap({ onboardingStatus: 'not_started' }));
+    expect(screen.queryByRole('heading', { name: 'Make Boox work for you' })).not.toBeInTheDocument();
 });

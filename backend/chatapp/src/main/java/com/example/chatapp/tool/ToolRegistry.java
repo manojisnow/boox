@@ -58,7 +58,7 @@ public class ToolRegistry {
       LOGGER.warn("Tool not found: {}", name);
       return "Error: Tool '" + name + "' not found.";
     }
-    LOGGER.info("Executing tool: {} with args: {}", name, arguments);
+    LOGGER.info("Executing tool: {}", name);
     try {
       return tool.execute(arguments, conversationId, model);
     } catch (Exception e) {

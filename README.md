@@ -187,6 +187,15 @@ boox/
 
 ## Features
 
+### Preferences and projects
+- **Optional onboarding** — save response preferences, background and goals locally; skip setup or edit them later in Preferences.
+- **Project context** — organize chats into projects with project instructions and explicitly saved notes, decisions and constraints.
+- **Controlled recall** — enable preferences and project context per chat. Selected, pinned and matching project notes are bounded, and Context used reports what was supplied.
+- **Independent saved notes** — deleting a source chat removes its source link while preserving the saved project note. Remove notes explicitly or delete their owning project.
+- **Local ownership** — one internal local identity owns the database records; accounts and cloud synchronization are not required. Included context is still sent to whichever model you select.
+
+See [preferences, project memory and upgrade behavior](docs/local-memory.md) for context selection, data handling and backup/rollback instructions.
+
 ### Chat
 - **Real-time streaming** — responses appear token by token via SSE (Server-Sent Events), with a toggle to switch to non-streaming mode
 - **Markdown rendering** — bot replies render as rich markdown with syntax-highlighted code blocks (via `react-markdown` + `react-syntax-highlighter`)

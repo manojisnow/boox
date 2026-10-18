@@ -77,4 +77,40 @@ class AgentModelClientTest {
                 Map.of("num_ctx", 1024),
                 List.of()));
   }
+
+  @Test
+  void attachmentAndLaterReviewAreRequiredAndNeverPruned() {
+    AgentModelClient client = new AgentModelClient("http://localhost:11434");
+    MockRestServiceServer server =
+        MockRestServiceServer.bindTo((RestTemplate) ReflectionTestUtils.getField(client, "client"))
+            .build();
+    List<Map<String, Object>> request =
+        List.of(
+            Map.of("role", "system", "content", "Evidence rules"),
+            Map.of(
+                "role",
+                "user",
+                "content",
+                "<file-content>" + "x".repeat(24000) + "</file-content>"),
+            Map.of("role", "assistant", "content", "Draft based on the attachment"),
+            Map.of("role", "user", "content", "Review this draft against all supplied files"));
+    server
+        .expect(requestTo("http://localhost:11434/api/chat"))
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("x".repeat(24000))))
+        .andRespond(
+            withSuccess("{\"message\":{\"content\":\"checked\"}}", MediaType.APPLICATION_JSON));
+    assertEquals(
+        "checked",
+        client
+            .chat("model", request, Map.of("num_ctx", 16384, "num_predict", 2048), List.of())
+            .path("content")
+            .asText());
+    server.verify();
+    server.reset();
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            client.chat("model", request, Map.of("num_ctx", 2048, "num_predict", 512), List.of()));
+    server.verify();
+  }
 }
