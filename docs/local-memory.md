@@ -8,7 +8,8 @@ owns the data; this identity does not provide authentication for a shared server
 
 Optional onboarding asks how you want Boox to respond, your familiarity with a topic,
 and any background, goals or working instructions you choose to share. Skip keeps chat
-available. Open Preferences later to edit, preview the generated instructions or clear
+available and discards unsaved onboarding edits while preserving previously saved
+preferences. Open Preferences later to edit, preview the generated instructions or clear
 the saved answers.
 
 Each chat can enable or disable preferences. Preferences are defaults: a request such as

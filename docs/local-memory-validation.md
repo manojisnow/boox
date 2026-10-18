@@ -75,6 +75,14 @@ saved notes, cross-chat recall and inclusion controls. The user reported that ev
 worked. This records user-reported acceptance of the flows exercised, rather than an
 independently observed exhaustive browser regression pass.
 
+During follow-up testing on 18 October, Skip onboarding exposed a stale-version conflict:
+an older onboarding panel could remain open after preferences were saved elsewhere.
+Skip now reloads the saved state, preserves existing preferences and closes without a
+write if onboarding is already complete. Its regression tests cover stale versions,
+discarding only draft edits, and load failures. All 148 frontend tests and the production
+build passed. A browser retry closed the stale panel, and the saved preference version
+remained unchanged.
+
 The application remains a single-process local installation with no login protection.
 Internal ownership prepares the schema for future accounts; it does not authenticate
 requests. SQLite encryption, multi-process coordination, account migration and automatic

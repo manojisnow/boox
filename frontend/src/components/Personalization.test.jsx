@@ -10,14 +10,34 @@ vi.mock('../services/api', () => ({
 const profile = { version: 2, onboardingStatus: 'not_started', responseLength: 'brief', background: 'Developer', instructions: '' };
 beforeEach(() => { vi.clearAllMocks(); getPreferences.mockResolvedValue(profile); listMemories.mockResolvedValue([]); });
 describe('local preferences', () => {
-    it('persists Skip with the loaded version and closes onboarding', async () => {
+    it('skips using the latest saved version, preserving saved preferences and discarding draft edits', async () => {
         const user = userEvent.setup(); const close = vi.fn();
         savePreferences.mockResolvedValue({ ...profile, version: 3, onboardingStatus: 'skipped' });
         render(<PreferencesPanel onboarding onClose={close} />);
         await user.type(await screen.findByLabelText('How should Boox help you?'), 'Do not retain this draft');
+        getPreferences.mockResolvedValue({ ...profile, version: 5, background: 'Updated elsewhere' });
         await user.click(screen.getByRole('button', { name: 'Skip onboarding' }));
-        await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ version: 2, onboardingStatus: 'skipped', responseLength: '', explanationStyle: '', familiarity: '', background: '', goals: '', instructions: '' }));
+        await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ ...profile, version: 5, onboardingStatus: 'skipped', background: 'Updated elsewhere' }));
         expect(close).toHaveBeenCalled();
+    });
+    it('closes stale onboarding without overwriting preferences already completed elsewhere', async () => {
+        const user = userEvent.setup(); const close = vi.fn();
+        render(<PreferencesPanel onboarding onClose={close} />);
+        await screen.findByRole('button', { name: 'Skip onboarding' });
+        getPreferences.mockResolvedValue({ ...profile, version: 3, onboardingStatus: 'completed' });
+        await user.click(screen.getByRole('button', { name: 'Skip onboarding' }));
+        await waitFor(() => expect(close).toHaveBeenCalledOnce());
+        expect(savePreferences).not.toHaveBeenCalled();
+    });
+    it('reports a failed skip instead of closing or overwriting saved data', async () => {
+        const user = userEvent.setup(); const close = vi.fn();
+        render(<PreferencesPanel onboarding onClose={close} />);
+        await screen.findByRole('button', { name: 'Skip onboarding' });
+        getPreferences.mockRejectedValue(new Error('Offline'));
+        await user.click(screen.getByRole('button', { name: 'Skip onboarding' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
+        expect(close).not.toHaveBeenCalled();
+        expect(savePreferences).not.toHaveBeenCalled();
     });
     it('allows editing and clearing with versions, without browser profile storage', async () => {
         const user = userEvent.setup();

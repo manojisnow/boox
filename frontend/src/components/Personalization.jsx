@@ -27,6 +27,19 @@ export function PreferencesPanel({ onClose, onboarding = false }) {
         try { const p = await operation(); setProfile(p); setSaved(true); setDirty(false); if (onboarding) onClose(); }
         catch (e) { setError(apiError(e)); } finally { setBusy(false); }
     };
+    const skipOnboarding = async () => {
+        setBusy(true); setError('');
+        try {
+            // Skip discards this draft, never preferences saved by another panel or tab.
+            const current = await getPreferences();
+            if (current.onboardingStatus === 'not_started') {
+                await savePreferences({ ...current, onboardingStatus: 'skipped' });
+            }
+            onClose();
+        } catch (e) {
+            setError(apiError(e));
+        } finally { setBusy(false); }
+    };
     const preview = profile && profileFields.filter(([key]) => profile[key]).map(([key, label, renderedLabel]) => `${renderedLabel || label}: ${profile[key]}`).join('\n');
     return <EditorPanel title={onboarding ? 'Make Boox work for you' : 'Preferences'} onClose={onClose}>
         <p>Optional preferences are stored on this device. Included preferences and project context are sent to your selected model; a remote model receives that information. Saving uses no model call.</p>
@@ -37,7 +50,7 @@ export function PreferencesPanel({ onClose, onboarding = false }) {
                 {profileFields.map(([key, label]) => <label key={key}>{label}<textarea rows={key === 'instructions' ? 3 : 2} maxLength={key === 'instructions' ? 2000 : ['background', 'goals'].includes(key) ? 1000 : 120} value={profile[key] || ''} onChange={e => { setSaved(false); setDirty(true); setProfile({ ...profile, [key]: e.target.value }); }} /></label>)}
                 <details><summary>{dirty ? 'Instruction preview (current edits)' : 'Saved instruction preview'}</summary><pre>{(!dirty ? profile.renderedInstructions : null) || preview || 'No preferences will be included.'}</pre><p>This preview describes current settings, not the exact context used by an earlier response.</p></details>
                 <div className="panel-actions"><button type="submit">Save preferences</button>
-                    {onboarding && <button type="button" onClick={() => apply(() => savePreferences({ version: profile.version, onboardingStatus: 'skipped', ...Object.fromEntries(profileFields.map(([key]) => [key, ''])) }))}>Skip onboarding</button>}
+                    {onboarding && <button type="button" onClick={skipOnboarding}>Skip onboarding</button>}
                     <button type="button" onClick={() => { if (window.confirm('Clear your saved preferences? Earlier replies and backups may retain information.')) apply(() => clearPreferences(profile.version)); }}>Clear preferences</button>
                 </div>
             </fieldset>
