@@ -8,8 +8,22 @@
 **/dist
 **/target
 *.log
-.env.local
-.env.*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Credentials, local databases and private launch assets must not enter build stages.
+.env
+.env.*
+.envrc
+**/.env
+**/.env.*
+**/.envrc
+.local
+.claude
+.kiro
+reports-laria
+data
+**/data
+**/*.db
+**/*.db-*

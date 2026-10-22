@@ -5,7 +5,7 @@
 # the default AI model on first run.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/v1.5.0/docker-compose.release.yml \
+#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/v1.6.0/docker-compose.release.yml \
 #     -o docker-compose.boox.yml
 #   docker compose -f docker-compose.boox.yml up
 #
@@ -52,7 +52,7 @@ services:
 
   # ── Boox application (frontend + backend in one image) ───────────────────────
   app:
-    image: dumanoj/boox:1.5.0
+    image: dumanoj/boox:1.6.0
     ports:
       - "${BOOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     environment:

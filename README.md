@@ -251,6 +251,7 @@ To use Parallel search and public-page excerpts, set `WEB_SEARCH_PROVIDER=parall
 
 ## Development Notes
 
+- Keep credentials in ignored local environment files or GitHub Secrets. `.env` and `.env.*` are ignored; only safe `.env.example`, `.env.sample`, and `.env.template` files are allowed as templates. The [Secret scanning workflow](docs/secret-scanning.md) runs Gitleaks against full Git history on pull requests and pushes to `main`, with secret values redacted from logs.
 - Frontend runs in development mode with hot-reload (Vite)
 - Backend uses Spring Boot with embedded Tomcat and a bounded SSE thread pool (`AsyncConfig`)
 - Conversation history is persisted to a local SQLite database (via Spring Data JPA), not kept in memory — it survives restarts
@@ -272,8 +273,8 @@ This project is licensed under the MIT License - see the [LICENSE](https://githu
 
 Framework versions, migration details, and rollback guidance: [framework upgrade](docs/framework-upgrade.md).
 
-## v1.5.0 release
+## v1.6.0
 
-See the [release notes](docs/releases/v1.5.0.md) for agent limits, external-data handling, installation, and backup/rollback instructions.
+Boox adds a quieter conversation UI, local preferences, projects and explicitly saved project notes. See the [release notes](docs/releases/v1.6.0.md) for capabilities, external-data handling, installation, and backup/rollback instructions.
 
 Maintainer publication checklist: [releasing Boox](docs/releasing.md).
