@@ -4,7 +4,7 @@ The Secret scanning workflow uses checksum-verified Gitleaks 8.30.1 to inspect f
 
 Local `.env` and `.env.*` files are ignored by Git; safe `.env.example`, `.env.sample` and `.env.template` files can be committed only with placeholder values. Docker build exclusions also cover environment files, databases and private `.local` launch assets. Neither ignore file removes a file already tracked by Git: review staged changes before committing.
 
-An audit with the updated scanner found one historical Docker credential in generated test logs. The owner confirmed on 20 October 2026 that it was retired/recycled. `.gitleaksignore` lists only the eight exact historical finding fingerprints. It contains no secret values and does not exempt a path, token pattern or future commit. The credential remains in old Git history; retirement, rather than this exception, prevents its use. History has not been rewritten.
+.gitleaksignore contains exact finding fingerprints for a retired credential. Exceptions do not exempt file paths, token patterns or future commits.
 
 To scan locally with the pinned version:
 

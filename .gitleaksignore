@@ -1,4 +1,4 @@
-# Historical Docker credential retired/recycled by the owner, confirmed 2026-10-20.
+# Exact exceptions for a retired Docker credential.
 # Exact finding fingerprints only; new commits and other credentials remain scanned.
 3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:314
 3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:324
