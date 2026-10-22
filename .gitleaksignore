@@ -1,0 +1,10 @@
+# Exact exceptions for a retired Docker credential.
+# Exact finding fingerprints only; new commits and other credentials remain scanned.
+3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:314
+3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:324
+3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:707
+3d398a184ad7bbf33325e460427a2d32c752231c:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:717
+d96e9b0abf134b6bfa1a101b5fbc97534f4239f0:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:314
+d96e9b0abf134b6bfa1a101b5fbc97534f4239f0:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:324
+d96e9b0abf134b6bfa1a101b5fbc97534f4239f0:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:707
+d96e9b0abf134b6bfa1a101b5fbc97534f4239f0:backend/integration-test/target/surefire-reports/TEST-com.example.chatapp.engine.OllamaChatEngineIntegrationTest.xml:generic-api-key:717
