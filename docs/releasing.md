@@ -1,9 +1,9 @@
 # Releasing Boox
 
 Release work belongs on a branch and goes through a PR. Do not edit the default
-branch directly. Run the app and obtain user manual validation before opening
-the PR. A release tag triggers public image publication, so push it only after
-release approval.
+branch directly. Validate the packaged app and record acceptance evidence. A release
+tag triggers public image publication, so push it only after maintainer release
+approval.
 
 ## Prepare a candidate
 
@@ -34,9 +34,10 @@ release approval.
    share one Ollama server. Validate streaming chat, cancellation and UI
    behavior manually as well.
 6. Record the candidate commit, image ID, platform, test outcomes and remaining
-   limitations. Local ARM64 checks do not prove AMD64 behavior. Ask the user to
-   validate the packaged app. Push the branch and open the PR only after manual validation. Verify
-   merged-commit CI before proceeding.
+   limitations. Local ARM64 checks do not prove AMD64 behavior. Include manual
+   packaged-app acceptance in the validation record. Open a reviewable PR and
+   verify CI on the final head and merged commit, including Secret scanning,
+   before publication.
 
 ## Publish and verify
 

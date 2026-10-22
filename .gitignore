@@ -46,3 +46,23 @@ reports-laria/
 
 # Private launch plans, recordings, exports and publication tracking
 .local/
+
+# Local coding-agent guidance and personal working documents
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+CODEX.md
+.cursorrules
+.windsurfrules
+.aider*
+.codex/
+.agents/
+.cursor/
+.windsurf/
+.gemini/
+.github/copilot-instructions.md
+.github/instructions/
+.github/agents/
+/docs/promoting-boox.md
