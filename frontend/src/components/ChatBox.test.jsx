@@ -390,16 +390,16 @@ describe('ChatBox image attachments', () => {
     });
 
     it('rejects a non-image file with an error toast', async () => {
+        const user = userEvent.setup({ applyAccept: false });
         render(<ChatBox {...visionProps} />);
-        await screen.findByLabelText('Attach image');
+        await user.click(screen.getByRole('button', { name: 'Attach', exact: true }));
+        await user.click(await screen.findByLabelText('Attach image'));
 
-        // user.upload() filters files against the input's accept="image/*" the
-        // way a real file picker would, so a mismatched type never reaches
-        // onChange - fireEvent bypasses that to actually exercise the app's
-        // own type check in handleFileSelect.
+        // Bypass the picker's accept filter to exercise application validation,
+        // while awaiting the upload interaction and its pending React effects.
         const file = new File(['not an image'], 'notes.txt', { type: 'text/plain' });
-        const fileInput = document.querySelector('input[type="file"]');
-        fireEvent.change(fileInput, { target: { files: [file] } });
+        const fileInput = document.querySelector('input[type="file"][accept="image/*"]');
+        await user.upload(fileInput, file);
 
         expect(await screen.findByRole('alert')).toHaveTextContent(
             'Only image files can be attached.'
