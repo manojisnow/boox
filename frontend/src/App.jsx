@@ -12,7 +12,7 @@ import {
 } from './services/api';
 import './App.css';
 
-const ACTIVE_KEY = 'boox-active-conversation';
+const ACTIVE_KEY = 'ullavox-active-conversation';
 
 const newConversationId = () =>
     (window.crypto && window.crypto.randomUUID)
@@ -184,11 +184,11 @@ const App = () => {
             {showPreferences && <PreferencesPanel onboarding={onboarding} onClose={() => { preferencesInteracted.current = true; setShowPreferences(false); setOnboarding(false); }} />}
             {draftProject !== undefined && <ProjectEditor project={draftProject} onClose={() => setDraftProject(undefined)} onSaved={refreshProjects} chatCount={conversations.filter(c => c.projectId === draftProject?.id).length} />}
             {appError && <div className="toast" role="alert">{appError}<button onClick={() => setAppError('')} aria-label="Dismiss application error">Dismiss</button></div>}
-            <button ref={navigationToggleRef} className="navigation-toggle icon-button" onClick={() => setSidebarExpanded(value => !value)} aria-label={sidebarExpanded ? 'Hide chat history' : 'Show chat history'} aria-expanded={sidebarExpanded} aria-controls="boox-sidebar"><Icon name="panel" /></button>
+            <button ref={navigationToggleRef} className="navigation-toggle icon-button" onClick={() => setSidebarExpanded(value => !value)} aria-label={sidebarExpanded ? 'Hide chat history' : 'Show chat history'} aria-expanded={sidebarExpanded} aria-controls="ullavox-sidebar"><Icon name="panel" /></button>
             {sidebarExpanded && <button className="navigation-scrim" aria-label="Close navigation" onClick={() => setSidebarExpanded(false)} />}
-            <aside id="boox-sidebar" ref={sidebarRef} className={`sidebar${sidebarExpanded ? ' expanded' : ' collapsed'}`} aria-label="Chat navigation" role={compact && sidebarExpanded ? 'dialog' : undefined} aria-modal={compact && sidebarExpanded ? true : undefined} inert={!sidebarExpanded}>
+            <aside id="ullavox-sidebar" ref={sidebarRef} className={`sidebar${sidebarExpanded ? ' expanded' : ' collapsed'}`} aria-label="Chat navigation" role={compact && sidebarExpanded ? 'dialog' : undefined} aria-modal={compact && sidebarExpanded ? true : undefined} inert={!sidebarExpanded}>
                 {sidebarExpanded && <>
-                    <div className="sidebar-brand">boox<span>.</span></div>
+                    <div className="sidebar-brand">ullavox<span>.</span></div>
                     <button className="new-chat-row" aria-label="New Chat" onClick={() => { handleNewChat(); if (window.innerWidth < 900) setSidebarExpanded(false); }}><Icon name="plus" />New chat</button>
                     <nav className="project-navigation" aria-label="Projects">
                         <button className={!selectedProject ? 'selected' : ''} aria-current={!selectedProject ? 'page' : undefined} onClick={() => handleSelectProject('')}><Icon name="chat" />Standalone chats</button>

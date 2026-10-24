@@ -1,4 +1,4 @@
-# Boox — Development History
+# Ullavox — Development History
 
 Two separate development sessions, ten total sub-phases across two plans.
 
@@ -163,7 +163,7 @@ Goal: the two biggest product gaps — chat history vanished on every restart, a
 - New `ConversationController` (`/api/conversations`) — list, resume (fetch messages, filtering out intermediate tool-call rows for a clean replay), rename, delete.
 - Frontend: `ConversationSidebar.jsx` — list, new chat, resume, inline rename, delete. `ChatBox.jsx` uses the conversation id as the session id, loads history on mount, and no longer wipes the conversation when the model is switched mid-chat (previously it did).
 - **Fix:** navigating away while a response was still streaming both hid the new conversation from the sidebar (it only refreshed after streaming completed) and dropped the assistant's reply (the backend only persisted it after the stream finished, so a disconnect mid-stream lost it). Fixed by refreshing the sidebar as soon as a message is sent, and by having the backend keep consuming Ollama and persist the full reply even after the SSE client disconnects.
-- Docker: a named `boox_data` volume at `/app/data` so the SQLite file survives container recreation.
+- Docker: a named `ullavox_data` volume at `/app/data` so the SQLite file survives container recreation.
 
 ### Context Window Management
 - `ContextWindowManager` — pure, unit-tested: estimates tokens (~chars/4) and splits a conversation's messages into a recent window that fits a budget plus the older messages that don't, nudging the window boundary to start on a `user` message.

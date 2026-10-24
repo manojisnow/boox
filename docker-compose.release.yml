@@ -1,13 +1,13 @@
-# Boox — End-User Compose File
+# Ullavox — End-User Compose File
 #
-# This file is for end users who want to run Boox without cloning the repo.
+# This file is for end users who want to run Ullavox without cloning the repo.
 # It pulls the pre-built image from Docker Hub and automatically downloads
 # the default AI model on first run.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/manojisnow/boox/v1.6.0/docker-compose.release.yml \
-#     -o docker-compose.boox.yml
-#   docker compose -f docker-compose.boox.yml up
+#   curl -fsSL https://raw.githubusercontent.com/manojisnow/ullavox/v1.6.0/docker-compose.release.yml \
+#     -o docker-compose.ullavox.yml
+#   docker compose -f docker-compose.ullavox.yml up
 #
 # Open http://localhost:8080 — no further configuration needed.
 # The AI model (~2.1 GB) is downloaded once and cached in a Docker volume.
@@ -20,7 +20,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:11434:11434"
+      - "${ULLAVOX_BIND_ADDRESS:-127.0.0.1}:11434:11434"
     deploy:
       resources:
         limits:
@@ -50,11 +50,11 @@ services:
       - ollama_data:/root/.ollama
     restart: "no"
 
-  # ── Boox application (frontend + backend in one image) ───────────────────────
+  # ── Ullavox application (frontend + backend in one image) ───────────────────────
   app:
-    image: dumanoj/boox:1.6.0
+    image: dumanoj/ullavox:1.6.0
     ports:
-      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${ULLAVOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     environment:
       - OLLAMA_API_URL=http://ollama:11434
       - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-legacy}
@@ -67,7 +67,7 @@ services:
       - PORT=8080
       - CORS_ALLOWED_ORIGINS=http://localhost:8080
     volumes:
-      - boox_data:/app/data
+      - ullavox_data:/app/data
     depends_on:
       ollama:
         condition: service_healthy
@@ -80,4 +80,4 @@ volumes:
   # Remove this volume only if you want to force a fresh model download.
   ollama_data:
   # Conversation history (SQLite DB) — survives restarts and upgrades.
-  boox_data:
+  ullavox_data:

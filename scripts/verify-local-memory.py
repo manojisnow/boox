@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', default='http://127.0.0.1:18085')
     parser.add_argument('--model', default='qwen2.5:14b')
-    parser.add_argument('--output', default='/tmp/boox-local-memory-validation.json')
+    parser.add_argument('--output', default='/tmp/ullavox-local-memory-validation.json')
     parser.add_argument('--allow-preferences-update', action='store_true', required=True)
     args = parser.parse_args()
     checks = []

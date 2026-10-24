@@ -1,6 +1,6 @@
-# Spring Boot Backend for Chat Application
+# Ullavox Backend
 
-This directory contains the **Spring Boot** backend for the chat app: a single Maven module (`chatapp`) under a parent POM that enforces code quality across it.
+This directory contains the **Spring Boot** backend for Ullavox: a single Maven module (`chatapp`) under a parent POM that enforces code quality across it.
 
 [← Back to Project Overview](../README.md)
 
@@ -61,10 +61,14 @@ backend/
    ollama.context.summary.enabled=true
 
    # Persistence (SQLite; the file's parent directory is created automatically)
-   spring.datasource.url=jdbc:sqlite:./data/boox.db
+   spring.datasource.url=jdbc:sqlite:./data/ullavox.db
 
    # CORS and other properties...
    ```
+   Set `ULLAVOX_DB_PATH` to select an existing database file; the path above is
+   relative to the process working directory. Before upgrading an existing
+   installation, follow [the migration guide](../docs/rename-compatibility.md).
+
    Most of these are also overridable via environment variables — see the [root README](../README.md#manual-configuration).
 
 ## REST API
@@ -114,8 +118,8 @@ Coverage report: `chatapp/target/site/jacoco/index.html` after running tests.
 - Please open issues or pull requests for improvements or bug fixes.
 
 ## Prerequisites
-- Java 21 (LTS)
+- Java 25 (LTS)
 - Maven 3.8+
 - Docker (for Testcontainers)
 
-> Runs on Spring Boot 3.x (Jakarta EE namespace) with Java 21.
+> Uses Spring Boot 4.1.1 with Java 25; see the Maven POMs for the configured versions.

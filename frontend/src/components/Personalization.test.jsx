@@ -14,7 +14,7 @@ describe('local preferences', () => {
         const user = userEvent.setup(); const close = vi.fn();
         savePreferences.mockResolvedValue({ ...profile, version: 3, onboardingStatus: 'skipped' });
         render(<PreferencesPanel onboarding onClose={close} />);
-        await user.type(await screen.findByLabelText('How should Boox help you?'), 'Do not retain this draft');
+        await user.type(await screen.findByLabelText('How should Ullavox help you?'), 'Do not retain this draft');
         getPreferences.mockResolvedValue({ ...profile, version: 5, background: 'Updated elsewhere' });
         await user.click(screen.getByRole('button', { name: 'Skip onboarding' }));
         await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ ...profile, version: 5, onboardingStatus: 'skipped', background: 'Updated elsewhere' }));
@@ -44,7 +44,7 @@ describe('local preferences', () => {
         savePreferences.mockImplementation(async p => ({ ...p, version: 3 })); clearPreferences.mockResolvedValue({ version: 4, onboardingStatus: 'skipped' });
         vi.spyOn(window, 'confirm').mockReturnValue(true);
         render(<PreferencesPanel onClose={() => {}} />);
-        await user.type(await screen.findByLabelText('How should Boox help you?'), 'Explain tradeoffs');
+        await user.type(await screen.findByLabelText('How should Ullavox help you?'), 'Explain tradeoffs');
         await user.click(screen.getByRole('button', { name: 'Save preferences' }));
         await waitFor(() => expect(savePreferences).toHaveBeenCalledWith(expect.objectContaining({ version: 2, instructions: 'Explain tradeoffs', onboardingStatus: 'completed' })));
         await user.click(screen.getByRole('button', { name: 'Clear preferences' }));
@@ -62,10 +62,10 @@ describe('local preferences', () => {
     it('keeps edits visible after version conflict', async () => {
         const user = userEvent.setup(); savePreferences.mockRejectedValue({ response: { status: 409 } });
         render(<PreferencesPanel onClose={() => {}} />);
-        await user.type(await screen.findByLabelText('How should Boox help you?'), 'One step at a time');
+        await user.type(await screen.findByLabelText('How should Ullavox help you?'), 'One step at a time');
         await user.click(screen.getByRole('button', { name: 'Save preferences' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('Reload and retry');
-        expect(screen.getByLabelText('How should Boox help you?')).toHaveValue('One step at a time');
+        expect(screen.getByLabelText('How should Ullavox help you?')).toHaveValue('One step at a time');
     });
 });
 describe('project memory', () => {
@@ -91,7 +91,7 @@ describe('project memory', () => {
     });
     it('creates projects and explains delete impact before preserving transcripts', async () => {
         const user = userEvent.setup(); const saved = vi.fn();
-        render(<ProjectEditor project={{ id: 'p1', version: 8, name: 'Boox', description: '', instructions: '' }} chatCount={3} onSaved={saved} onClose={() => {}} />);
+        render(<ProjectEditor project={{ id: 'p1', version: 8, name: 'Ullavox', description: '', instructions: '' }} chatCount={3} onSaved={saved} onClose={() => {}} />);
         await user.type(screen.getByLabelText('Project instructions'), 'Work offline');
         await user.click(screen.getByRole('button', { name: 'Save project' }));
         await waitFor(() => expect(saveProject).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', version: 8, instructions: 'Work offline' })));
@@ -161,7 +161,7 @@ it('uses backend field bounds and requires shortening an overlong source message
     const { unmount } = render(<PreferencesPanel onClose={() => {}} />);
     expect(await screen.findByLabelText('Response length')).toHaveAttribute('maxlength', '120');
     expect(screen.getByLabelText('Background (optional)')).toHaveAttribute('maxlength', '1000');
-    expect(screen.getByLabelText('How should Boox help you?')).toHaveAttribute('maxlength', '2000');
+    expect(screen.getByLabelText('How should Ullavox help you?')).toHaveAttribute('maxlength', '2000');
     unmount();
     render(<MemoryPanel projectId="p1" conversationId="c1" sourceMessage={{ id: 8, text: 'x'.repeat(2001) }} onClose={() => {}} onSelectionChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'Save note' })).toBeDisabled();

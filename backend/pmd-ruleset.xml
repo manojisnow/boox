@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ruleset name="Boox"
+<ruleset name="Ullavox"
     xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
   <description>
-    Boox backend PMD rules. maven-pmd-plugin has no top-level "exclude a rule from a
+    Ullavox backend PMD rules. maven-pmd-plugin has no top-level "exclude a rule from a
     category" config option (its excludeRules element is not a real parameter) - rule
     exclusion has to happen inside the ruleset that references the category, like this.
   </description>

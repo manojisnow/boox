@@ -1,9 +1,10 @@
 services:
   app:
+    image: ${ULLAVOX_IMAGE:-ullavox:local}
     build: .
     ports:
-      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:3000:3000"
-      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${ULLAVOX_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+      - "${ULLAVOX_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     environment:
       - OLLAMA_API_URL=http://ollama:11434
       - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-legacy}
@@ -20,7 +21,7 @@ services:
       - chat.cors.allowed-headers=*
       - chat.cors.allow-credentials=true
     volumes:
-      - boox_data:/app/data
+      - ullavox_data:/app/data
     depends_on:
       - ollama
 
@@ -29,7 +30,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "${BOOX_BIND_ADDRESS:-127.0.0.1}:11434:11434"
+      - "${ULLAVOX_BIND_ADDRESS:-127.0.0.1}:11434:11434"
     deploy:
       resources:
         limits:
@@ -41,4 +42,4 @@ services:
 
 volumes:
   ollama_data:
-  boox_data:
+  ullavox_data:

@@ -1,10 +1,10 @@
-# Boox UX direction
+# Ullavox UX direction
 
 Design review · 18 October 2026 · Proposal, not an implemented interface
 
 ## Product premise
 
-Boox is a calm place to think, with context you control. It combines local model access, ongoing conversations, explicit project knowledge, and bounded research. The interface should make that combination feel like one product.
+Ullavox is a calm place to think, with context you control. It combines local model access, ongoing conversations, explicit project knowledge, and bounded research. The interface should make that combination feel like one product.
 
 The primary loop is: open a conversation, understand its context, write, read, continue. Organizing knowledge and tuning the model support that loop.
 

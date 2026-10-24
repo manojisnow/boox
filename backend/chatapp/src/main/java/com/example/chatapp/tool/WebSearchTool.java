@@ -312,7 +312,7 @@ public class WebSearchTool implements Tool {
     final HttpHeaders headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
-        "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
+        "Mozilla/5.0 (compatible; Ullavox-ChatBot/1.6.0; +https://github.com/manojisnow/ullavox)");
     headers.set(HttpHeaders.ACCEPT, "application/json");
     final HttpEntity<Void> entity = new HttpEntity<>(headers);
     final ResponseEntity<String> response =
@@ -395,7 +395,7 @@ public class WebSearchTool implements Tool {
     final HttpHeaders wikiHeaders = new HttpHeaders();
     wikiHeaders.set(
         HttpHeaders.USER_AGENT,
-        "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
+        "Mozilla/5.0 (compatible; Ullavox-ChatBot/1.6.0; +https://github.com/manojisnow/ullavox)");
     final HttpEntity<Void> entity = new HttpEntity<>(wikiHeaders);
     final ResponseEntity<String> searchResponse =
         restTemplate.exchange(searchUrl, HttpMethod.GET, entity, String.class);
@@ -491,7 +491,7 @@ public class WebSearchTool implements Tool {
     final HttpHeaders headers = new HttpHeaders();
     headers.set(
         HttpHeaders.USER_AGENT,
-        "Mozilla/5.0 (compatible; Boox-ChatBot/1.0; +https://github.com/boox)");
+        "Mozilla/5.0 (compatible; Ullavox-ChatBot/1.6.0; +https://github.com/manojisnow/ullavox)");
     final HttpEntity<Void> entity = new HttpEntity<>(headers);
     final ResponseEntity<String> response =
         restTemplate.exchange(url, HttpMethod.GET, entity, String.class);

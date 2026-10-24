@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @DataJpaTest(
     properties = {
       "spring.jpa.hibernate.ddl-auto=validate",
-      "spring.datasource.url=jdbc:sqlite:target/boox-agent-completion-migration-test.db",
+      "spring.datasource.url=jdbc:sqlite:target/ullavox-agent-completion-migration-test.db",
       "spring.flyway.enabled=false"
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

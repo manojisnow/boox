@@ -11,7 +11,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.context.WebApplicationContext;
 
 @org.springframework.test.context.ActiveProfiles("test")
-@SpringBootTest(properties = "spring.datasource.url=jdbc:sqlite:target/boox-contract-test.db")
+@SpringBootTest(properties = "spring.datasource.url=jdbc:sqlite:target/ullavox-contract-test.db")
 public abstract class BaseContractTest {
 
   @Autowired private WebApplicationContext context;

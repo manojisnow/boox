@@ -314,7 +314,7 @@ describe('local context APIs', () => {
     it('uses versioned preference and project resources', async () => {
         axios.request.mockResolvedValue({ data: {} });
         await getPreferences(); await savePreferences({ version: 1, instructions: '' }); await clearPreferences(2);
-        await listProjects(); await saveProject({ name: 'Boox' }); await saveProject({ id: 'p1', version: 3, name: 'Boox' }); await deleteProject('p1', 4);
+        await listProjects(); await saveProject({ name: 'Ullavox' }); await saveProject({ id: 'p1', version: 3, name: 'Ullavox' }); await deleteProject('p1', 4);
         expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'put', url: '/api/preferences', data: { version: 1, instructions: '' } }));
         expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'delete', url: '/api/preferences', params: { version: 2 } }));
         expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'post', url: '/api/projects' }));

@@ -68,7 +68,7 @@ class MemoryControllerTest {
 
   @Test
   void projectRoutesExposeCreatedAndNoContentContracts() throws Exception {
-    var project = Map.<String, Object>of("id", "p", "name", "Boox", "version", 0);
+    var project = Map.<String, Object>of("id", "p", "name", "Ullavox", "version", 0);
     when(memory.projects()).thenReturn(List.of(project));
     when(memory.project("p")).thenReturn(project);
     when(memory.saveProject(isNull(), anyMap())).thenReturn(project);
@@ -78,15 +78,15 @@ class MemoryControllerTest {
         .andExpect(jsonPath("$[0].id").value("p"));
     mvc.perform(get("/api/projects/p"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.name").value("Boox"));
+        .andExpect(jsonPath("$.name").value("Ullavox"));
     mvc.perform(
-            post("/api/projects").contentType("application/json").content("{\"name\":\"Boox\"}"))
+            post("/api/projects").contentType("application/json").content("{\"name\":\"Ullavox\"}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value("p"));
     mvc.perform(
             put("/api/projects/p")
                 .contentType("application/json")
-                .content("{\"version\":0,\"name\":\"Boox\"}"))
+                .content("{\"version\":0,\"name\":\"Ullavox\"}"))
         .andExpect(status().isOk());
     mvc.perform(delete("/api/projects/p").param("version", "0")).andExpect(status().isNoContent());
     verify(memory).deleteProject("p", 0L);

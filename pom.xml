@@ -9,6 +9,6 @@
     <modules>
         <module>backend</module>
     </modules>
-    <name>React-SpringBoot Chat Application</name>
+    <name>Ullavox</name>
     <description>Parent aggregator for the backend module. The frontend is a Vite app built via npm (see frontend/ and the Dockerfile).</description>
 </project> 

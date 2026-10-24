@@ -17,7 +17,7 @@ export function EditorPanel({ title, onClose, children }) {
     </dialog>;
 }
 
-const profileFields = [['responseLength', 'Response length'], ['explanationStyle', 'Explanation style'], ['familiarity', 'Assumed familiarity'], ['background', 'Background (optional)', 'User-provided background'], ['goals', 'Goals', 'User goals'], ['instructions', 'How should Boox help you?', 'Working preferences']];
+const profileFields = [['responseLength', 'Response length'], ['explanationStyle', 'Explanation style'], ['familiarity', 'Assumed familiarity'], ['background', 'Background (optional)', 'User-provided background'], ['goals', 'Goals', 'User goals'], ['instructions', 'How should Ullavox help you?', 'Working preferences']];
 export function PreferencesPanel({ onClose, onboarding = false }) {
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState('');
@@ -44,7 +44,7 @@ export function PreferencesPanel({ onClose, onboarding = false }) {
         } finally { setBusy(false); }
     };
     const preview = profile && profileFields.filter(([key]) => profile[key]).map(([key, label, renderedLabel]) => `${renderedLabel || label}: ${profile[key]}`).join('\n');
-    return <EditorPanel title={onboarding ? 'Make Boox work for you' : 'Preferences'} onClose={onClose}>
+    return <EditorPanel title={onboarding ? 'Make Ullavox work for you' : 'Preferences'} onClose={onClose}>
         <p>Optional preferences are stored on this device. Included preferences and project context are sent to your selected model; a remote model receives that information. Saving uses no model call.</p>
         <p>Changes apply when the next response starts. Running work keeps the version it started with.</p>
         {error && <><p role="alert">{error}</p><button type="button" disabled={busy} onClick={async () => { setBusy(true); try { setProfile(await getPreferences()); setError(''); setSaved(false); setDirty(false); } catch (e) { setError(apiError(e)); } finally { setBusy(false); } }}>Reload saved preferences</button></>}
@@ -114,7 +114,7 @@ export function MemoryPanel({ projectId, conversationId, sourceMessage, selected
     const filteredNotes = notes.filter(n => `${n.title} ${n.content}`.toLowerCase().includes(query.toLowerCase()));
     return <EditorPanel title="Project notes" onClose={onClose}>
         <p>Save only what you want carried across chats in this project. Saved notes remain when their source chat is deleted or moved. Manage them here.</p>
-        <p>Select up to five notes for the next message. Selection clears when Boox accepts the request. Pinned notes and relevant matches may also be included within the context budget.</p>
+        <p>Select up to five notes for the next message. Selection clears when Ullavox accepts the request. Pinned notes and relevant matches may also be included within the context budget.</p>
         {error && <p role="alert">{error}</p>}
         <div className="panel-actions"><button type="button" disabled={busy} onClick={() => setDraft({ title: '', content: '', kind: 'note', pinned: false })}>Add note</button>
         <button type="button" disabled={busy} onClick={async () => { setBusy(true); try { await refresh(); setError(''); } catch (e) { setError(apiError(e)); } finally { setBusy(false); } }}>Refresh notes</button></div>

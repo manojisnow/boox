@@ -45,7 +45,7 @@ data
 .github/copilot-instructions.md
 .github/instructions
 .github/agents
-docs/promoting-boox.md
+docs/promoting-*.md
 **/.claude
 **/.codex
 **/.agents

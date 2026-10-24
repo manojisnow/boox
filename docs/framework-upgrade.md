@@ -33,7 +33,7 @@ Node 20, which is no longer supported. Use `nvm use` in `frontend/`.
   Review these overrides when upgrading Boot again.
 - SQLite requires `INTEGER PRIMARY KEY` for identity columns. Hibernate 7's
   schema exporter can omit the identity type if another integer column appears
-  earlier in the table. `BooxSqliteDialect` and explicit integer ID column
+  earlier in the table. `UllavoxSqliteDialect` and explicit integer ID column
   definitions preserve identity generation for both messages and agent steps.
   Keep this workaround until an upstream fix is verified against fresh and
   existing databases. Existing tables do not need to be recreated.
@@ -48,7 +48,7 @@ Node 20, which is no longer supported. Use `nvm use` in `frontend/`.
 
 Run `mvn -f backend/pom.xml clean verify` with Java 25 and
 `npm ci && npm test -- --coverage && npm run build` in `frontend/` with Node 24.
-Build the release image with `docker build --pull -t boox .`.
+Build the release image with `docker build --pull -t ullavox .`.
 
 Before using an existing database, take a SQLite backup (including committed WAL
 contents, using SQLite's backup API or `.backup`). Test the upgrade against a
@@ -57,7 +57,7 @@ follow-ups, attachment clearing and web research in the running app before PR.
 Keep the previous image and database backup until the upgrade is accepted. To
 roll back, stop the new app, restore the backup, and start the previous image.
 
-The upgrade does not change Boox's authentication or network exposure. The
+The upgrade does not change Ullavox's authentication or network exposure. The
 unauthenticated API and Compose ports bound to all interfaces remain a separate
 security concern before a release intended for untrusted networks.
 

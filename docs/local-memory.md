@@ -1,12 +1,12 @@
 # Preferences and project memory
 
-Boox keeps preferences, projects and explicitly saved project notes in its local SQLite
+Ullavox keeps preferences, projects and explicitly saved project notes in its local SQLite
 database. No account or external memory provider is needed. One internal local identity
 owns the data; this identity does not provide authentication for a shared server.
 
 ## Preferences
 
-Optional onboarding asks how you want Boox to respond, your familiarity with a topic,
+Optional onboarding asks how you want Ullavox to respond, your familiarity with a topic,
 and any background, goals or working instructions you choose to share. Skip keeps chat
 available and discards unsaved onboarding edits while preserving previously saved
 preferences. Open Preferences later to edit, preview the generated instructions or clear
@@ -16,7 +16,7 @@ Each chat can enable or disable preferences. Preferences are defaults: a request
 "explain this in detail" can override your usual preference for short answers. Chatting
 does not automatically change your saved preferences.
 
-Boox reads the enabled settings when execution starts. A queued Agent task uses the
+Ullavox reads the enabled settings when execution starts. A queued Agent task uses the
 settings current when it starts; a task already running keeps its resolved version.
 Changes to settings affect subsequent executions. Clearing settings currently used by
 running work can return a conflict; wait for completion or cancel an Agent task and retry.
@@ -30,7 +30,7 @@ notes from the old project.
 
 Project notes are explicit: write one in the notes panel or save a completed, persisted
 message after reviewing its text. Choose a note, decision or constraint, edit it, and
-optionally pin it. Partial streaming output cannot be saved. Boox does not automatically
+optionally pin it. Partial streaming output cannot be saved. Ullavox does not automatically
 extract personal traits or promote conversation summaries into project notes.
 
 For an enabled project, selection considers notes explicitly selected for that turn,
@@ -50,7 +50,7 @@ its notes and detaches its chats; it does not delete the chat transcripts.
 Context used reports included and omitted preferences/project notes and their versions.
 The backend selects and assembles this information; it is not copied from browser storage
 into every outgoing request. Profiles, project context and conversation instructions are
-separate. Application tool/evidence restrictions remain enforced by Boox.
+separate. Application tool/evidence restrictions remain enforced by Ullavox.
 
 Ask and Agent share context accounting but retain different capacities. Ask's configured
 input ceiling remains separate from Agent's larger default context. Required input that
@@ -80,8 +80,8 @@ select notes.
 
 The SQLite database is not newly encrypted by this feature. Protect the host, disk and
 backups. Compose binds application and Ollama ports to `127.0.0.1` by default. Setting
-`BOOX_BIND_ADDRESS=0.0.0.0` deliberately exposes them to other machines; the APIs have no
-login protection. Operate one Boox application process per database.
+`ULLAVOX_BIND_ADDRESS=0.0.0.0` deliberately exposes them to other machines; the APIs have no
+login protection. Operate one Ullavox application process per database.
 
 ## Upgrade and rollback
 

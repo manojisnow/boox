@@ -35,7 +35,7 @@ class PersonalizationResolverTest {
     when(memory.conversationSettings("chat")).thenReturn(Map.of("projectId", "project"));
     when(memory.preferences()).thenReturn(Map.of("responseLength", "concise", "version", 2));
     when(memory.project("project"))
-        .thenReturn(Map.of("instructions", "Work locally", "version", 3, "name", "Boox"));
+        .thenReturn(Map.of("instructions", "Work locally", "version", 3, "name", "Ullavox"));
     when(memory.memories("project"))
         .thenReturn(
             List.of(

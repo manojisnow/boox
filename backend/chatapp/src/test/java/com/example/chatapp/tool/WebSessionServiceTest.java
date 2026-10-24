@@ -16,7 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 @DataJpaTest(
     properties = {
       "spring.jpa.hibernate.ddl-auto=validate",
-      "spring.datasource.url=jdbc:sqlite:target/boox-web-session-migration-test.db",
+      "spring.datasource.url=jdbc:sqlite:target/ullavox-web-session-migration-test.db",
       "spring.flyway.enabled=false"
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

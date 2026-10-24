@@ -139,7 +139,7 @@ const ChatBox = ({
             } catch (e) {
                 if (!current) return;
                 if (e.response?.status === 404) { setExecutionPending(false); return; }
-                setExecutionPending(true); setExecutionError('Checking response status. Sending stays paused until Boox confirms the worker has finished.');
+                setExecutionPending(true); setExecutionError('Checking response status. Sending stays paused until Ullavox confirms the worker has finished.');
                 timer = setTimeout(check, 2000);
             }
         };
@@ -680,7 +680,7 @@ const ChatBox = ({
                 {settingsError && <p role="alert">{settingsError}</p>}
                 <div className="context-section"><h3>Connection</h3>
                     {servers.length <= 1 && <label>Server<select aria-label="Server" value={selectedServer} onChange={e => setSelectedServer(e.target.value)} disabled={blocked}><option value="" disabled>Select a server</option>{servers.map(server => <option key={server} value={server}>{server}</option>)}</select></label>}
-                    {selectedServer && <p>{selectedServer === 'ollama' ? 'The model list comes from the Ollama service configured for this Boox installation. It can include models that run locally or in the cloud.' : `The model list comes from the ${connectionName} connection configured for this Boox installation.`}</p>}
+                    {selectedServer && <p>{selectedServer === 'ollama' ? 'The model list comes from the Ollama service configured for this Ullavox installation. It can include models that run locally or in the cloud.' : `The model list comes from the ${connectionName} connection configured for this Ullavox installation.`}</p>}
                     <p>Context is sent to the selected model. Remote models receive the information you include.</p>
                 </div>
                 <div className="context-section"><h3>Advanced</h3>
@@ -761,16 +761,16 @@ const ChatBox = ({
                 try { const value = await getConversationSettings(conversationId); setSettings(value); setSystemPrompt(value.systemPrompt || ''); setProjectId(value.projectId || ''); setUsePreferences(value.usePreferences); setUseProjectContext(value.useProjectContext); setSelectedMemoryIds([]); setSettingsError(''); } catch (e) { setSettingsError(apiError(e)); }
             }}>Reload chat settings</button></div>}
             {executionError && <p role="status">{executionError}</p>}
-            {executionPending && <p role="status">Boox is checking or completing this conversation’s response. Reconnecting does not cancel its work.</p>}
+            {executionPending && <p role="status">Ullavox is checking or completing this conversation’s response. Reconnecting does not cancel its work.</p>}
             <div className="chat-messages">
                 {showPlaceholder ? (
                     <div className="chat-greeting">
-                        <div className="greeting-wordmark">boox<span>.</span></div>
+                        <div className="greeting-wordmark">ullavox<span>.</span></div>
                         <h2 className="greeting-title">A little space to think.</h2>
                         <div className="greeting-subtitle">
                             {selectedModel ? (projectId ? 'Pick up an idea, or start something new in this project.' : 'Ask a question. Explore an idea. Make a little progress.') : (modelsLoading ? 'Connecting to your model…' : selectedServer ? 'No models available. Check your connection and installed models, then retry.' : 'Open Context to choose a connection and get started.')}
                         </div>
-                        {onboarding && onOpenPreferences && <button type="button" className="onboarding-link" onClick={onOpenPreferences}>Make Boox feel more like you →</button>}
+                        {onboarding && onOpenPreferences && <button type="button" className="onboarding-link" onClick={onOpenPreferences}>Make Ullavox feel more like you →</button>}
                     </div>
                 ) : (
                     messages.map((msg, index) => (

@@ -1,4 +1,4 @@
-# Parallel web search in Boox
+# Parallel web search in Ullavox
 
 Set `WEB_SEARCH_PROVIDER=parallel` in the backend environment or Compose `.env`,
 then restart the backend. Leave `PARALLEL_API_KEY` empty for anonymous light use,
@@ -50,18 +50,18 @@ subject to the agreement. They restrict cross-customer sharing of outputs,
 resale/data products, competitive use and training models with outputs. Public
 benchmark/evaluation disclosure requires written consent. Submitted data may be
 used to improve/train Parallel's services, and processing personal data requires
-a separate DPA. These constraints matter for hosted or commercial Boox; do not
+a separate DPA. These constraints matter for hosted or commercial Ullavox; do not
 infer blanket permission from free MCP access. A personal opt-in integration is
 consistent with the light-use documentation, but obtain provider clarification
 before offering shared hosted access. This is a terms assessment, not legal
-clearance. Distributing Boox source does not bundle a Parallel subscription or
+clearance. Distributing Ullavox source does not bundle a Parallel subscription or
 permission to redistribute third-party page content.
 
 Keep each installation's provider credentials under its operator's control.
 Do not build a shared cross-user evidence cache or publish captured provider
 outputs/evaluation results in the repository. Follow the
 [acceptable use policy](https://parallel.ai/acceptable-use-policy) and source
-website rights. Boox's existing unauthenticated API means hosted multi-user
+website rights. Ullavox's existing unauthenticated API means hosted multi-user
 access needs authentication and isolation before using a shared provider account.
 
 References:
