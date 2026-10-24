@@ -97,18 +97,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Produces tags:  dumanoj/boox:1.2.3  dumanoj/boox:1.2  dumanoj/boox:latest
+      # Produces tags:  dumanoj/ullavox:1.2.3  dumanoj/ullavox:1.2  dumanoj/ullavox:latest
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: dumanoj/boox
+          images: dumanoj/ullavox
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
           labels: |
-            org.opencontainers.image.title=Boox
+            org.opencontainers.image.title=Ullavox
             org.opencontainers.image.description=AI chat application powered by Ollama
 
       - name: Build and push Docker image
@@ -128,7 +128,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: dumanoj/boox
+          repository: dumanoj/ullavox
           short-description: ${{ github.event.repository.description }}
           readme-filepath: ./README.md
 
@@ -141,9 +141,9 @@ jobs:
         run: |
           notes="docs/releases/$RELEASE_TAG.md"
           if [ -f "$notes" ]; then
-            cp "$notes" "$RUNNER_TEMP/boox-release-notes.md"
+            cp "$notes" "$RUNNER_TEMP/ullavox-release-notes.md"
           else
-            printf '## Install\n\nDownload the Compose file from https://github.com/manojisnow/boox/blob/%s/docker-compose.release.yml and run `docker compose -f docker-compose.boox.yml up -d`. See README.md for configuration instructions.\n' "$RELEASE_TAG" > "$RUNNER_TEMP/boox-release-notes.md"
+            printf '## Install\n\nDownload the Compose file from https://github.com/manojisnow/ullavox/blob/%s/docker-compose.release.yml and run `docker compose -f docker-compose.ullavox.yml up -d`. See README.md for configuration instructions.\n' "$RELEASE_TAG" > "$RUNNER_TEMP/ullavox-release-notes.md"
           fi
 
       - name: Create GitHub Release
@@ -152,4 +152,4 @@ jobs:
         with:
           files: docker-compose.release.yml
           generate_release_notes: true
-          body_path: ${{ runner.temp }}/boox-release-notes.md
+          body_path: ${{ runner.temp }}/ullavox-release-notes.md

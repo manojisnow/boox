@@ -5,7 +5,7 @@ import org.hibernate.community.dialect.identity.SQLiteIdentityColumnSupport;
 import org.hibernate.dialect.identity.IdentityColumnSupport;
 
 /** Preserves SQLite INTEGER PRIMARY KEY generation with Hibernate 7's schema exporter. */
-public class BooxSqliteDialect extends SQLiteDialect {
+public class UllavoxSqliteDialect extends SQLiteDialect {
   @Override
   public IdentityColumnSupport getIdentityColumnSupport() {
     return new SQLiteIdentityColumnSupport() {

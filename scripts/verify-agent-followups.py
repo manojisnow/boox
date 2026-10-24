@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in live regression: requires Boox at localhost:8080 and qwen2.5:14b in Ollama.
+"""Opt-in live regression: requires Ullavox at localhost:8080 and qwen2.5:14b in Ollama.
 Creates a new test conversation and verifies five turns without tool-name instructions.
 Results are saved under /tmp for manual inspection; no existing conversation is modified.
 """
@@ -42,6 +42,6 @@ assert '7' in fourth['finalOutput']
 cleared = task('Can you verify row b directly from the file now?', clear=True)
 assert cleared['attachedFileNames'] == []
 assert any((phrase in cleared['finalOutput'].lower() for phrase in ['cannot', "can't", 'no longer', 'not available', 'not currently', "don't have", 'do not have', 'unable'])), 'Claimed direct verification after clearing files'
-with open('/tmp/boox-followup-live-results.json', 'w') as f:
+with open('/tmp/ullavox-followup-live-results.json', 'w') as f:
     json.dump({'conversationId': conversation, 'runs': [first, second, third, fourth, cleared]}, f, indent=2)
 print('PASS: explanation differs, scope and files retained, hypothetical total 24, original evidence unchanged, honest limitation after clearing', flush=True)

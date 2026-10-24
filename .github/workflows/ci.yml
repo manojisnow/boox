@@ -95,14 +95,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build the Docker image
-        run: docker build -t boox-app:ci-${{ github.sha }} .
+        run: docker build -t ullavox-app:ci-${{ github.sha }} .
 
       - name: Run the container using Docker Compose
         # We run in detached mode and override the image to use the one we just built
         run: |
           # Create a temporary .env file for docker-compose to use
-          echo "BOOX_IMAGE_TAG=ci-${{ github.sha }}" > .env
-          docker compose up -d
+          echo "ULLAVOX_IMAGE=ullavox-app:ci-${{ github.sha }}" > .env
+          docker compose up --no-build -d
 
       - name: Wait for container to be healthy
         # This gives the app time to start and respects the HEALTHCHECK in the Dockerfile

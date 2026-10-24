@@ -64,7 +64,7 @@ obedience or a measured improvement in answer quality.
 
 `scripts/verify-memory-container.py` verified assets, fresh startup and durable preferences
 and notes after restarting a disposable named-volume container. It only accepts container
-names beginning with `boox-memory-validation-` to reduce accidental use against a real
+names beginning with `ullavox-memory-validation-` to reduce accidental use against a real
 installation.
 
 ## Remaining acceptance and operating limits

@@ -1,6 +1,6 @@
-# React Frontend for Chat Application
+# Ullavox Frontend
 
-This directory contains the **React** single-page application (SPA) for the chat app, built with **Vite**. It communicates with the Spring Boot backend for AI-driven chat, tool calling, and conversation history.
+This directory contains the **React** single-page application (SPA) for Ullavox, built with **Vite**. It communicates with the Spring Boot backend for AI-driven chat, tool calling, and conversation history.
 
 [← Back to Project Overview](../README.md)
 
@@ -21,9 +21,13 @@ This directory contains the **React** single-page application (SPA) for the chat
 - `vite.config.js` — dev server (port 3000, proxies `/api` to the backend on `:8080`) and build config
 
 ## Setup & Development
+
+Requires Node.js 24.15+ within the Node 24 release line (`.nvmrc`) and npm.
+Run these commands from `frontend/`, with the backend running separately.
+
 1. **Install dependencies:**
    ```sh
-   npm install
+   npm ci
    ```
 2. **Start the dev server:**
    ```sh

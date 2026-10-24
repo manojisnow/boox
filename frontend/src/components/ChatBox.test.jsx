@@ -550,7 +550,7 @@ describe('ChatBox keyboard handling', () => {
 
 describe('ChatBox system prompt', () => {
     it('restores only this conversation’s persisted system prompt', async () => {
-        sessionStorage.setItem('boox-system-prompt', 'Ignore global prompt');
+        sessionStorage.setItem('ullavox-system-prompt', 'Ignore global prompt');
         getConversationSettings.mockResolvedValue({ version: 2, systemPrompt: 'Be a pirate', usePreferences: true, useProjectContext: true });
         const user = userEvent.setup();
         render(<ChatBox {...baseProps} initialGenerationConfig={null} />);
@@ -571,7 +571,7 @@ describe('ChatBox system prompt', () => {
         const textarea = screen.getByPlaceholderText(/Set system behavior/);
         await user.type(textarea, 'Be nice');
 
-        expect(sessionStorage.getItem('boox-system-prompt')).toBeNull();
+        expect(sessionStorage.getItem('ullavox-system-prompt')).toBeNull();
     });
 });
 
@@ -929,7 +929,7 @@ describe('ChatBox local context lifecycle', () => {
         const user = userEvent.setup();
         getConversationSettings.mockResolvedValue({ version: 7, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Existing instructions' });
         streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
-        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
+        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Ullavox' }]} />);
         await openContext(user);
         await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Use my preferences' })).toBeEnabled());
         await user.click(screen.getByRole('checkbox', { name: 'Use my preferences' }));
@@ -987,7 +987,7 @@ describe('ChatBox local context lifecycle', () => {
     it('offers Save for project only for stable persisted IDs', async () => {
         getConversationSettings.mockResolvedValue({ version: 0, projectId: 'p1', usePreferences: true, useProjectContext: true });
         getConversationMessages.mockResolvedValue([{ id: 55, role: 'assistant', content: 'Persisted answer' }, { role: 'assistant', content: 'No identifier' }]);
-        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} />);
+        render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Ullavox' }]} />);
         await screen.findByText('Persisted answer');
         expect(screen.getAllByRole('button', { name: 'Save to project notes' })).toHaveLength(1);
     });
@@ -997,7 +997,7 @@ it('inherits an unsaved project chat without creating it until settings are save
     const user = userEvent.setup();
     getConversationSettings.mockRejectedValue({ response: { status: 404 } });
     streamMessage.mockResolvedValue({ body: { getReader: () => ({ read: () => Promise.resolve({ done: true }) }) } });
-    render(<ChatBox {...baseProps} initialProjectId="p1" projects={[{ id: 'p1', name: 'Boox' }]} />);
+    render(<ChatBox {...baseProps} initialProjectId="p1" projects={[{ id: 'p1', name: 'Ullavox' }]} />);
     await openContext(user);
     await waitFor(() => expect(screen.getByLabelText('Chat project')).toBeEnabled());
     expect(screen.getByLabelText('Chat project')).toHaveValue('p1');
@@ -1011,7 +1011,7 @@ it('inherits an unsaved project chat without creating it until settings are save
 it('blocks sends during project-deletion settings refresh and preserves unrelated prompt edits', async () => {
     const user = userEvent.setup();
     getConversationSettings.mockResolvedValue({ version: 2, projectId: 'p1', usePreferences: true, useProjectContext: true, systemPrompt: 'Saved' });
-    const { rerender } = render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Boox' }]} settingsRevision={0} />);
+    const { rerender } = render(<ChatBox {...baseProps} projects={[{ id: 'p1', name: 'Ullavox' }]} settingsRevision={0} />);
     await openContext(user);
     await user.click(screen.getByLabelText('Toggle system prompt'));
     await waitFor(() => expect(screen.getByLabelText('Conversation instructions')).toHaveValue('Saved'));

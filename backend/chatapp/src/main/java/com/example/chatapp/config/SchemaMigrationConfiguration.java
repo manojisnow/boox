@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class SchemaMigrationConfiguration {
   @Bean
-  public Boolean booxSchemaMigration(DataSource dataSource) {
+  public Boolean ullavoxSchemaMigration(DataSource dataSource) {
     SchemaMigrator.migrate(dataSource);
     return Boolean.TRUE;
   }
@@ -22,7 +22,7 @@ public class SchemaMigrationConfiguration {
         var dependencies = new java.util.ArrayList<String>();
         String[] previous = definition.getDependsOn();
         if (previous != null) java.util.Collections.addAll(dependencies, previous);
-        dependencies.add("booxSchemaMigration");
+        dependencies.add("ullavoxSchemaMigration");
         definition.setDependsOn(dependencies.toArray(String[]::new));
       }
     };

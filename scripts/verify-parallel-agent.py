@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Opt-in Boox integration checks; requires Parallel enabled and an installed tool model.
+"""Opt-in Ullavox integration checks; requires Parallel enabled and an installed tool model.
 Creates test conversations. Captured provider/model output stays under /tmp.
-Set BOOX_TEST_URL, BOOX_TEST_MODEL, EXPECTED_BOOT_VERSION, EXPECTED_JAVA_MIN and
-EXPECTED_JAVA_MAX to validate independently verified current version facts.
+Set ULLAVOX_TEST_URL and ULLAVOX_TEST_MODEL.
+Set EXPECTED_BOOT_VERSION, EXPECTED_JAVA_MIN and EXPECTED_JAVA_MAX to validate independently verified current version facts.
 This is an application regression check, not a provider performance benchmark.
 """
 import json
@@ -11,8 +11,8 @@ import time
 import urllib.request
 import uuid
 
-BASE = os.environ.get("BOOX_TEST_URL", "http://localhost:8080")
-MODEL = os.environ.get("BOOX_TEST_MODEL", "gpt-oss:120b-cloud")
+BASE = os.environ.get("ULLAVOX_TEST_URL", "http://localhost:8080")
+MODEL = os.environ.get("ULLAVOX_TEST_MODEL", "gpt-oss:120b-cloud")
 CONVERSATION = "parallel-validation-" + str(uuid.uuid4())
 RESULTS = []
 
@@ -36,7 +36,7 @@ def task(goal, conversation=CONVERSATION, **extra):
         time.sleep(2)
         run = request("/api/agent-runs/" + run["id"])
     RESULTS.append(run)
-    with open("/tmp/boox-parallel-validation.json", "w") as output:
+    with open("/tmp/ullavox-parallel-validation.json", "w") as output:
         json.dump({"conversationId": CONVERSATION, "runs": RESULTS}, output, indent=2)
     assert run["status"] == "COMPLETED", run.get("error", run["status"])
     assert "†source" not in run["finalOutput"], "Invented citation marker"

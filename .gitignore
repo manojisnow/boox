@@ -38,7 +38,7 @@ yarn-error.log*
 # Claude Code
 .claude/
 
-# Boox local SQLite database
+# Ullavox local SQLite database
 backend/chatapp/data/
 *.db
 reports-laria/
@@ -65,4 +65,4 @@ CODEX.md
 .github/copilot-instructions.md
 .github/instructions/
 .github/agents/
-/docs/promoting-boox.md
+/docs/promoting-*.md

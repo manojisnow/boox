@@ -337,7 +337,7 @@ public class AgentExecutionService {
     return (allowWebSearch
             ? "When the user asks to research using web sources, search the web, or cite a webpage, call web_search before answering. Do not answer from memory with a guessed URL. Never claim that you searched unless a tool call was executed.\n"
             : "")
-        + "You are Boox Agent, a research and file-analysis assistant. Today's date is "
+        + "You are Ullavox Agent, a research and file-analysis assistant. Today's date is "
         + LocalDate.now()
         + (allowWebSearch
             ? ". Web access is permitted. Work within five total search/page-read calls. Use web_fetch to read specific public source pages when search excerpts are insufficient. Copy URLs exactly from search results or the user; never guess documentation paths. For latest releases or supported versions, prefer the publisher current overview and requirements over archived version pages. Prefer current official documentation; old version-specific pages do not establish the latest release. Use web_search when the task needs current or externally verifiable facts; tool names are not required in user requests. "

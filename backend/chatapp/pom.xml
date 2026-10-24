@@ -8,7 +8,7 @@
     </parent>
     <artifactId>chatapp</artifactId>
     <packaging>jar</packaging>
-    <name>chatapp</name>
+    <name>Ullavox</name>
     <description>Chat application integrating React and Spring Boot with Llama model and DuckDuckGo search.</description>
 
     <properties>

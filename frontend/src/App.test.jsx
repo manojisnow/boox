@@ -72,11 +72,11 @@ describe('App', () => {
         await waitFor(() => expect(listConversations).toHaveBeenCalled());
         const id = screen.getByTestId('conversation-id').textContent;
         expect(id).toBeTruthy();
-        expect(localStorage.getItem('boox-active-conversation')).toBe(id);
+        expect(localStorage.getItem('ullavox-active-conversation')).toBe(id);
     });
 
     it('resumes the conversation id and server stored in localStorage', async () => {
-        localStorage.setItem('boox-active-conversation', '1');
+        localStorage.setItem('ullavox-active-conversation', '1');
         render(<App />);
         await waitFor(() => expect(screen.getByTestId('conversation-id')).toHaveTextContent('1'));
         await waitFor(() => expect(screen.getByTestId('selected-server')).toHaveTextContent('ollama'));
@@ -138,7 +138,7 @@ describe('App', () => {
     });
 
     it('deletes a conversation after confirmation and replaces the active id if it was active', async () => {
-        localStorage.setItem('boox-active-conversation', '1');
+        localStorage.setItem('ullavox-active-conversation', '1');
         vi.spyOn(window, 'confirm').mockReturnValue(true);
         const user = userEvent.setup();
         render(<App />);
@@ -154,7 +154,7 @@ describe('App', () => {
     });
 
     it('does not delete when the user cancels the confirmation', async () => {
-        localStorage.setItem('boox-active-conversation', '1');
+        localStorage.setItem('ullavox-active-conversation', '1');
         vi.spyOn(window, 'confirm').mockReturnValue(false);
         const user = userEvent.setup();
         render(<App />);
@@ -251,18 +251,18 @@ describe('project navigation and local installation state', () => {
     });
 
     it('replaces a deleted stored chat ID without creating a conversation', async () => {
-        localStorage.setItem('boox-active-conversation', 'deleted-chat');
+        localStorage.setItem('ullavox-active-conversation', 'deleted-chat');
         render(<App />);
         await waitFor(() => expect(screen.getByTestId('conversation-id').textContent).not.toBe('deleted-chat'));
-        expect(localStorage.getItem('boox-active-conversation')).toBe(screen.getByTestId('conversation-id').textContent);
+        expect(localStorage.getItem('ullavox-active-conversation')).toBe(screen.getByTestId('conversation-id').textContent);
     });
     it('restores project navigation and inherits its project for a new chat', async () => {
-        const user = userEvent.setup(); localStorage.setItem('boox-active-conversation', '1');
-        listProjects.mockResolvedValue([{ id: 'p1', name: 'Boox' }]);
+        const user = userEvent.setup(); localStorage.setItem('ullavox-active-conversation', '1');
+        listProjects.mockResolvedValue([{ id: 'p1', name: 'Ullavox' }]);
         listConversations.mockResolvedValue([{ id: '1', title: 'First', server: 'ollama', projectId: 'p1' }, { id: '2', title: 'Standalone', server: 'ollama' }]);
         render(<App />);
         await user.click(screen.getByLabelText('Show chat history'));
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Boox', exact: true })).toHaveAttribute('aria-current', 'page'));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Ullavox', exact: true })).toHaveAttribute('aria-current', 'page'));
         expect(screen.getByText('select-1')).toBeInTheDocument(); expect(screen.queryByText('select-2')).not.toBeInTheDocument();
         await user.click(screen.getByLabelText('New Chat'));
         expect(screen.getByTestId('initial-project')).toHaveTextContent('p1');
@@ -295,5 +295,5 @@ it('does not reopen onboarding from an old bootstrap response after the user vis
     expect(await screen.findByRole('heading', { name: 'Preferences' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close Preferences' }));
     await act(async () => bootstrap({ onboardingStatus: 'not_started' }));
-    expect(screen.queryByRole('heading', { name: 'Make Boox work for you' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Make Ullavox work for you' })).not.toBeInTheDocument();
 });

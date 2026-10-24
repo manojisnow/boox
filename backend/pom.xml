@@ -9,7 +9,7 @@
     <modules>
         <module>chatapp</module>
     </modules>
-    <name>ChatApp Backend Parent</name>
+    <name>Ullavox Backend Parent</name>
     <description>Parent module for ChatApp backend, aggregating app, unit, integration, and contract test modules.</description>
     <properties>
         <spring-boot.version>4.1.1</spring-boot.version>

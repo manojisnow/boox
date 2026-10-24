@@ -10,7 +10,7 @@ import urllib.request
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--base', default='http://localhost:8085')
 parser.add_argument('--model', default='granite4:3b')
-parser.add_argument('--output', default='/tmp/boox-release-package-results.json')
+parser.add_argument('--output', default='/tmp/ullavox-release-package-results.json')
 args = parser.parse_args()
 conversation = 'release-validation-' + str(time.time_ns())
 results = []

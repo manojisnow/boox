@@ -1,4 +1,4 @@
-# Releasing Boox
+# Releasing Ullavox
 
 Release work belongs on a branch and goes through a PR. Do not edit the default
 branch directly. Validate the packaged app and record acceptance evidence. A release
@@ -7,7 +7,7 @@ approval.
 
 ## Prepare a candidate
 
-1. Update the Boox image tag in `docker-compose.release.yml` to the target
+1. Update the Ullavox image tag in `docker-compose.release.yml` to the target
    version. Keep README's generic install pointed at the latest published release
    asset, and put an exact tag URL in the curated notes at
    `docs/releases/vX.Y.Z.md`. Keep the UI version marker unchanged unless a

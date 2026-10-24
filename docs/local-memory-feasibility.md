@@ -39,7 +39,7 @@ Excluded: login, registration, cloud sync, multiple selectable local profiles, a
 fact extraction, personality inference, global learned memory, ChatSorter, semantic
 search, and guarantees of secure multi-user hosting.
 
-Onboarding asks how Boox should help: response length, explanation style, familiarity,
+Onboarding asks how Ullavox should help: response length, explanation style, familiarity,
 optional background/goals, and additional working preferences. No field is mandatory.
 Do not request credentials or require demographic/sensitive details. Render structured
 answers into short instructions deterministically; do not invoke a model to create a
@@ -156,7 +156,7 @@ Register the reservation under the owner mutex; undo it on transaction rollback.
 only after commit. Executor rejection marks the committed run failed and releases its
 reservation; the accepted user message remains visible. Test this path on a brand-new
 conversation with foreign keys enabled. On restart, recover queued/running runs as failed
-before accepting new work. This release supports one Boox process per database.
+before accepting new work. This release supports one Ullavox process per database.
 
 ## How saved information enters live requests
 
@@ -352,7 +352,7 @@ Use versioned migrations (proposed: Flyway with the existing Xerial driver), fol
 by Hibernate schema validation rather than Hibernate-owned upgrades. Official Flyway
 documentation lists SQLite support and its single-migrator limitation. SQLite documents
 the parent-table rebuild procedure and required foreign-key handling. Neither source
-alone validates integration with Boox's exact dependency set.
+alone validates integration with Ullavox's exact dependency set.
 
 Migration rules:
 
@@ -377,7 +377,7 @@ Migration rules:
 
 Executed probe: [SqliteOwnershipProbe.java](studies/local-memory/SqliteOwnershipProbe.java).
 It uses a reduced synthetic legacy schema with representative summary/settings, image
-and agent rows, and Boox's configured `sqlite-jdbc:3.53.4.0` (SQLite 3.53.4). It does not
+and agent rows, and Ullavox's configured `sqlite-jdbc:3.53.4.0` (SQLite 3.53.4). It does not
 open a real application database. It uses `user_version` purely as a study marker;
 production migration history will belong to the chosen migration framework.
 

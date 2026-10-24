@@ -1,20 +1,25 @@
-# Boox - AI Chat Application
+# Ullavox - AI Chat Application
 
 A modern chat application built with React and Spring Boot that uses Ollama for local AI models.
 
-![Boox's conversation interface with project navigation, model selection, and a spacious composer](docs/images/quiet-conversation-ui.png)
+![Ullavox interface with project navigation, model selection, and a spacious composer](docs/images/ullavox-interface.jpg)
 
-## ⚡ Zero-Setup Quick Start
+This checkout prepares the Ullavox distribution. Repository and registry cutover
+is still pending; build from source until the first renamed release is published.
+Existing users must follow [upgrade instructions](docs/rename-compatibility.md)
+to retain their data with the new configuration and storage names.
+
+## ⚡ Zero-Setup Quick Start (after distribution cutover)
 
 Just Docker required — no repo clone, no build, no manual model setup.
 
 ```bash
 # 1. Download the compose file
-curl -fsSL https://github.com/manojisnow/boox/releases/latest/download/docker-compose.release.yml \
-  -o docker-compose.boox.yml
+curl -fsSL https://github.com/manojisnow/ullavox/releases/latest/download/docker-compose.release.yml \
+  -o docker-compose.ullavox.yml
 
 # 2. Run it
-docker compose -f docker-compose.boox.yml up
+docker compose -f docker-compose.ullavox.yml up
 ```
 
 Open **http://localhost:8080** — done.
@@ -49,7 +54,7 @@ the full stack end-to-end. Requires cloning the repository.
 
 ```bash
 # Build and start everything
-docker compose up -d
+docker compose up --build -d
 
 # View logs
 docker compose logs -f
@@ -58,11 +63,8 @@ docker compose logs -f
 After the containers are up and running, you'll need to download the granite4:3b model:
 
 ```bash
-# Get the Ollama container ID
-docker compose ps
-
 # Download the granite4:3b model
-docker exec <ollama_container_id> ollama pull granite4:3b
+docker compose exec ollama ollama pull granite4:3b
 ```
 
 The Ollama model will be cached in a Docker volume and won't need to be downloaded again.
@@ -74,7 +76,7 @@ Open your browser and go to: http://localhost:8080
 If you have enough resources and want to download a different model, you can do so by running the following command:
 
 ```bash
-docker exec <ollama_container_id> ollama pull <model_name>
+docker compose exec ollama ollama pull <model_name>
 ```
 
 ### Option 2: Local Development
@@ -96,13 +98,13 @@ mvn spring-boot:run
 3. Start the frontend:
 ```bash
 cd frontend
-npm install
+npm ci
 npm start
 ```
 
 ### Option 3: Docker + Local Ollama
 
-If you prefer to run Ollama locally (useful if you use Ollama for other projects) but want to containerize the Boox application:
+If you prefer to run Ollama locally (useful if you use Ollama for other projects) but want to containerize the Ullavox application:
 
 1. Start Ollama locally and pull the model:
 ```bash
@@ -110,18 +112,21 @@ ollama serve
 ollama pull granite4:3b
 ```
 
-2. Run the Boox container with host network access:
+2. Build the source image, then run it with host access to Ollama:
 ```bash
-docker run -d --name boox_app \
-  -p 8080:8080 \
-  -v boox_data:/app/data \
+docker build -t ullavox .
+```
+```bash
+docker run -d --name ullavox_app \
+  -p 127.0.0.1:8080:8080 \
+  -v ullavox_data:/app/data \
   -e OLLAMA_API_URL=http://host.docker.internal:11434 \
   -e OLLAMA_MODEL=granite4:3b \
-  boox
+  ullavox
 ```
 
 > The image serves both the frontend and backend from a single origin on `:8080` — no separate
-> `:3000` port. `-v boox_data:/app/data` persists conversation history (SQLite) across restarts.
+> `:3000` port. `-v ullavox_data:/app/data` persists conversation history (SQLite) across restarts.
 
 This setup is particularly useful if you:
 - Already have Ollama running locally
@@ -153,25 +158,27 @@ OLLAMA_API_TEMPERATURE=0.5  # Adjust temperature
 
 ### Manual Configuration
 
-When running services separately, you can configure:
+For a locally built image with Ollama running on the host, you can configure:
 
 ```bash
-docker run -d --name boox_app \
-  -p 8080:8080 \
-  -v boox_data:/app/data \
-  -e OLLAMA_API_URL=http://ollama:11434 \
+docker run -d --name ullavox_app \
+  -p 127.0.0.1:8080:8080 \
+  -v ullavox_data:/app/data \
+  -e OLLAMA_API_URL=http://host.docker.internal:11434 \
   -e OLLAMA_MODEL=granite4:3b \
   -e OLLAMA_API_TEMPERATURE=0.7 \
-  boox
+  ullavox
 ```
 
 Available variables:
+- `ULLAVOX_BIND_ADDRESS`: Compose host bind address (default: `127.0.0.1`).
+- Compose users can pass a custom database path through a service environment override; see [upgrade instructions](docs/rename-compatibility.md).
 - `OLLAMA_API_URL`: Ollama server URL
 - `OLLAMA_MODEL`: AI model to use (default: granite4:3b)
 - `OLLAMA_API_TEMPERATURE`: Model temperature (default: 0.7) — server-wide default; any conversation can override it via the generation settings panel (see [Features](#chat))
 - `PORT`: Backend port (default: 8080)
 - `CORS_ALLOWED_ORIGINS`: CORS origins (default: http://localhost:3000)
-- `BOOX_DB_PATH`: SQLite database file path (default: `/app/data/boox.db` in Docker, `./data/boox.db` locally) — conversation history is stored here
+- `ULLAVOX_DB_PATH`: SQLite database file path (default: `/app/data/ullavox.db` in Docker, `./data/ullavox.db` locally) — conversation history is stored here
 - `OLLAMA_CONTEXT_MAX_TOKENS`: token budget for what's sent to the model each turn (default: 3000); older messages are folded into a running summary rather than dropped
 - `OLLAMA_CONTEXT_SUMMARY_ENABLED`: whether to summarize messages that fall out of the context window (default: true)
 - `OLLAMA_CONTEXT_NUM_CTX`: if set (>0), passed to Ollama as `options.num_ctx` to size the model's own context window — server-wide default; overridable per-conversation the same way
@@ -179,7 +186,7 @@ Available variables:
 ## Project Structure
 
 ```
-boox/
+ullavox/
 ├── backend/           # Spring Boot backend
 │   └── chatapp/          # Main application module
 ├── frontend/         # React frontend
@@ -216,7 +223,7 @@ See [preferences, project memory and upgrade behavior](docs/local-memory.md) for
 - **Files** accepts up to 4 text, Markdown, CSV, JSON, or code files, with a combined limit of 24,000 characters. File attachments are stored in the local conversation database; selecting a cloud Ollama model sends task input to that model's provider. PDF, Office documents, editing files, and executing code are not supported in this version.
 - Progress shows actual searches, expandable evidence, and the draft-review step. Reloading or changing conversations restores the latest task. A temporary connection failure retries status checks without starting another task.
 - **Cancel** stops at the next checkpoint after an in-flight request returns. Model calls have a 3-minute read timeout; search-provider calls have a 30-second read timeout. Tasks interrupted by a server restart are marked failed with a retry message.
-- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence trigger one correction attempt. If that attempt is empty or still includes unsupported URLs, the agent returns a limitation message instead of the rejected answer. You should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages. If an answer omits links, Boox shows up to five available web-source links from its evidence.
+- **Response ready** means an answer was returned, not that its factual claims were independently proven. The review uses the same model. URLs absent from retrieved or attached evidence trigger one correction attempt. If that attempt is empty or still includes unsupported URLs, the agent returns a limitation message instead of the rejected answer. You should still inspect the sources for important claims. Source excerpts can be incomplete; the agent cannot browse arbitrary pages. If an answer omits links, Ullavox shows up to five available web-source links from its evidence.
 
 ### Conversation History
 - **Persistent, resumable conversations** — every conversation is saved to a local SQLite database and survives app restarts and container recreation
@@ -269,12 +276,12 @@ To use Parallel search and public-page excerpts, set `WEB_SEARCH_PROVIDER=parall
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/manojisnow/boox/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 Framework versions, migration details, and rollback guidance: [framework upgrade](docs/framework-upgrade.md).
 
-## v1.6.0
+## Previous release: v1.6.0
 
-Boox adds a quieter conversation UI, local preferences, projects and explicitly saved project notes. See the [release notes](docs/releases/v1.6.0.md) for capabilities, external-data handling, installation, and backup/rollback instructions.
+Version 1.6.0 added a quieter conversation UI, local preferences, projects and explicitly saved project notes. See the [release notes](docs/releases/v1.6.0.md) for capabilities, external-data handling, installation, and backup/rollback instructions.
 
-Maintainer publication checklist: [releasing Boox](docs/releasing.md).
+Technical release procedure: [releasing Ullavox](docs/releasing.md).

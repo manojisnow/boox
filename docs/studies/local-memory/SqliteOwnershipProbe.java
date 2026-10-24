@@ -3,7 +3,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.UUID;
 
-/** Standalone feasibility probe. Uses only an in-memory synthetic database, never Boox data. */
+/** Standalone feasibility probe. Uses only an in-memory synthetic database, never Ullavox data. */
 public class SqliteOwnershipProbe {
   private static int passed;
 
@@ -35,7 +35,7 @@ public class SqliteOwnershipProbe {
       check("repeat migration preserves one stable owner", value(db, "SELECT count(*) FROM local_user").equals("1") && value(db, "SELECT local_user_id FROM installation").equals(owner));
       expectRejected(db, "INSERT INTO conversation(id,title,owner_id) VALUES ('missing-owner','bad',NULL)", "missing owner rejected");
       sql(db, "INSERT INTO local_user VALUES ('other-user')");
-      sql(db, "INSERT INTO project VALUES ('p1','" + owner + "','Boox')");
+      sql(db, "INSERT INTO project VALUES ('p1','" + owner + "','Ullavox')");
       expectRejected(db, "INSERT INTO conversation(id,title,owner_id,project_id) VALUES ('cross-owner','bad','other-user','p1')", "cross-owner project assignment rejected");
       sql(db, "UPDATE conversation SET project_id='p1' WHERE id='c1'");
       sql(db, "INSERT INTO conversation(id,title,owner_id,project_id) VALUES ('c2','Other chat','" + owner + "','p1')");

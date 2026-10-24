@@ -13,10 +13,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', default='http://127.0.0.1:18089')
     parser.add_argument('--container', required=True)
-    parser.add_argument('--output', default='/tmp/boox-memory-container-results.json')
+    parser.add_argument('--output', default='/tmp/ullavox-memory-container-results.json')
     args = parser.parse_args()
-    if not args.container.startswith('boox-memory-validation-'):
-        parser.error('Only disposable boox-memory-validation-* containers may be restarted')
+    if not args.container.startswith('ullavox-memory-validation-'):
+        parser.error('Only disposable ullavox-memory-validation-* containers may be restarted')
 
     def request(path, method='GET', body=None):
         req = urllib.request.Request(args.base + path, method=method,

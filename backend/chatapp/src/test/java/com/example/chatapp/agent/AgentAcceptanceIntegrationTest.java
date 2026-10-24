@@ -31,7 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 @DataJpaTest(
     properties = {
       "spring.jpa.hibernate.ddl-auto=validate",
-      "spring.datasource.url=jdbc:sqlite:target/boox-agent-acceptance-migration-test.db",
+      "spring.datasource.url=jdbc:sqlite:target/ullavox-agent-acceptance-migration-test.db",
       "spring.flyway.enabled=false"
     })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)

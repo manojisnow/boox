@@ -53,7 +53,7 @@ public class ParallelWebClient {
     final HttpHeaders headers = new HttpHeaders();
     headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
     headers.set(HttpHeaders.ACCEPT, "application/json, text/event-stream");
-    headers.set(HttpHeaders.USER_AGENT, "Boox/1.5 (Parallel MCP client)");
+    headers.set(HttpHeaders.USER_AGENT, "Ullavox/1.6.0 (Parallel MCP client)");
     if (!apiKey.isBlank()) headers.setBearerAuth(apiKey);
     try {
       final Map<String, Object> args = new java.util.HashMap<>(input);
@@ -70,7 +70,7 @@ public class ParallelWebClient {
                   "capabilities",
                   Map.of(),
                   "clientInfo",
-                  Map.of("name", "boox", "version", "1.5.0")),
+                  Map.of("name", "ullavox", "version", "1.6.0")),
               1);
       final String version = initialized.path("result").path("protocolVersion").asText();
       if (!PROTOCOL.equals(version)) return "Error: Parallel MCP protocol is unsupported.";

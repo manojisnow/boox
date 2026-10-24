@@ -124,7 +124,7 @@ public final class SchemaMigrator {
                     "type"));
     if (!tables.equals(expected.keySet()))
       throw new IllegalStateException(
-          "Unsupported database schema; restore or migrate a supported Boox version first");
+          "Unsupported database schema; restore or migrate a supported Ullavox version first");
     for (var entry : expected.entrySet()) {
       Set<String> columns = new HashSet<>();
       try (var statement = connection.createStatement();

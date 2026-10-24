@@ -41,7 +41,7 @@ const Message = ({ text, sender, toolCalls, images }) => {
     const isUser = sender === 'user';
     let displayName = '';
     if (!isUser) {
-        displayName = sender === 'assistant' ? 'boox' : sender;
+        displayName = sender === 'assistant' ? 'ullavox' : sender;
     }
     const hasToolCalls = !isUser && toolCalls && toolCalls.length > 0;
     const hasImages = images && images.length > 0;
